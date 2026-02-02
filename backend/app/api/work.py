@@ -141,7 +141,6 @@ def dispatch_task(
     # Best-effort: enqueue an agent dispatch. This does not mutate the task.
     background.add_task(
         notify_openclaw,
-        session,
         NotifyContext(event="task.assigned", actor_employee_id=actor_employee_id, task_id=task.id),
     )
 
