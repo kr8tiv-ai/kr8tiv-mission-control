@@ -102,6 +102,32 @@ def create_task(
     return Task.model_validate(task)
 
 
+@router.post("/tasks/{task_id}/dispatch")
+def dispatch_task(
+    task_id: int,
+    background: BackgroundTasks,
+    session: Session = Depends(get_session),
+    actor_employee_id: int = Depends(get_actor_employee_id),
+):
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.assignee_employee_id is None:
+        raise HTTPException(status_code=400, detail="Task has no assignee")
+
+    _validate_task_assignee(session, task.assignee_employee_id)
+
+    # Best-effort: enqueue an agent dispatch. This does not mutate the task.
+    background.add_task(
+        notify_openclaw,
+        session,
+        NotifyContext(event="task.assigned", actor_employee_id=actor_employee_id, task=task),
+    )
+
+    return {"ok": True}
+
+
 @router.patch("/tasks/{task_id}", response_model=Task)
 def update_task(
     task_id: int,

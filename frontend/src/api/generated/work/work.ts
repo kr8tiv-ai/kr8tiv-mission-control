@@ -352,6 +352,122 @@ export const useCreateTaskTasksPost = <
   );
 };
 /**
+ * @summary Dispatch Task
+ */
+export type dispatchTaskTasksTaskIdDispatchPostResponse200 = {
+  data: unknown;
+  status: 200;
+};
+
+export type dispatchTaskTasksTaskIdDispatchPostResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type dispatchTaskTasksTaskIdDispatchPostResponseSuccess =
+  dispatchTaskTasksTaskIdDispatchPostResponse200 & {
+    headers: Headers;
+  };
+export type dispatchTaskTasksTaskIdDispatchPostResponseError =
+  dispatchTaskTasksTaskIdDispatchPostResponse422 & {
+    headers: Headers;
+  };
+
+export type dispatchTaskTasksTaskIdDispatchPostResponse =
+  | dispatchTaskTasksTaskIdDispatchPostResponseSuccess
+  | dispatchTaskTasksTaskIdDispatchPostResponseError;
+
+export const getDispatchTaskTasksTaskIdDispatchPostUrl = (taskId: number) => {
+  return `/tasks/${taskId}/dispatch`;
+};
+
+export const dispatchTaskTasksTaskIdDispatchPost = async (
+  taskId: number,
+  options?: RequestInit,
+): Promise<dispatchTaskTasksTaskIdDispatchPostResponse> => {
+  return customFetch<dispatchTaskTasksTaskIdDispatchPostResponse>(
+    getDispatchTaskTasksTaskIdDispatchPostUrl(taskId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getDispatchTaskTasksTaskIdDispatchPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dispatchTaskTasksTaskIdDispatchPost>>,
+    TError,
+    { taskId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dispatchTaskTasksTaskIdDispatchPost>>,
+  TError,
+  { taskId: number },
+  TContext
+> => {
+  const mutationKey = ["dispatchTaskTasksTaskIdDispatchPost"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dispatchTaskTasksTaskIdDispatchPost>>,
+    { taskId: number }
+  > = (props) => {
+    const { taskId } = props ?? {};
+
+    return dispatchTaskTasksTaskIdDispatchPost(taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DispatchTaskTasksTaskIdDispatchPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dispatchTaskTasksTaskIdDispatchPost>>
+>;
+
+export type DispatchTaskTasksTaskIdDispatchPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Dispatch Task
+ */
+export const useDispatchTaskTasksTaskIdDispatchPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof dispatchTaskTasksTaskIdDispatchPost>>,
+      TError,
+      { taskId: number },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof dispatchTaskTasksTaskIdDispatchPost>>,
+  TError,
+  { taskId: number },
+  TContext
+> => {
+  return useMutation(
+    getDispatchTaskTasksTaskIdDispatchPostMutationOptions(options),
+    queryClient,
+  );
+};
+/**
  * @summary Update Task
  */
 export type updateTaskTasksTaskIdPatchResponse200 = {

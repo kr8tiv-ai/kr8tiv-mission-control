@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 import { Select } from "@/components/ui/select";
@@ -14,15 +20,16 @@ import { useListProjectsProjectsGet } from "@/api/generated/projects/projects";
 import { useListEmployeesEmployeesGet } from "@/api/generated/org/org";
 import {
   useCreateTaskTasksPost,
+  useDeleteTaskTasksTaskIdDelete,
+  useDispatchTaskTasksTaskIdDispatchPost,
+  useListTaskCommentsTaskCommentsGet,
   useListTasksTasksGet,
   useUpdateTaskTasksTaskIdPatch,
-  useDeleteTaskTasksTaskIdDelete,
   useCreateTaskCommentTaskCommentsPost,
-  useListTaskCommentsTaskCommentsGet,
 } from "@/api/generated/work/work";
 import {
-  useListProjectMembersProjectsProjectIdMembersGet,
   useAddProjectMemberProjectsProjectIdMembersPost,
+  useListProjectMembersProjectsProjectIdMembersGet,
   useRemoveProjectMemberProjectsProjectIdMembersMemberIdDelete,
   useUpdateProjectMemberProjectsProjectIdMembersMemberIdPatch,
 } from "@/api/generated/projects/projects";
@@ -51,7 +58,10 @@ export default function ProjectDetailPage() {
 
   const employees = useListEmployeesEmployeesGet();
   const employeeList = employees.data?.status === 200 ? employees.data.data : [];
-  const eligibleAssignees = employeeList.filter((e) => e.employee_type !== "agent" || !!e.openclaw_session_key);
+
+  const eligibleAssignees = employeeList.filter(
+    (e) => e.employee_type !== "agent" || !!e.openclaw_session_key,
+  );
 
   const members = useListProjectMembersProjectsProjectIdMembersGet(projectId);
   const memberList = members.data?.status === 200 ? members.data.data : [];
@@ -75,6 +85,11 @@ export default function ProjectDetailPage() {
   });
   const deleteTask = useDeleteTaskTasksTaskIdDelete({
     mutation: { onSuccess: () => tasks.refetch() },
+  });
+  const dispatchTask = useDispatchTaskTasksTaskIdDispatchPost({
+    mutation: {
+      onSuccess: () => tasks.refetch(),
+    },
   });
 
   const [title, setTitle] = useState("");
@@ -110,6 +125,11 @@ export default function ProjectDetailPage() {
     return map;
   })();
 
+  const employeeById = new Map<number, (typeof employeeList)[number]>();
+  for (const e of employeeList) {
+    if (e.id != null) employeeById.set(Number(e.id), e);
+  }
+
   const employeeName = (id: number | null | undefined) =>
     employeeList.find((e) => e.id === id)?.name ?? "—";
 
@@ -128,16 +148,40 @@ export default function ProjectDetailPage() {
       {projects.isLoading || employees.isLoading || members.isLoading || tasks.isLoading ? (
         <div className="mb-4 text-sm text-muted-foreground">Loading…</div>
       ) : null}
-      {projects.error ? <div className="mb-4 text-sm text-destructive">{(projects.error as Error).message}</div> : null}
-      {employees.error ? <div className="mb-4 text-sm text-destructive">{(employees.error as Error).message}</div> : null}
-      {members.error ? <div className="mb-4 text-sm text-destructive">{(members.error as Error).message}</div> : null}
-      {tasks.error ? <div className="mb-4 text-sm text-destructive">{(tasks.error as Error).message}</div> : null}
+      {projects.error ? (
+        <div className="mb-4 text-sm text-destructive">
+          {(projects.error as Error).message}
+        </div>
+      ) : null}
+      {employees.error ? (
+        <div className="mb-4 text-sm text-destructive">
+          {(employees.error as Error).message}
+        </div>
+      ) : null}
+      {members.error ? (
+        <div className="mb-4 text-sm text-destructive">{(members.error as Error).message}</div>
+      ) : null}
+      {tasks.error ? (
+        <div className="mb-4 text-sm text-destructive">{(tasks.error as Error).message}</div>
+      ) : null}
+
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{project?.name ?? `Project #${projectId}`}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Project detail: staffing + tasks.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {project?.name ?? `Project #${projectId}`}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Project detail: staffing + tasks.
+          </p>
         </div>
-        <Button variant="outline" onClick={() => { tasks.refetch(); members.refetch(); }} disabled={tasks.isFetching || members.isFetching}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            tasks.refetch();
+            members.refetch();
+          }}
+          disabled={tasks.isFetching || members.isFetching}
+        >
           Refresh
         </Button>
       </div>
@@ -149,14 +193,31 @@ export default function ProjectDetailPage() {
             <CardDescription>Project-scoped tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {createTask.error ? <div className="text-sm text-destructive">{(createTask.error as Error).message}</div> : null}
-            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <Textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
+            {createTask.error ? (
+              <div className="text-sm text-destructive">
+                {(createTask.error as Error).message}
+              </div>
+            ) : null}
+            <Input
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <Textarea
+              placeholder="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
             <div className="grid grid-cols-1 gap-2">
-              <Select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
+              <Select
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+              >
                 <option value="">Assignee</option>
                 {eligibleAssignees.map((e) => (
-                  <option key={e.id ?? e.name} value={e.id ?? ""}>{e.name}</option>
+                  <option key={e.id ?? e.name} value={e.id ?? ""}>
+                    {e.name}
+                  </option>
                 ))}
               </Select>
             </div>
@@ -185,28 +246,43 @@ export default function ProjectDetailPage() {
             <CardDescription>Project members</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Select onChange={(e) => {
-              const empId = e.target.value;
-              if (!empId) return;
-              addMember.mutate({ projectId, data: { project_id: projectId, employee_id: Number(empId), role: "member" } });
-              e.currentTarget.value = "";
-            }}>
+            <Select
+              onChange={(e) => {
+                const empId = e.target.value;
+                if (!empId) return;
+                addMember.mutate({
+                  projectId,
+                  data: { project_id: projectId, employee_id: Number(empId), role: "member" },
+                });
+                e.currentTarget.value = "";
+              }}
+            >
               <option value="">Add member…</option>
               {eligibleAssignees.map((e) => (
-                <option key={e.id ?? e.name} value={e.id ?? ""}>{e.name}</option>
+                <option key={e.id ?? e.name} value={e.id ?? ""}>
+                  {e.name}
+                </option>
               ))}
             </Select>
             {addMember.error ? (
-              <div className="text-xs text-destructive">{(addMember.error as Error).message}</div>
+              <div className="text-xs text-destructive">
+                {(addMember.error as Error).message}
+              </div>
             ) : null}
             <ul className="space-y-2">
               {projectMembers.map((m) => (
-                <li key={m.id ?? `${m.project_id}-${m.employee_id}`} className="rounded-md border p-2 text-sm">
+                <li
+                  key={m.id ?? `${m.project_id}-${m.employee_id}`}
+                  className="rounded-md border p-2 text-sm"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div>{employeeName(m.employee_id)}</div>
                     <Button
                       variant="outline"
-                      onClick={() => { if (m.id == null) return; removeMember.mutate({ projectId, memberId: Number(m.id) }); }}
+                      onClick={() => {
+                        if (m.id == null) return;
+                        removeMember.mutate({ projectId, memberId: Number(m.id) });
+                      }}
                     >
                       Remove
                     </Button>
@@ -216,17 +292,25 @@ export default function ProjectDetailPage() {
                       placeholder="Role (e.g., PM, QA, Dev)"
                       defaultValue={m.role ?? ""}
                       onBlur={(e) =>
-                        m.id == null ? undefined : updateMember.mutate({
-                          projectId,
-                          memberId: Number(m.id),
-                          data: { project_id: projectId, employee_id: m.employee_id, role: e.currentTarget.value || null },
-                        })
+                        m.id == null
+                          ? undefined
+                          : updateMember.mutate({
+                              projectId,
+                              memberId: Number(m.id),
+                              data: {
+                                project_id: projectId,
+                                employee_id: m.employee_id,
+                                role: e.currentTarget.value || null,
+                              },
+                            })
                       }
                     />
                   </div>
                 </li>
               ))}
-              {projectMembers.length === 0 ? <li className="text-sm text-muted-foreground">No members yet.</li> : null}
+              {projectMembers.length === 0 ? (
+                <li className="text-sm text-muted-foreground">No members yet.</li>
+              ) : null}
             </ul>
           </CardContent>
         </Card>
@@ -237,36 +321,93 @@ export default function ProjectDetailPage() {
           {STATUSES.map((s) => (
             <Card key={s}>
               <CardHeader>
-                <CardTitle className="text-sm uppercase tracking-wide">{s.replace("_", " ")}</CardTitle>
+                <CardTitle className="text-sm uppercase tracking-wide">
+                  {s.replace("_", " ")}
+                </CardTitle>
                 <CardDescription>{tasksByStatus.get(s)?.length ?? 0} tasks</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {(tasksByStatus.get(s) ?? []).map((t) => (
-                  <div key={t.id ?? t.title} className="rounded-md border p-2 text-sm">
-                    <div className="font-medium">{t.title}</div>
-                    <div className="text-xs text-muted-foreground">Assignee: {employeeName(t.assignee_employee_id)}</div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {STATUSES.filter((x) => x !== s).map((x) => (
+                {(tasksByStatus.get(s) ?? []).map((t) => {
+                  const assignee =
+                    t.assignee_employee_id != null
+                      ? employeeById.get(Number(t.assignee_employee_id))
+                      : undefined;
+
+                  const canTrigger = Boolean(
+                    t.id != null &&
+                      assignee &&
+                      assignee.employee_type === "agent" &&
+                      assignee.openclaw_session_key,
+                  );
+
+                  return (
+                    <div key={t.id ?? t.title} className="rounded-md border p-2 text-sm">
+                      <div className="font-medium">{t.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Assignee: {employeeName(t.assignee_employee_id)}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {STATUSES.filter((x) => x !== s).map((x) => (
+                          <Button
+                            key={x}
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              updateTask.mutate({
+                                taskId: Number(t.id),
+                                data: { status: x },
+                              })
+                            }
+                          >
+                            {x}
+                          </Button>
+                        ))}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-2">
                         <Button
-                          key={x}
                           variant="outline"
                           size="sm"
-                          onClick={() => updateTask.mutate({ taskId: Number(t.id), data: { status: x } })}
+                          onClick={() => {
+                            setCommentTaskId(Number(t.id));
+                            setReplyToCommentId(null);
+                          }}
                         >
-                          {x}
+                          Comments
                         </Button>
-                      ))}
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => dispatchTask.mutate({ taskId: Number(t.id) })}
+                          disabled={!canTrigger || dispatchTask.isPending}
+                          title={
+                            canTrigger
+                              ? "Send a dispatch message to the assigned agent"
+                              : "Only available when the assignee is a provisioned agent"
+                          }
+                        >
+                          Trigger
+                        </Button>
+
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteTask.mutate({ taskId: Number(t.id) })}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+
+                      {dispatchTask.error ? (
+                        <div className="mt-2 text-xs text-destructive">
+                          {(dispatchTask.error as Error).message}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-2 flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => { setCommentTaskId(Number(t.id)); setReplyToCommentId(null); }}>
-                        Comments
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => deleteTask.mutate({ taskId: Number(t.id) })}>
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(tasksByStatus.get(s) ?? []).length === 0 ? (
                   <div className="text-xs text-muted-foreground">No tasks</div>
                 ) : null}
@@ -283,12 +424,20 @@ export default function ProjectDetailPage() {
             <CardDescription>{commentTaskId ? `Task #${commentTaskId}` : "Select a task"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {addComment.error ? <div className="text-sm text-destructive">{(addComment.error as Error).message}</div> : null}
+            {addComment.error ? (
+              <div className="text-sm text-destructive">{(addComment.error as Error).message}</div>
+            ) : null}
             {replyToCommentId ? (
               <div className="rounded-md border bg-muted/40 p-2 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs text-muted-foreground">Replying to comment #{replyToCommentId}</div>
-                  <Button variant="outline" size="sm" onClick={() => setReplyToCommentId(null)}>
+                  <div className="text-xs text-muted-foreground">
+                    Replying to comment #{replyToCommentId}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReplyToCommentId(null)}
+                  >
                     Cancel reply
                   </Button>
                 </div>
@@ -324,17 +473,25 @@ export default function ProjectDetailPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="font-medium">{employeeName(c.author_employee_id)}</div>
-                      <div className="text-xs text-muted-foreground">{(c.created_at ? new Date(c.created_at).toLocaleString() : "—")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {c.created_at ? new Date(c.created_at).toLocaleString() : "—"}
+                      </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setReplyToCommentId(Number(c.id))}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReplyToCommentId(Number(c.id))}
+                    >
                       Reply
                     </Button>
                   </div>
-                  {(c.reply_to_comment_id ? (
+                  {c.reply_to_comment_id ? (
                     <div className="mt-2 rounded-md border bg-muted/40 p-2 text-xs">
-                      <div className="text-muted-foreground">Replying to #{c.reply_to_comment_id}: {commentById.get(Number(c.reply_to_comment_id))?.body ?? "—"}</div>
+                      <div className="text-muted-foreground">
+                        Replying to #{c.reply_to_comment_id}: {commentById.get(Number(c.reply_to_comment_id))?.body ?? "—"}
+                      </div>
                     </div>
-                  ) : null)}
+                  ) : null}
                   <div className="mt-2">{c.body}</div>
                 </li>
               ))}
