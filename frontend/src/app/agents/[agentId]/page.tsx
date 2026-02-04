@@ -101,6 +101,10 @@ export default function AgentDetailPage() {
     if (!agent) return [];
     return events.filter((event) => event.agent_id === agent.id);
   }, [events, agent]);
+  const linkedBoard = useMemo(() => {
+    if (!agent?.board_id) return null;
+    return boards.find((board) => board.id === agent.board_id) ?? null;
+  }, [boards, agent?.board_id]);
 
   const loadAgent = async () => {
     if (!isSignedIn || !agentId) return;
@@ -261,10 +265,16 @@ export default function AgentDetailPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-quiet">
                         Board
                       </p>
-                      <p className="mt-1 text-sm text-strong">
-                        {boards.find((board) => board.id === agent.board_id)?.name ??
-                          "—"}
-                      </p>
+                      {linkedBoard ? (
+                        <Link
+                          href={`/boards/${linkedBoard.id}`}
+                          className="mt-1 inline-flex text-sm font-medium text-[color:var(--accent)] transition hover:underline"
+                        >
+                          {linkedBoard.name}
+                        </Link>
+                      ) : (
+                        <p className="mt-1 text-sm text-strong">—</p>
+                      )}
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-quiet">
