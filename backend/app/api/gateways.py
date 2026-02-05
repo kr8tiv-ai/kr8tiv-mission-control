@@ -305,6 +305,19 @@ async def _ensure_main_agent(
     session.refresh(agent)
     try:
         await provision_main_agent(agent, gateway, raw_token, auth.user, action=action)
+        await ensure_session(
+            gateway.main_session_key, config=GatewayClientConfig(url=gateway.url, token=gateway.token), label=agent.name
+        )
+        await send_message(
+            (
+                f"Hello {agent.name}. Your gateway provisioning was updated.\n\n"
+                "Please re-read MAIN_AGENTS.md, MAIN_USER.md, MAIN_HEARTBEAT.md, and MAIN_TOOLS.md. "
+                "If BOOTSTRAP.md exists, run it once then delete it. Begin heartbeats after startup."
+            ),
+            session_key=gateway.main_session_key,
+            config=GatewayClientConfig(url=gateway.url, token=gateway.token),
+            deliver=True,
+        )
     except OpenClawGatewayError:
         # Best-effort provisioning.
         pass
