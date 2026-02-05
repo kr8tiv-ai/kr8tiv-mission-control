@@ -72,7 +72,8 @@ curl -s "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks?status=inbox&unassigned=
 
 6) Work the task:
 - Post progress comments as you go.
-- Before working, fetch the latest task comments and respond in the task thread if the human asked a question.
+- Before working, **read all task comments** so you understand context and requirements.
+- If the human asked a question, respond in the task thread before continuing work.
 - Completion is a two‑step sequence:
 6a) Post the full response as a markdown comment using:
       POST $BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks/{TASK_ID}/comments
