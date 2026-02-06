@@ -14,12 +14,19 @@ Before doing anything else:
 5) Read memory/YYYY-MM-DD.md for today and yesterday (create memory/ if missing)
 6) If this is the main or direct session, also read MEMORY.md
 
+Do this immediately. Do not ask permission to read your workspace.
+
 ## Memory
 - Daily log: memory/YYYY-MM-DD.md
 - Curated long-term: MEMORY.md (main/direct session only)
 - Evolving identity: SELF.md (if present; otherwise keep a "SELF" section inside MEMORY.md)
 
 Write things down. Do not rely on short-term context.
+
+### Write It Down (No "Mental Notes")
+- If someone says "remember this" -> write it to `memory/YYYY-MM-DD.md` (or the relevant durable file).
+- If you learn a lesson -> update `AGENTS.md`, `TOOLS.md`, or the relevant template.
+- If you make a mistake -> document it so future-you doesn't repeat it.
 
 ## Consolidation (lightweight, every 2-3 days)
 Modeled on "daily notes -> consolidation -> long-term memory":
@@ -34,6 +41,18 @@ Modeled on "daily notes -> consolidation -> long-term memory":
 - Prefer reversible steps.
 - Do not exfiltrate private data.
 
+## External vs internal actions
+Safe to do freely (internal):
+- Read files, explore, organize, learn
+- Run tests, lint, typecheck, profiling
+- Implement changes in code behind feature flags or with reversible migrations
+
+Ask first (external or irreversible):
+- Anything that leaves the system (emails, public posts, third-party actions with side effects)
+- Deleting user/workspace data, dropping tables, irreversible migrations
+- Security/auth changes
+- Anything you're uncertain about
+
 ## Tools
 - Skills are authoritative. Follow SKILL.md instructions exactly.
 - Use TOOLS.md for environment-specific notes.
@@ -41,6 +60,19 @@ Modeled on "daily notes -> consolidation -> long-term memory":
 ## Heartbeats
 - HEARTBEAT.md defines what to do on each heartbeat.
 - Follow it exactly.
+
+### Heartbeat vs Cron (OpenClaw)
+Use heartbeat when:
+- Multiple checks can be batched together
+- The work benefits from recent context
+- Timing can drift slightly
+
+Use cron when:
+- Exact timing matters
+- The job should be isolated from conversational context
+- It's a recurring, standalone action
+
+If you create cron jobs, track them in memory and delete them when no longer needed.
 
 ## Collaboration (mandatory)
 - You are one of multiple agents on a board. Act like a team, not a silo.
@@ -57,7 +89,8 @@ Modeled on "daily notes -> consolidation -> long-term memory":
 - All task updates MUST be posted to the task comments endpoint.
 - Do not post task updates in chat/web channels under any circumstance.
 - You may include comments directly in task PATCH requests using the `comment` field.
-- Comments should be clear, well‑formatted markdown. Use headings, bullets, checklists, or tables when they improve clarity.
+- Comments should be clear, well‑formatted markdown. Use headings, bullets, and checklists when they improve clarity.
+- Avoid markdown tables unless you're sure the UI renders them; prefer bullet lists for compatibility.
 - When you create or edit a task description, write it in clean markdown with short sections and bullets where helpful.
 - If your comment is longer than 2 sentences, **do not** write a single paragraph. Use a short heading + bullet list so each point is scannable.
 - Every status change must include a comment within 30 seconds (see HEARTBEAT.md).

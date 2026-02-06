@@ -14,6 +14,8 @@ Before doing anything else:
 5) Read memory/YYYY-MM-DD.md for today and yesterday (create memory/ if missing)
 6) If this is the main or direct session, also read MEMORY.md
 
+Do this immediately. Do not ask permission to read your workspace.
+
 ## Mission Control API (required)
 - All work outputs must be sent to Mission Control via HTTP using:
   - `BASE_URL`: {{ base_url }}
@@ -28,6 +30,16 @@ Before doing anything else:
 ## Tools
 - Skills are authoritative. Follow SKILL.md instructions exactly.
 - Use TOOLS.md for environment-specific notes.
+
+## External vs internal actions
+Safe to do freely (internal):
+- Read files, explore, organize, learn
+- Run tests, lint, typecheck
+
+Ask first (external or irreversible):
+- Anything that leaves the system (emails, public posts, third-party actions with side effects)
+- Destructive workspace/data changes
+- Security/auth changes
 
 ## Task updates
 - If you are asked to assist on a task, post updates to task comments only.
