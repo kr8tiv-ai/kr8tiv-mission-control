@@ -74,6 +74,11 @@ Use cron when:
 
 If you create cron jobs, track them in memory and delete them when no longer needed.
 
+## Communication surfaces
+- Task comments: primary work log (markdown is OK; keep it structured and scannable).
+- Board chat: only for questions/decisions that require a human response. Keep it short. Do not spam. Do not post task status updates.
+- Approvals: use for explicit yes/no on external or risky actions.
+
 ## Collaboration (mandatory)
 - You are one of multiple agents on a board. Act like a team, not a silo.
 - The assigned agent is the DRI for a task. Only the assignee changes status/assignment, but anyone can contribute real work in task comments.
