@@ -5,7 +5,6 @@ from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -43,8 +42,6 @@ from app.schemas.board_onboarding import BoardOnboardingAgentUpdate, BoardOnboar
 from app.schemas.boards import BoardRead
 from app.schemas.common import OkResponse
 from app.schemas.gateway_coordination import (
-    GatewayBoardEnsureRequest,
-    GatewayBoardEnsureResponse,
     GatewayLeadBroadcastBoardResult,
     GatewayLeadBroadcastRequest,
     GatewayLeadBroadcastResponse,
@@ -82,13 +79,6 @@ async def _gateway_config(session: AsyncSession, board: Board) -> GatewayClientC
     if gateway is None or not gateway.url:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
     return GatewayClientConfig(url=gateway.url, token=gateway.token)
-
-
-def _slugify(value: str) -> str:
-    import re
-
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug or "board"
 
 
 async def _require_gateway_main(
@@ -591,90 +581,6 @@ async def ask_user_via_gateway_main(
         board_id=board.id,
         main_agent_id=main_agent.id if main_agent else None,
         main_agent_name=main_agent.name if main_agent else None,
-    )
-
-
-@router.post("/gateway/boards/ensure", response_model=GatewayBoardEnsureResponse)
-async def ensure_gateway_board(
-    payload: GatewayBoardEnsureRequest,
-    session: AsyncSession = Depends(get_session),
-    agent_ctx: AgentAuthContext = Depends(get_agent_auth_context),
-) -> GatewayBoardEnsureResponse:
-    gateway, config = await _require_gateway_main(session, agent_ctx.agent)
-
-    requested_name = payload.name.strip()
-    requested_slug = _slugify(payload.slug.strip() if payload.slug else requested_name)
-
-    # Try slug match first, then case-insensitive name match.
-    existing = (
-        await session.exec(
-            select(Board)
-            .where(col(Board.gateway_id) == gateway.id)
-            .where(col(Board.slug) == requested_slug)
-        )
-    ).first()
-    if existing is None:
-        existing = (
-            await session.exec(
-                select(Board)
-                .where(col(Board.gateway_id) == gateway.id)
-                .where(func.lower(col(Board.name)) == requested_name.lower())
-            )
-        ).first()
-
-    created = False
-    board = existing
-    if board is None:
-        slug = requested_slug
-        suffix = 2
-        while True:
-            conflict = (
-                await session.exec(
-                    select(Board.id)
-                    .where(col(Board.gateway_id) == gateway.id)
-                    .where(col(Board.slug) == slug)
-                )
-            ).first()
-            if conflict is None:
-                break
-            slug = f"{requested_slug}-{suffix}"
-            suffix += 1
-
-        board = Board(
-            name=requested_name,
-            slug=slug,
-            gateway_id=gateway.id,
-            board_type=payload.board_type,
-            objective=payload.objective.strip() if payload.objective else None,
-            success_metrics=payload.success_metrics,
-            target_date=payload.target_date,
-            goal_confirmed=False,
-            goal_source="gateway_main_agent",
-        )
-        session.add(board)
-        await session.commit()
-        await session.refresh(board)
-        created = True
-
-    lead, lead_created = await ensure_board_lead_agent(
-        session,
-        board=board,
-        gateway=gateway,
-        config=config,
-        user=None,
-        agent_name=payload.lead_agent_name.strip() if payload.lead_agent_name else None,
-        identity_profile=payload.lead_identity_profile,
-        action="provision",
-    )
-
-    return GatewayBoardEnsureResponse(
-        created=created,
-        lead_created=lead_created,
-        board_id=board.id,
-        lead_agent_id=lead.id,
-        board_name=board.name,
-        board_slug=board.slug,
-        lead_agent_name=lead.name,
     )
 
 

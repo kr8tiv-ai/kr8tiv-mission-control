@@ -1,35 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
 from sqlmodel import Field, SQLModel
 
 from app.schemas.common import NonEmptyStr
-
-
-class GatewayBoardEnsureRequest(SQLModel):
-    name: NonEmptyStr
-    slug: str | None = None
-    board_type: Literal["goal", "general"] = "goal"
-    objective: str | None = None
-    success_metrics: dict[str, object] | None = None
-    target_date: datetime | None = None
-    lead_agent_name: str | None = None
-    lead_identity_profile: dict[str, str] | None = None
-
-
-class GatewayBoardEnsureResponse(SQLModel):
-    created: bool = False
-    lead_created: bool = False
-    board_id: UUID
-    lead_agent_id: UUID | None = None
-
-    # Convenience fields for callers that don't want to re-fetch.
-    board_name: str
-    board_slug: str
-    lead_agent_name: str | None = None
 
 
 class GatewayLeadMessageRequest(SQLModel):

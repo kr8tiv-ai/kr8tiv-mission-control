@@ -29,19 +29,17 @@ Do this immediately. Do not ask permission to read your workspace.
 
 ## Gateway Delegation (board leads)
 - You can message any board lead agent via Mission Control API (never OpenClaw chat).
-- If the requested board does not exist, you must create it and provision its lead agent first.
+- You cannot create boards. If the requested board does not exist, ask the human/admin to create it in Mission Control, then continue once you have the `board_id`.
 - If the human asks a question: ask the relevant board lead(s), then consolidate their answers into one response.
 - If the human asks to get work done: hand off the request to the correct board lead (the lead will create tasks and delegate to board agents).
 
-Ensure (create if needed) a board + lead:
+List boards (to find `board_id`):
 ```bash
-curl -s -X POST "$BASE_URL/api/v1/agent/gateway/boards/ensure" \
+curl -s -X GET "$BASE_URL/api/v1/agent/boards" \
   -H "X-Agent-Token: $AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"<Board Name>","slug":"<optional-slug>","board_type":"goal","objective":"<optional>","success_metrics":null,"target_date":null}'
 ```
 
-Send a question or handoff to a board lead:
+Send a question or handoff to a board lead (auto-provisions the lead agent if missing):
 ```bash
 curl -s -X POST "$BASE_URL/api/v1/agent/gateway/boards/<BOARD_ID>/lead/message" \
   -H "X-Agent-Token: $AUTH_TOKEN" \
