@@ -8,6 +8,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 from uuid import uuid4
 
 import websockets
+from websockets.exceptions import WebSocketException
 
 from app.integrations.openclaw_gateway_protocol import PROTOCOL_VERSION
 
@@ -121,7 +122,13 @@ async def openclaw_call(
             return await _send_request(ws, method, params)
     except OpenClawGatewayError:
         raise
-    except Exception as exc:  # pragma: no cover - network errors
+    except (
+        asyncio.TimeoutError,
+        ConnectionError,
+        OSError,
+        ValueError,
+        WebSocketException,
+    ) as exc:  # pragma: no cover - network/protocol errors
         raise OpenClawGatewayError(str(exc)) from exc
 
 
