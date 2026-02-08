@@ -18,14 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
 
 import { ApiError } from "@/api/mutator";
@@ -294,33 +287,22 @@ export default function GatewaysPage() {
       ) : null}
       </DashboardPageLayout>
 
-      <Dialog
+      <ConfirmActionDialog
         open={Boolean(deleteTarget)}
         onOpenChange={() => setDeleteTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete gateway?</DialogTitle>
-            <DialogDescription>
-              This removes the gateway connection from Mission Control. Boards
-              using it will need a new gateway assigned.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteMutation.error ? (
-            <p className="text-sm text-red-500">
-              {deleteMutation.error.message}
-            </p>
-          ) : null}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleDelete} disabled={deleteMutation.isPending}>
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Delete gateway?"
+        description={
+          <>
+            This removes the gateway connection from Mission Control. Boards
+            using it will need a new gateway assigned.
+          </>
+        }
+        errorMessage={deleteMutation.error?.message}
+        errorStyle="text"
+        cancelVariant="ghost"
+        onConfirm={handleDelete}
+        isConfirming={deleteMutation.isPending}
+      />
     </>
   );
 }

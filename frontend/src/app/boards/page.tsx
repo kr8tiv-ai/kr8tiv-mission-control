@@ -30,14 +30,7 @@ import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import type { BoardGroupRead, BoardRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
 
 const compactId = (value: string) =>
@@ -322,37 +315,25 @@ export default function BoardsPage() {
           <p className="mt-4 text-sm text-red-500">{boardsQuery.error.message}</p>
         ) : null}
       </DashboardPageLayout>
-      <Dialog
+      <ConfirmActionDialog
         open={!!deleteTarget}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
+        onOpenChange={(open) => {
+          if (!open) {
             setDeleteTarget(null);
           }
         }}
-      >
-        <DialogContent aria-label="Delete board">
-          <DialogHeader>
-            <DialogTitle>Delete board</DialogTitle>
-            <DialogDescription>
-              This will remove {deleteTarget?.name}. This action cannot be
-              undone.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteMutation.error ? (
-            <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-xs text-muted">
-              {deleteMutation.error.message}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleDelete} disabled={deleteMutation.isPending}>
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        ariaLabel="Delete board"
+        title="Delete board"
+        description={
+          <>
+            This will remove {deleteTarget?.name}. This action cannot be
+            undone.
+          </>
+        }
+        errorMessage={deleteMutation.error?.message}
+        onConfirm={handleDelete}
+        isConfirming={deleteMutation.isPending}
+      />
     </>
   );
 }
