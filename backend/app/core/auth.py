@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import TYPE_CHECKING, Literal
 
+import httpx
 import jwt
 from clerk_backend_api import Clerk
 from clerk_backend_api.models.clerkerrors import ClerkErrors
@@ -323,11 +324,22 @@ async def _fetch_clerk_profile(clerk_user_id: str) -> tuple[str | None, str | No
             secret_kind,
             response_body,
         )
-    except Exception:
+    except httpx.TimeoutException as exc:
         logger.warning(
-            "auth.clerk.profile.fetch_failed clerk_user_id=%s reason=sdk_exception",
+            "auth.clerk.profile.fetch_failed clerk_user_id=%s reason=timeout "
+            "server_url=%s secret_kind=%s error=%s",
             clerk_user_id,
-            exc_info=True,
+            server_url,
+            secret_kind,
+            str(exc) or exc.__class__.__name__,
+        )
+    except Exception as exc:
+        logger.warning(
+            "auth.clerk.profile.fetch_failed clerk_user_id=%s reason=sdk_exception "
+            "error_type=%s error=%s",
+            clerk_user_id,
+            exc.__class__.__name__,
+            str(exc)[:300],
         )
     return None, None
 
@@ -399,23 +411,38 @@ async def _get_or_sync_user(
     clerk_user_id: str,
     claims: dict[str, object],
 ) -> User:
-    email, name = await _fetch_clerk_profile(clerk_user_id)
-    logger.info(
-        "auth.claims.parsed clerk_user_id=%s extracted_email=%s extracted_name=%s claims=%s",
-        clerk_user_id,
-        email,
-        name,
-        _claim_debug_snapshot(claims),
-    )
+    claim_email = _extract_claim_email(claims)
+    claim_name = _extract_claim_name(claims)
     defaults: dict[str, object | None] = {
-        "email": email,
-        "name": name,
+        "email": claim_email,
+        "name": claim_name,
     }
-    user, _created = await crud.get_or_create(
+    user, created = await crud.get_or_create(
         session,
         User,
         clerk_user_id=clerk_user_id,
         defaults=defaults,
+    )
+
+    profile_email: str | None = None
+    profile_name: str | None = None
+    # Avoid a network roundtrip to Clerk on every request once core profile
+    # fields are present in our DB.
+    should_fetch_profile = created or not user.email or not user.name
+    if should_fetch_profile:
+        profile_email, profile_name = await _fetch_clerk_profile(clerk_user_id)
+
+    email = profile_email or claim_email
+    name = profile_name or claim_name
+    logger.info(
+        "auth.claims.parsed clerk_user_id=%s extracted_email=%s extracted_name=%s "
+        "claim_email=%s claim_name=%s claims=%s",
+        clerk_user_id,
+        profile_email,
+        profile_name,
+        claim_email,
+        claim_name,
+        _claim_debug_snapshot(claims),
     )
 
     changed = False
@@ -433,7 +460,7 @@ async def _get_or_sync_user(
         "auth.user.sync clerk_user_id=%s updated=%s claim_email=%s final_email=%s",
         clerk_user_id,
         changed,
-        _normalize_email(defaults.get("email")),
+        _normalize_email(claim_email),
         _normalize_email(user.email),
     )
     if not user.email:
