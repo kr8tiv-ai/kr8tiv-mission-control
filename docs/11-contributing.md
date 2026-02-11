@@ -5,7 +5,7 @@
 - [Coverage policy](coverage-policy.md)
 - [Testing guide](testing/README.md)
 
-## How to contribute (first pass)
+## How to contribute
 - Follow the repo’s existing PR and review conventions.
 - Prefer small PRs.
 - Update docs when behavior changes.
