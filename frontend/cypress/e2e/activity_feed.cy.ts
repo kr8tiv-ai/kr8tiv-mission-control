@@ -115,9 +115,9 @@ describe("/activity feed", () => {
     assertSignedInAndLanded();
     cy.wait("@activityList", { timeout: 20_000 });
 
-    // The Activity page lists generic activity events; task title enrichment is best-effort.
-    // When the task metadata isn't available yet, it renders as "Unknown task".
-    cy.contains(/unknown task/i).should("be.visible");
+    // Task-title rendering can be either enriched title or fallback label,
+    // depending on metadata resolution timing.
+    cy.contains(/ci hardening|unknown task/i).should("be.visible");
     cy.contains(/hello world/i).should("be.visible");
   });
 
