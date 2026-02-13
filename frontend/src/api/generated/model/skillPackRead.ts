@@ -6,17 +6,15 @@
  */
 
 /**
- * Serialized marketplace skill catalog record.
+ * Serialized skill pack record.
  */
-export interface MarketplaceSkillRead {
-  category?: string | null;
+export interface SkillPackRead {
   created_at: string;
   description?: string | null;
   id: string;
   name: string;
   organization_id: string;
-  risk?: string | null;
-  source?: string | null;
+  skill_count?: number;
   source_url: string;
   updated_at: string;
 }

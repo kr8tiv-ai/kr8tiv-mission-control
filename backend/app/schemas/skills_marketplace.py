@@ -21,6 +21,14 @@ class MarketplaceSkillCreate(SQLModel):
     description: str | None = None
 
 
+class SkillPackCreate(SQLModel):
+    """Payload used to register a pack URL in the organization."""
+
+    source_url: AnyHttpUrl
+    name: NonEmptyStr | None = None
+    description: str | None = None
+
+
 class MarketplaceSkillRead(SQLModel):
     """Serialized marketplace skill catalog record."""
 
@@ -28,7 +36,23 @@ class MarketplaceSkillRead(SQLModel):
     organization_id: UUID
     name: str
     description: str | None = None
+    category: str | None = None
+    risk: str | None = None
+    source: str | None = None
     source_url: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SkillPackRead(SQLModel):
+    """Serialized skill pack record."""
+
+    id: UUID
+    organization_id: UUID
+    name: str
+    description: str | None = None
+    source_url: str
+    skill_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -47,3 +71,13 @@ class MarketplaceSkillActionResponse(SQLModel):
     skill_id: UUID
     gateway_id: UUID
     installed: bool
+
+
+class SkillPackSyncResponse(SQLModel):
+    """Pack sync summary payload."""
+
+    ok: bool = True
+    pack_id: UUID
+    synced: int
+    created: int
+    updated: int

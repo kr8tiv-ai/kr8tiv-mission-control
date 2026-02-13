@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -13,13 +15,18 @@ from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import require_org_admin
-from app.api.skills_marketplace import router as skills_marketplace_router
+from app.api.skills_marketplace import (
+    PackSkillCandidate,
+    _collect_pack_skills_from_repo,
+    router as skills_marketplace_router,
+)
 from app.db.session import get_session
 from app.models.gateway_installed_skills import GatewayInstalledSkill
 from app.models.gateways import Gateway
 from app.models.marketplace_skills import MarketplaceSkill
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
+from app.models.skill_packs import SkillPack
 from app.services.organizations import OrganizationContext
 
 
@@ -219,3 +226,307 @@ async def test_list_marketplace_skills_marks_installed_cards() -> None:
         assert cards_by_id[str(second.id)]["installed_at"] is None
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_sync_pack_clones_and_upserts_skills(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = await _make_engine()
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    try:
+        async with session_maker() as session:
+            organization, _gateway = await _seed_base(session)
+            pack = SkillPack(
+                organization_id=organization.id,
+                name="Antigravity Awesome Skills",
+                source_url="https://github.com/sickn33/antigravity-awesome-skills",
+            )
+            session.add(pack)
+            await session.commit()
+            await session.refresh(pack)
+
+        app = _build_test_app(session_maker, organization=organization)
+
+        collected = [
+            PackSkillCandidate(
+                name="Skill Alpha",
+                description="Alpha description",
+                source_url="https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/alpha",
+                category="testing",
+                risk="low",
+                source="skills-index",
+            ),
+            PackSkillCandidate(
+                name="Skill Beta",
+                description="Beta description",
+                source_url="https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/beta",
+                category="automation",
+                risk="medium",
+                source="skills-index",
+            ),
+        ]
+
+        def _fake_collect_pack_skills(source_url: str) -> list[PackSkillCandidate]:
+            assert source_url == "https://github.com/sickn33/antigravity-awesome-skills"
+            return collected
+
+        monkeypatch.setattr(
+            "app.api.skills_marketplace._collect_pack_skills",
+            _fake_collect_pack_skills,
+        )
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            first_sync = await client.post(f"/api/v1/skills/packs/{pack.id}/sync")
+            second_sync = await client.post(f"/api/v1/skills/packs/{pack.id}/sync")
+
+        assert first_sync.status_code == 200
+        first_body = first_sync.json()
+        assert first_body["pack_id"] == str(pack.id)
+        assert first_body["synced"] == 2
+        assert first_body["created"] == 2
+        assert first_body["updated"] == 0
+
+        assert second_sync.status_code == 200
+        second_body = second_sync.json()
+        assert second_body["pack_id"] == str(pack.id)
+        assert second_body["synced"] == 2
+        assert second_body["created"] == 0
+        assert second_body["updated"] == 0
+
+        async with session_maker() as session:
+            synced_skills = (
+                await session.exec(
+                    select(MarketplaceSkill).where(
+                        col(MarketplaceSkill.organization_id) == organization.id,
+                    ),
+                )
+            ).all()
+            assert len(synced_skills) == 2
+            by_source = {skill.source_url: skill for skill in synced_skills}
+            assert (
+                by_source[
+                    "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/alpha"
+                ].name
+                == "Skill Alpha"
+            )
+            assert (
+                by_source[
+                    "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/alpha"
+                ].category
+                == "testing"
+            )
+            assert (
+                by_source[
+                    "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/alpha"
+                ].risk
+                == "low"
+            )
+            assert (
+                by_source[
+                    "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/beta"
+                ].description
+                == "Beta description"
+            )
+            assert (
+                by_source[
+                    "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/beta"
+                ].source
+                == "skills-index"
+            )
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_list_skill_packs_includes_skill_count() -> None:
+    engine = await _make_engine()
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    try:
+        async with session_maker() as session:
+            organization, _gateway = await _seed_base(session)
+            pack = SkillPack(
+                organization_id=organization.id,
+                name="Pack One",
+                source_url="https://github.com/sickn33/antigravity-awesome-skills",
+            )
+            session.add(pack)
+            session.add(
+                MarketplaceSkill(
+                    organization_id=organization.id,
+                    name="Skill One",
+                    source_url=(
+                        "https://github.com/sickn33/antigravity-awesome-skills"
+                        "/tree/main/skills/alpha"
+                    ),
+                )
+            )
+            session.add(
+                MarketplaceSkill(
+                    organization_id=organization.id,
+                    name="Skill Two",
+                    source_url=(
+                        "https://github.com/sickn33/antigravity-awesome-skills"
+                        "/tree/main/skills/beta"
+                    ),
+                )
+            )
+            session.add(
+                MarketplaceSkill(
+                    organization_id=organization.id,
+                    name="Other Repo Skill",
+                    source_url="https://github.com/other/repo/tree/main/skills/other",
+                )
+            )
+            await session.commit()
+
+        app = _build_test_app(session_maker, organization=organization)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/api/v1/skills/packs")
+
+        assert response.status_code == 200
+        items = response.json()
+        assert len(items) == 1
+        assert items[0]["name"] == "Pack One"
+        assert items[0]["skill_count"] == 2
+    finally:
+        await engine.dispose()
+
+
+def test_collect_pack_skills_from_repo_uses_root_index_when_present(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "skills").mkdir()
+    indexed_dir = repo_dir / "skills" / "indexed-fallback"
+    indexed_dir.mkdir()
+    (indexed_dir / "SKILL.md").write_text("# Should Not Be Used\n", encoding="utf-8")
+
+    (repo_dir / "skills_index.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "first",
+                    "name": "Index First",
+                    "description": "From index one",
+                    "path": "skills/index-first",
+                    "category": "uncategorized",
+                    "risk": "unknown",
+                    "source": "index-source",
+                },
+                {
+                    "id": "second",
+                    "name": "Index Second",
+                    "description": "From index two",
+                    "path": "skills/index-second/SKILL.md",
+                    "category": "catalog",
+                    "risk": "low",
+                    "source": "index-source",
+                },
+                {
+                    "id": "root",
+                    "name": "Root Skill",
+                    "description": "Root from index",
+                    "path": "SKILL.md",
+                    "category": "uncategorized",
+                    "risk": "unknown",
+                    "source": "index-source",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    skills = _collect_pack_skills_from_repo(
+        repo_dir=repo_dir,
+        source_url="https://github.com/sickn33/antigravity-awesome-skills",
+        branch="main",
+    )
+
+    assert len(skills) == 3
+    by_source = {skill.source_url: skill for skill in skills}
+    assert (
+        "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/index-first"
+        in by_source
+    )
+    assert (
+        "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/index-second"
+        in by_source
+    )
+    assert "https://github.com/sickn33/antigravity-awesome-skills/tree/main" in by_source
+    assert by_source[
+        "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/index-first"
+    ].name == "Index First"
+    assert by_source[
+        "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/index-first"
+    ].category == "uncategorized"
+    assert by_source[
+        "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/index-first"
+    ].risk == "unknown"
+    assert by_source[
+        "https://github.com/sickn33/antigravity-awesome-skills/tree/main/skills/index-first"
+    ].source == "index-source"
+    assert by_source["https://github.com/sickn33/antigravity-awesome-skills/tree/main"].name == "Root Skill"
+
+
+def test_collect_pack_skills_from_repo_supports_root_skill_md(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "SKILL.md").write_text(
+        "---\nname: x-research-skill\ndescription: Root skill package\n---\n",
+        encoding="utf-8",
+    )
+
+    skills = _collect_pack_skills_from_repo(
+        repo_dir=repo_dir,
+        source_url="https://github.com/rohunvora/x-research-skill",
+        branch="main",
+    )
+
+    assert len(skills) == 1
+    only_skill = skills[0]
+    assert only_skill.name == "x-research-skill"
+    assert only_skill.description == "Root skill package"
+    assert only_skill.source_url == "https://github.com/rohunvora/x-research-skill/tree/main"
+
+
+def test_collect_pack_skills_from_repo_supports_top_level_skill_folders(
+    tmp_path: Path,
+) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    first = repo_dir / "content-idea-generator"
+    second = repo_dir / "homepage-audit"
+    first.mkdir()
+    second.mkdir()
+    (first / "SKILL.md").write_text("# Content Idea Generator\n", encoding="utf-8")
+    (second / "SKILL.md").write_text("# Homepage Audit\n", encoding="utf-8")
+
+    skills = _collect_pack_skills_from_repo(
+        repo_dir=repo_dir,
+        source_url="https://github.com/BrianRWagner/ai-marketing-skills",
+        branch="main",
+    )
+
+    assert len(skills) == 2
+    by_source = {skill.source_url: skill for skill in skills}
+    assert (
+        "https://github.com/BrianRWagner/ai-marketing-skills/tree/main/content-idea-generator"
+        in by_source
+    )
+    assert (
+        "https://github.com/BrianRWagner/ai-marketing-skills/tree/main/homepage-audit"
+        in by_source
+    )

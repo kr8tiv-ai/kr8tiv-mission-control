@@ -9,6 +9,7 @@
  * Marketplace card payload with gateway-specific install state.
  */
 export interface MarketplaceSkillCardRead {
+  category?: string | null;
   created_at: string;
   description?: string | null;
   id: string;
@@ -16,6 +17,8 @@ export interface MarketplaceSkillCardRead {
   installed_at?: string | null;
   name: string;
   organization_id: string;
+  risk?: string | null;
+  source?: string | null;
   source_url: string;
   updated_at: string;
 }

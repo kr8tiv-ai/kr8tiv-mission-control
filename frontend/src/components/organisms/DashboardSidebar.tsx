@@ -6,13 +6,14 @@ import {
   Activity,
   BarChart3,
   Bot,
+  Boxes,
   CheckCircle2,
   Folder,
   Building2,
   LayoutGrid,
   Network,
-  Package,
   Settings,
+  Store,
   Tags,
 } from "lucide-react";
 
@@ -166,6 +167,42 @@ export function DashboardSidebar() {
           </div>
 
           <div>
+            {isAdmin ? (
+              <>
+                <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Skills
+                </p>
+                <div className="mt-1 space-y-1">
+                  <Link
+                    href="/skills/marketplace"
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                      pathname === "/skills" || pathname.startsWith("/skills/marketplace")
+                        ? "bg-blue-100 text-blue-800 font-medium"
+                        : "hover:bg-slate-100",
+                    )}
+                  >
+                    <Store className="h-4 w-4" />
+                    Marketplace
+                  </Link>
+                  <Link
+                    href="/skills/packs"
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                      pathname.startsWith("/skills/packs")
+                        ? "bg-blue-100 text-blue-800 font-medium"
+                        : "hover:bg-slate-100",
+                    )}
+                  >
+                    <Boxes className="h-4 w-4" />
+                    Packs
+                  </Link>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <div>
             <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Administration
             </p>
@@ -194,20 +231,6 @@ export function DashboardSidebar() {
                 >
                   <Network className="h-4 w-4" />
                   Gateways
-                </Link>
-              ) : null}
-              {isAdmin ? (
-                <Link
-                  href="/skills"
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
-                    pathname.startsWith("/skills")
-                      ? "bg-blue-100 text-blue-800 font-medium"
-                      : "hover:bg-slate-100",
-                  )}
-                >
-                  <Package className="h-4 w-4" />
-                  Skills
                 </Link>
               ) : null}
               {isAdmin ? (

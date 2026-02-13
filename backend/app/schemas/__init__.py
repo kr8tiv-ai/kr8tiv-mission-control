@@ -38,6 +38,9 @@ from app.schemas.skills_marketplace import (
     MarketplaceSkillCardRead,
     MarketplaceSkillCreate,
     MarketplaceSkillRead,
+    SkillPackCreate,
+    SkillPackRead,
+    SkillPackSyncResponse,
 )
 from app.schemas.souls_directory import (
     SoulsDirectoryMarkdownResponse,
@@ -93,6 +96,9 @@ __all__ = [
     "MarketplaceSkillCardRead",
     "MarketplaceSkillCreate",
     "MarketplaceSkillRead",
+    "SkillPackCreate",
+    "SkillPackRead",
+    "SkillPackSyncResponse",
     "TagCreate",
     "TagRead",
     "TagRef",

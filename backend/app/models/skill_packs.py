@@ -1,4 +1,4 @@
-"""Organization-scoped skill catalog entries for the skills marketplace."""
+"""Organization-scoped skill pack sources."""
 
 from __future__ import annotations
 
@@ -14,15 +14,15 @@ from app.models.tenancy import TenantScoped
 RUNTIME_ANNOTATION_TYPES = (datetime,)
 
 
-class MarketplaceSkill(TenantScoped, table=True):
-    """A marketplace skill entry that can be installed onto one or more gateways."""
+class SkillPack(TenantScoped, table=True):
+    """A pack repository URL that can be synced into marketplace skills."""
 
-    __tablename__ = "marketplace_skills"  # pyright: ignore[reportAssignmentType]
+    __tablename__ = "skill_packs"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
         UniqueConstraint(
             "organization_id",
             "source_url",
-            name="uq_marketplace_skills_org_source_url",
+            name="uq_skill_packs_org_source_url",
         ),
     )
 
@@ -30,9 +30,6 @@ class MarketplaceSkill(TenantScoped, table=True):
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)
     name: str
     description: str | None = Field(default=None)
-    category: str | None = Field(default=None)
-    risk: str | None = Field(default=None)
-    source: str | None = Field(default=None)
     source_url: str
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

@@ -14,6 +14,7 @@ from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.models.gateway_installed_skills import GatewayInstalledSkill
 from app.models.marketplace_skills import MarketplaceSkill
+from app.models.skill_packs import SkillPack
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
@@ -46,6 +47,7 @@ __all__ = [
     "Gateway",
     "GatewayInstalledSkill",
     "MarketplaceSkill",
+    "SkillPack",
     "Organization",
     "BoardTaskCustomField",
     "TaskCustomFieldDefinition",
