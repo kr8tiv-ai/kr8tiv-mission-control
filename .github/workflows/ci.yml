@@ -3,8 +3,6 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [master]
-  # Allow maintainers to manually kick CI when GitHub doesn't create a run for a new head SHA.
   workflow_dispatch:
 
 concurrency:
