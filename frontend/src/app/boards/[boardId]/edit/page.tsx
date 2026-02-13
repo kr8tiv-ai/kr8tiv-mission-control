@@ -190,10 +190,7 @@ function WebhookCard({
         />
       ) : (
         <div className="text-sm text-slate-700">
-          <Markdown
-            content={webhook.description || ""}
-            variant="description"
-          />
+          <Markdown content={webhook.description || ""} variant="description" />
         </div>
       )}
       <div className="rounded-md bg-slate-50 px-3 py-2">
@@ -944,9 +941,7 @@ export default function EditBoardPage() {
                   aria-checked={resolvedOnlyLeadCanChangeStatus}
                   aria-label="Only lead can change status"
                   onClick={() =>
-                    setOnlyLeadCanChangeStatus(
-                      !resolvedOnlyLeadCanChangeStatus,
-                    )
+                    setOnlyLeadCanChangeStatus(!resolvedOnlyLeadCanChangeStatus)
                   }
                   disabled={isLoading}
                   className={`mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition ${
