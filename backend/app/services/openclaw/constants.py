@@ -13,7 +13,7 @@ _GATEWAY_AGENT_SUFFIX = ":main"
 
 DEFAULT_HEARTBEAT_CONFIG: dict[str, Any] = {
     "every": "10m",
-    "target": "none",
+    "target": "last",
     "includeReasoning": False,
 }
 

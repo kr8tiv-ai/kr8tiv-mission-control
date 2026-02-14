@@ -49,11 +49,6 @@ const EMOJI_OPTIONS = [
   { value: ":brain:", label: "Brain", glyph: "🧠" },
 ];
 
-const HEARTBEAT_TARGET_OPTIONS: SearchableSelectOption[] = [
-  { value: "none", label: "None (no outbound message)" },
-  { value: "last", label: "Last channel" },
-];
-
 const getBoardOptions = (boards: BoardRead[]): SearchableSelectOption[] =>
   boards.map((board) => ({
     value: board.id,
@@ -81,7 +76,6 @@ export default function NewAgentPage() {
   const [name, setName] = useState("");
   const [boardId, setBoardId] = useState<string>("");
   const [heartbeatEvery, setHeartbeatEvery] = useState("10m");
-  const [heartbeatTarget, setHeartbeatTarget] = useState("none");
   const [identityProfile, setIdentityProfile] = useState<IdentityProfile>({
     ...DEFAULT_IDENTITY_PROFILE,
   });
@@ -136,7 +130,7 @@ export default function NewAgentPage() {
         board_id: resolvedBoardId,
         heartbeat_config: {
           every: heartbeatEvery.trim() || "10m",
-          target: heartbeatTarget,
+          target: "last",
           includeReasoning: false,
         },
         identity_profile: normalizeIdentityProfile(
@@ -277,7 +271,7 @@ export default function NewAgentPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Schedule & notifications
           </p>
-          <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div className="mt-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-900">
                 Interval
@@ -291,24 +285,6 @@ export default function NewAgentPage() {
               <p className="text-xs text-slate-500">
                 How often this agent runs HEARTBEAT.md (10m, 30m, 2h).
               </p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-900">
-                Target
-              </label>
-              <SearchableSelect
-                ariaLabel="Select heartbeat target"
-                value={heartbeatTarget}
-                onValueChange={setHeartbeatTarget}
-                options={HEARTBEAT_TARGET_OPTIONS}
-                placeholder="Select target"
-                searchPlaceholder="Search targets..."
-                emptyMessage="No matching targets."
-                triggerClassName="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                contentClassName="rounded-xl border border-slate-200 shadow-lg"
-                itemClassName="px-4 py-3 text-sm text-slate-700 data-[selected=true]:bg-slate-50 data-[selected=true]:text-slate-900"
-                disabled={isLoading}
-              />
             </div>
           </div>
         </div>

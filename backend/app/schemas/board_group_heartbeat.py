@@ -16,8 +16,6 @@ class BoardGroupHeartbeatApply(SQLModel):
     # Heartbeat cadence string understood by the OpenClaw gateway
     # (e.g. "2m", "10m", "30m").
     every: str
-    # Optional heartbeat target (most deployments use "none").
-    target: str | None = None
     include_board_leads: bool = False
 
 

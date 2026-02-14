@@ -235,10 +235,7 @@ def _update_agent_heartbeat(
     if isinstance(raw, dict):
         heartbeat.update(raw)
     heartbeat["every"] = payload.every
-    if payload.target is not None:
-        heartbeat["target"] = payload.target
-    elif "target" not in heartbeat:
-        heartbeat["target"] = DEFAULT_HEARTBEAT_CONFIG.get("target", "none")
+    heartbeat["target"] = DEFAULT_HEARTBEAT_CONFIG.get("target", "last")
     agent.heartbeat_config = heartbeat
     agent.updated_at = utcnow()
 

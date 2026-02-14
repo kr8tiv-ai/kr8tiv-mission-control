@@ -307,7 +307,7 @@ async def test_control_plane_upsert_agent_create_then_update(monkeypatch):
             agent_id="board-agent-a",
             name="Board Agent A",
             workspace_path="/tmp/workspace-board-agent-a",
-            heartbeat={"every": "10m", "target": "none", "includeReasoning": False},
+            heartbeat={"every": "10m", "target": "last", "includeReasoning": False},
         ),
     )
 
@@ -341,7 +341,7 @@ async def test_control_plane_upsert_agent_handles_already_exists(monkeypatch):
             agent_id="board-agent-a",
             name="Board Agent A",
             workspace_path="/tmp/workspace-board-agent-a",
-            heartbeat={"every": "10m", "target": "none", "includeReasoning": False},
+            heartbeat={"every": "10m", "target": "last", "includeReasoning": False},
         ),
     )
 
