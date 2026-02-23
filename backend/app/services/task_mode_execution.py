@@ -34,7 +34,7 @@ from app.services.queue import QueuedTask
 from app.services.task_mode_queue import decode_task_mode_execution
 
 logger = get_logger(__name__)
-_VERDICT_PATTERN = re.compile(r"VERDICT:\s*(APPROVED|REVISE)\s*$", re.IGNORECASE | re.MULTILINE)
+_VERDICT_PATTERN = re.compile(r"VERDICT:?\s*(APPROVED|REVISE)\s*$", re.IGNORECASE | re.MULTILINE)
 _ARENA_MODES = {"arena", "arena_notebook"}
 _NOTEBOOK_MODES = {"notebook", "arena_notebook", "notebook_creation"}
 
@@ -157,6 +157,8 @@ async def _run_agent_turn(
     max_rounds: int,
     is_reviewer: bool,
 ) -> tuple[str, str]:
+    import asyncio
+
     board_agent = await _find_board_agent(ctx.board.id, agent_id)
     if board_agent is None:
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing board agent")
@@ -167,18 +169,53 @@ async def _run_agent_turn(
     try:
         from app.services.openclaw.gateway_rpc import send_message
 
+        # Get baseline message count before sending
+        history_before = await get_chat_history(
+            board_agent.openclaw_session_id,
+            config=ctx.gateway_config,
+            limit=10,
+        )
+        baseline_count = 0
+        if isinstance(history_before, dict) and "messages" in history_before:
+            baseline_count = len(history_before["messages"])
+
         await send_message(
             prompt,
             session_key=board_agent.openclaw_session_id,
             config=ctx.gateway_config,
             deliver=False,
         )
-        history = await get_chat_history(
-            board_agent.openclaw_session_id,
-            config=ctx.gateway_config,
-            limit=10,
-        )
-        response = _extract_latest_message(history)
+
+        # Poll for new response with exponential backoff (2s, 4s, 8s, 16s, 30s)
+        backoff_delays = [2, 4, 8, 16, 30]  # ~60s total timeout
+        response = None
+        for attempt, delay in enumerate(backoff_delays, start=1):
+            await asyncio.sleep(delay)
+            history = await get_chat_history(
+                board_agent.openclaw_session_id,
+                config=ctx.gateway_config,
+                limit=10,
+            )
+            current_count = 0
+            if isinstance(history, dict) and "messages" in history:
+                current_count = len(history["messages"])
+
+            # Check if we have a new message
+            if current_count > baseline_count:
+                response = _extract_latest_message(history)
+                if response:
+                    logger.info(
+                        "task_mode.agent_turn.response_received",
+                        extra={
+                            "task_id": str(ctx.task.id),
+                            "agent_id": agent_id,
+                            "attempt": attempt,
+                            "delay": delay,
+                        },
+                    )
+                    return board_agent.name, response
+
+        # If we got here, no new response after all polling attempts
         if response:
             return board_agent.name, response
     except Exception as exc:  # pragma: no cover - network/runtime dependent
@@ -270,7 +307,51 @@ async def _execute_arena_mode(
     if final_agent not in set(ctx.allowed_agents):
         final_agent = participants[0]
 
-    summary_lines: list[str] = [f"Task: {task.title}"]
+    # Pre-flight health check: verify all participants are available
+    available_participants: list[str] = []
+    for agent_id in participants:
+        agent = await _find_board_agent(ctx.board.id, agent_id)
+        if agent is None or not agent.openclaw_session_id:
+            logger.warning(
+                "task_mode.arena.agent_unavailable",
+                extra={
+                    "task_id": str(task.id),
+                    "agent_id": agent_id,
+                    "reason": "missing_agent" if agent is None else "missing_session_id",
+                },
+            )
+            continue
+        available_participants.append(agent_id)
+
+    if not available_participants:
+        raise RuntimeError(
+            f"Arena execution failed: ALL agents unavailable. "
+            f"Requested: {participants}, Available: none"
+        )
+
+    if len(available_participants) < len(participants):
+        logger.warning(
+            "task_mode.arena.partial_availability",
+            extra={
+                "task_id": str(task.id),
+                "requested": participants,
+                "available": available_participants,
+            },
+        )
+
+    participants = available_participants
+
+    summary_lines: list[str] = []
+
+    # Supermemory integration point
+    if parsed_config.supermemory_enabled:
+        # TODO: Wire supermemory.js here to inject relevant context
+        # Context should be retrieved based on task title/description
+        # and injected at the top of the prompt before task details
+        summary_lines.append("[Supermemory context injection point — wire supermemory.js here]")
+        summary_lines.append("")
+
+    summary_lines.append(f"Task: {task.title}")
     if task.description:
         summary_lines.append(f"Description: {task.description}")
     converged = False
@@ -296,6 +377,14 @@ async def _execute_arena_mode(
                 }
             )
             summary_lines.append(f"[Round {round_number} | {agent_id}] {output}")
+
+        # Truncate summary_lines if exceeding 8000 chars
+        total_chars = sum(len(line) for line in summary_lines)
+        if total_chars > 8000:
+            # Keep header (task/description) and last 2 rounds only
+            header_lines = [line for line in summary_lines if line.startswith("Task:") or line.startswith("Description:") or line.startswith("[Supermemory")]
+            recent_rounds = [line for line in summary_lines if f"[Round {round_number}]" in line or f"[Round {round_number - 1}]" in line]
+            summary_lines = header_lines + [f"... (earlier rounds truncated) ..."] + recent_rounds
 
         reviewer_output = next(
             (
@@ -417,7 +506,16 @@ async def execute_task_mode(task: QueuedTask) -> None:
             session.add(task_row)
             await session.commit()
         except Exception as exc:
-            task_row.status = "inbox"
+            # Check if any iterations were completed
+            iterations_count = (
+                await session.exec(
+                    select(TaskIteration).where(col(TaskIteration.task_id) == task_row.id)
+                )
+            ).all()
+            # Only reset to inbox if zero iterations completed; otherwise keep in_progress
+            if len(iterations_count) == 0:
+                task_row.status = "inbox"
+            # If iterations exist, leave status as in_progress so work isn't lost
             task_row.updated_at = utcnow()
             session.add(task_row)
             _record_task_comment(
