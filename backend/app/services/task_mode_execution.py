@@ -201,30 +201,92 @@ async def _find_board_agent(
     return None
 
 
-def _extract_latest_message(history_payload: object) -> str | None:
+def _history_entries(history_payload: object) -> list[object]:
     if isinstance(history_payload, dict):
-        messages = history_payload.get("messages")
-        if isinstance(messages, list):
-            for item in reversed(messages):
-                text = _extract_latest_message(item)
-                if text:
-                    return text
-        content = history_payload.get("content")
-        if isinstance(content, str) and content.strip():
-            return content.strip()
-        message = history_payload.get("message")
-        if isinstance(message, str) and message.strip():
-            return message.strip()
-        text = history_payload.get("text")
+        for key in ("history", "messages", "items"):
+            value = history_payload.get(key)
+            if isinstance(value, list):
+                return value
+        return []
+    if isinstance(history_payload, list):
+        return history_payload
+    return []
+
+
+def _content_text(content: object) -> str | None:
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    if isinstance(content, dict):
+        text = content.get("text")
         if isinstance(text, str) and text.strip():
             return text.strip()
+        message = content.get("message")
+        if isinstance(message, str) and message.strip():
+            return message.strip()
+        nested = content.get("content")
+        return _content_text(nested)
+    if isinstance(content, list):
+        for item in reversed(content):
+            text = _content_text(item)
+            if text:
+                return text
+    return None
+
+
+def _latest_history_signature(history_payload: object) -> str | None:
+    entries = _history_entries(history_payload)
+    if not entries:
         return None
+    latest = entries[-1]
+    try:
+        return json.dumps(latest, sort_keys=True, ensure_ascii=False)
+    except Exception:
+        return str(latest)
+
+
+def _latest_history_role(history_payload: object) -> str | None:
+    entries = _history_entries(history_payload)
+    if entries and isinstance(entries[-1], dict):
+        role = entries[-1].get("role")
+        if isinstance(role, str):
+            return role.strip().lower()
+    if isinstance(history_payload, dict):
+        role = history_payload.get("role")
+        if isinstance(role, str):
+            return role.strip().lower()
+    return None
+
+
+def _extract_latest_message(history_payload: object) -> str | None:
+    entries = _history_entries(history_payload)
+    if entries:
+        for item in reversed(entries):
+            text = _extract_latest_message(item)
+            if text:
+                return text
+
+    if isinstance(history_payload, dict):
+        role = history_payload.get("role")
+        if isinstance(role, str) and role.strip().lower() not in ("assistant", "agent"):
+            return None
+
+        content_text = _content_text(history_payload.get("content"))
+        if content_text:
+            return content_text
+
+        for key in ("output_text", "message", "text"):
+            value = history_payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
     if isinstance(history_payload, list):
         for item in reversed(history_payload):
             text = _extract_latest_message(item)
             if text:
                 return text
         return None
+
     return None
 
 
@@ -249,15 +311,13 @@ async def _run_agent_turn(
     try:
         from app.services.openclaw.gateway_rpc import send_message
 
-        # Get baseline message count before sending
+        # Capture baseline history signature before sending.
         history_before = await get_chat_history(
             board_agent.openclaw_session_id,
             config=ctx.gateway_config,
-            limit=10,
+            limit=20,
         )
-        baseline_count = 0
-        if isinstance(history_before, dict) and "messages" in history_before:
-            baseline_count = len(history_before["messages"])
+        baseline_signature = _latest_history_signature(history_before)
 
         await send_message(
             prompt,
@@ -268,36 +328,35 @@ async def _run_agent_turn(
 
         # Poll for new response with exponential backoff (2s, 4s, 8s, 16s, 30s)
         backoff_delays = [2, 4, 8, 16, 30]  # ~60s total timeout
-        response = None
         for attempt, delay in enumerate(backoff_delays, start=1):
             await asyncio.sleep(delay)
             history = await get_chat_history(
                 board_agent.openclaw_session_id,
                 config=ctx.gateway_config,
-                limit=10,
+                limit=20,
             )
-            current_count = 0
-            if isinstance(history, dict) and "messages" in history:
-                current_count = len(history["messages"])
 
-            # Check if we have a new message
-            if current_count > baseline_count:
-                response = _extract_latest_message(history)
-                if response:
-                    logger.info(
-                        "task_mode.agent_turn.response_received",
-                        extra={
-                            "task_id": str(ctx.task.id),
-                            "agent_id": agent_id,
-                            "attempt": attempt,
-                            "delay": delay,
-                        },
-                    )
-                    return board_agent.name, response
+            latest_role = _latest_history_role(history)
+            current_signature = _latest_history_signature(history)
+            response = _extract_latest_message(history)
 
-        # If we got here, no new response after all polling attempts
-        if response:
-            return board_agent.name, response
+            # A valid turn means a new latest history entry from assistant/agent with text.
+            if (
+                response
+                and latest_role in {"assistant", "agent"}
+                and current_signature is not None
+                and current_signature != baseline_signature
+            ):
+                logger.info(
+                    "task_mode.agent_turn.response_received",
+                    extra={
+                        "task_id": str(ctx.task.id),
+                        "agent_id": agent_id,
+                        "attempt": attempt,
+                        "delay": delay,
+                    },
+                )
+                return board_agent.name, response
     except Exception as exc:  # pragma: no cover - network/runtime dependent
         logger.warning(
             "task_mode.agent_turn.gateway_failed",
