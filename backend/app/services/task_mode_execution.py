@@ -226,7 +226,10 @@ async def _run_agent_turn(
                 "error": str(exc),
             },
         )
-        raise RuntimeError(f"Arena agent '{agent_id}' unavailable: gateway response unavailable") from exc
+        detail = str(exc).strip() or exc.__class__.__name__
+        raise RuntimeError(
+            f"Arena agent '{agent_id}' unavailable: gateway response unavailable ({detail})"
+        ) from exc
     raise RuntimeError(f"Arena agent '{agent_id}' unavailable: gateway response unavailable")
 
 
