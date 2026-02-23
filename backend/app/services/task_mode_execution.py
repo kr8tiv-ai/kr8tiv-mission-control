@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -81,6 +84,84 @@ def _parse_sources(task: Task) -> NotebookSourcesPayload:
         urls=tuple(sources.urls),
         texts=tuple(sources.texts),
     )
+
+
+async def _load_supermemory_context(task: Task, *, limit: int = 3) -> list[str]:
+    """Fetch compact context lines from supermemory.js for the current task.
+
+    Best-effort only: failures are logged and return an empty list.
+    """
+    script_path = Path("/data/.openclaw/workspace/supermemory.js")
+    if not script_path.exists():
+        return []
+
+    query_parts = [task.title.strip()]
+    if task.description:
+        query_parts.append(task.description.strip())
+    query = "\n".join(part for part in query_parts if part)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "node",
+            str(script_path),
+            "search",
+            query,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8)
+    except Exception as exc:  # pragma: no cover - env/runtime dependent
+        logger.warning(
+            "task_mode.arena.supermemory.lookup_failed",
+            extra={"task_id": str(task.id), "error": str(exc)},
+        )
+        return []
+
+    if proc.returncode != 0:
+        logger.warning(
+            "task_mode.arena.supermemory.nonzero_exit",
+            extra={
+                "task_id": str(task.id),
+                "returncode": proc.returncode,
+                "stderr": (stderr.decode("utf-8", errors="ignore") or "").strip(),
+            },
+        )
+        return []
+
+    try:
+        payload = json.loads(stdout.decode("utf-8", errors="ignore") or "{}")
+    except Exception as exc:  # pragma: no cover - malformed output
+        logger.warning(
+            "task_mode.arena.supermemory.parse_failed",
+            extra={"task_id": str(task.id), "error": str(exc)},
+        )
+        return []
+
+    candidates: list[str] = []
+    for key in ("results", "items", "data"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                text = item.get("content") or item.get("text") or item.get("snippet")
+                if isinstance(text, str) and text.strip():
+                    compact = " ".join(text.strip().split())
+                    candidates.append(compact[:240])
+        if candidates:
+            break
+
+    # Deduplicate while preserving order
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for line in candidates:
+        if line in seen:
+            continue
+        seen.add(line)
+        deduped.append(line)
+        if len(deduped) >= limit:
+            break
+    return deduped
 
 
 def _select_arena_agents(config: ArenaConfig) -> list[str]:
@@ -345,13 +426,14 @@ async def _execute_arena_mode(
 
     summary_lines: list[str] = []
 
-    # Supermemory integration point
+    # Supermemory integration
     if parsed_config.supermemory_enabled:
-        # TODO: Wire supermemory.js here to inject relevant context
-        # Context should be retrieved based on task title/description
-        # and injected at the top of the prompt before task details
-        summary_lines.append("[Supermemory context injection point — wire supermemory.js here]")
-        summary_lines.append("")
+        context_lines = await _load_supermemory_context(task)
+        if context_lines:
+            summary_lines.append("Supermemory context:")
+            for item in context_lines:
+                summary_lines.append(f"- {item}")
+            summary_lines.append("")
 
     summary_lines.append(f"Task: {task.title}")
     if task.description:
