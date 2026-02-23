@@ -4,21 +4,29 @@
  * Mission Control API
  * OpenAPI spec version: 0.1.0
  */
+import type { ArenaConfig } from "./arenaConfig";
 import type { TaskCreateCustomFieldValues } from "./taskCreateCustomFieldValues";
+import type { TaskCreateNotebookProfile } from "./taskCreateNotebookProfile";
 import type { TaskCreateStatus } from "./taskCreateStatus";
+import type { TaskCreateTaskMode } from "./taskCreateTaskMode";
 
 /**
  * Payload for creating a task.
  */
 export interface TaskCreate {
-  title: string;
-  description?: string | null;
-  status?: TaskCreateStatus;
-  priority?: string;
-  due_at?: string | null;
+  arena_config?: ArenaConfig | null;
   assigned_agent_id?: string | null;
-  depends_on_task_ids?: string[];
-  tag_ids?: string[];
   created_by_user_id?: string | null;
   custom_field_values?: TaskCreateCustomFieldValues;
+  depends_on_task_ids?: string[];
+  description?: string | null;
+  due_at?: string | null;
+  notebook_id?: string | null;
+  notebook_profile?: TaskCreateNotebookProfile;
+  notebook_share_url?: string | null;
+  priority?: string;
+  status?: TaskCreateStatus;
+  tag_ids?: string[];
+  task_mode?: TaskCreateTaskMode;
+  title: string;
 }

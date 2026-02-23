@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field
 
 from app.core.time import utcnow
@@ -25,6 +27,11 @@ class Task(TenantScoped, table=True):
     description: str | None = None
     status: str = Field(default="inbox", index=True)
     priority: str = Field(default="medium", index=True)
+    task_mode: str = Field(default="standard", index=True)
+    arena_config: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    notebook_profile: str = Field(default="auto", index=True)
+    notebook_id: str | None = Field(default=None, sa_column=Column(Text))
+    notebook_share_url: str | None = Field(default=None, sa_column=Column(Text))
     due_at: datetime | None = None
     in_progress_at: datetime | None = None
     previous_in_progress_at: datetime | None = None

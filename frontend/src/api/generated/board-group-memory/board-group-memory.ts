@@ -24,7 +24,7 @@ import type {
   BoardGroupMemoryCreate,
   BoardGroupMemoryRead,
   HTTPValidationError,
-  LimitOffsetPageTypeVarCustomizedBoardGroupMemoryRead,
+  LimitOffsetPageTCustomizedBoardGroupMemoryRead,
   ListBoardGroupMemoryApiV1BoardGroupsGroupIdMemoryGetParams,
   ListBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGetParams,
   StreamBoardGroupMemoryApiV1BoardGroupsGroupIdMemoryStreamGetParams,
@@ -40,7 +40,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary List Board Group Memory
  */
 export type listBoardGroupMemoryApiV1BoardGroupsGroupIdMemoryGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedBoardGroupMemoryRead;
+  data: LimitOffsetPageTCustomizedBoardGroupMemoryRead;
   status: 200;
 };
 
@@ -808,7 +808,7 @@ Use this for cross-board context and coordination signals.
  */
 export type listBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGetResponse200 =
   {
-    data: LimitOffsetPageTypeVarCustomizedBoardGroupMemoryRead;
+    data: LimitOffsetPageTCustomizedBoardGroupMemoryRead;
     status: 200;
   };
 

@@ -9,7 +9,7 @@
  * Payload for updating a board webhook.
  */
 export interface BoardWebhookUpdate {
+  agent_id?: string | null;
   description?: string | null;
   enabled?: boolean | null;
-  agent_id?: string | null;
 }

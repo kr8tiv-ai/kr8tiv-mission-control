@@ -1,147 +1,286 @@
-# OpenClaw Mission Control
+# Kr8tiv Mission Control
 
 [![CI](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml/badge.svg)](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml)
 
-OpenClaw Mission Control is the centralized operations and governance platform for running OpenClaw across teams and organizations, with unified visibility, approval controls, and gateway-aware orchestration.
-It gives operators a single interface for work orchestration, agent and gateway management, approval-driven governance, and API-backed automation.
+## Fork Attribution
 
-<img width="1896" height="869" alt="Mission Control dashboard" src="https://github.com/user-attachments/assets/49a3c823-6aaf-4c56-8328-fb1485ee940f" />
-<img width="1896" height="858" alt="image" src="https://github.com/user-attachments/assets/2bfee13a-3dab-4f4a-9135-e47bb6949dcf" />
-<img width="1890" height="865" alt="image" src="https://github.com/user-attachments/assets/84c2e867-5dc7-4a36-9290-e29179d2a659" />
-<img width="1912" height="881" alt="image" src="https://github.com/user-attachments/assets/3bbd825c-9969-4bbf-bf31-987f9168f370" />
-<img width="1902" height="878" alt="image" src="https://github.com/user-attachments/assets/eea09632-60e4-4d6d-9e6e-bdfa0ac97630" />
+- Upstream project: [OpenClaw Mission Control](https://github.com/abhi1693/openclaw-mission-control)
+- Upstream owner: [@abhi1693](https://github.com/abhi1693)
+- Fork owner and publishing organization: [kr8tiv-ai](https://github.com/orgs/kr8tiv-ai)
 
-## Platform overview
+This distribution preserves upstream credit and keeps the upstream MIT license terms.
 
-Mission Control is designed to be the day-to-day operations surface for OpenClaw.
-Instead of splitting work across multiple tools, teams can plan, execute, review, and audit activity in one system.
+Kr8tiv Mission Control is a production-ready fork direction for OpenClaw Mission Control with mode-aware task orchestration:
 
-Core operational areas:
+- Standard task flow
+- NotebookLM-grounded task flow
+- Arena iterative multi-agent flow
+- Arena + NotebookLM combined flow
+- NotebookLM creation flow
 
-- Work orchestration: manage organizations, board groups, boards, tasks, and tags.
-- Agent operations: create, inspect, and manage agent lifecycle from a unified control surface.
-- Governance and approvals: route sensitive actions through explicit approval flows.
-- Gateway management: connect and operate gateway integrations for distributed environments.
-- Activity visibility: review a timeline of system actions for faster debugging and accountability.
-- API-first model: support both web workflows and automation clients from the same platform.
+It keeps the existing backend/frontend stack and auth model while adding durable multi-round execution and notebook integration.
 
-## Use cases
+## Architecture
 
-- Multi-team agent operations: run multiple boards and board groups across organizations from a single control plane.
-- Human-in-the-loop execution: require approvals before sensitive actions and keep decision trails attached to work.
-- Distributed runtime control: connect gateways and operate remote execution environments without changing operator workflow.
-- Audit and incident review: use activity history to reconstruct what happened, when it happened, and who initiated it.
-- API-backed process integration: connect internal workflows and automation clients to the same operational model used in the UI.
+### Core stack
 
-## What makes Mission Control different
+- Frontend: Next.js + TypeScript (`frontend/`)
+- Backend: FastAPI + SQLModel + Alembic (`backend/`)
+- Queue: Redis + custom queue worker (`backend/app/services/queue_worker.py`)
+- Database: PostgreSQL
+- Runtime: Docker Compose (`compose.yml`)
 
-- Operations-first design: built for running agent work reliably, not just creating tasks.
-- Governance built in: approvals, auth modes, and clear control boundaries are first-class.
-- Gateway-aware orchestration: built to operate both local and connected runtime environments.
-- Unified UI and API model: operators and automation act on the same objects and lifecycle.
-- Team-scale structure: organizations, board groups, boards, tasks, tags, and users in one system of record.
+### Task mode expansion
 
-## Who it is for
+Tasks support:
 
-- Platform teams running OpenClaw in self-hosted or internal environments.
-- Operations and engineering teams that need clear approval and auditability controls.
-- Organizations that want API-accessible operations without losing a usable web UI.
+- `standard`
+- `notebook`
+- `arena`
+- `arena_notebook`
+- `notebook_creation`
 
-## Get started in minutes
+New task columns:
 
-### Option A: One-command production-style bootstrap
+- `task_mode`
+- `arena_config` (JSONB)
+- `notebook_profile`
+- `notebook_id`
+- `notebook_share_url`
 
-If you haven't cloned the repo yet, you can run the installer in one line:
+New table:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/abhi1693/openclaw-mission-control/master/install.sh | bash
-```
+- `task_iterations` for round-by-round arena persistence
 
-If you already cloned the repo:
-
-```bash
-./install.sh
-```
-
-The installer is interactive and will:
-
-- Ask for deployment mode (`docker` or `local`).
-- Install missing system dependencies when possible.
-- Generate and configure environment files.
-- Bootstrap and start the selected deployment mode.
-
-Installer support matrix: [`docs/installer-support.md`](./docs/installer-support.md)
-
-### Option B: Manual setup
+## Quick Start
 
 ### Prerequisites
 
-- Docker Engine
-- Docker Compose v2 (`docker compose`)
+- Docker Engine + Compose v2
+- Git
+- A valid `LOCAL_AUTH_TOKEN` if using local auth
 
-### 1. Configure environment
+### 1) Configure environment
 
 ```bash
 cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
-Before startup:
+Set at minimum:
 
-- Set `LOCAL_AUTH_TOKEN` to a non-placeholder value (minimum 50 characters) when `AUTH_MODE=local`.
-- Ensure `NEXT_PUBLIC_API_URL` is reachable from your browser.
+- `AUTH_MODE=local`
+- `LOCAL_AUTH_TOKEN=<50+ character token>`
+- `NEXT_PUBLIC_API_URL=http://localhost:8000`
 
-### 2. Start Mission Control
+Optional task-mode variables:
+
+- `ARENA_ALLOWED_AGENTS=friday,arsenal,edith,jocasta`
+- `ARENA_REVIEWER_AGENT=arsenal`
+- `NOTEBOOKLM_RUNNER_CMD=uvx --from notebooklm-mcp-cli nlm`
+- `NOTEBOOKLM_PROFILES_ROOT=/var/lib/notebooklm/profiles`
+- `NOTEBOOKLM_TIMEOUT_SECONDS=120`
+
+### 2) Start services
 
 ```bash
 docker compose -f compose.yml --env-file .env up -d --build
 ```
 
-### 3. Open the application
+Endpoints:
 
-- Mission Control UI: http://localhost:3000
-- Backend health: http://localhost:8000/healthz
+- UI: `http://localhost:3000`
+- API: `http://localhost:8000`
+- Health: `http://localhost:8000/healthz`
 
-### 4. Stop the stack
+### 3) Stop services
 
 ```bash
 docker compose -f compose.yml --env-file .env down
 ```
 
-## Authentication
+## Migrations
 
-Mission Control supports two authentication modes:
+Migrations run automatically in dev when enabled by config.
 
-- `local`: shared bearer token mode (default for self-hosted use)
-- `clerk`: Clerk JWT mode
+Manual:
 
-Environment templates:
+```bash
+cd backend
+alembic upgrade head
+```
 
-- Root: [`.env.example`](./.env.example)
-- Backend: [`backend/.env.example`](./backend/.env.example)
-- Frontend: [`frontend/.env.example`](./frontend/.env.example)
+Added migration for this expansion:
 
-## Documentation
+- `backend/migrations/versions/c7f4d1b2a9e3_add_task_modes_and_iterations.py`
 
-Complete guides for deployment, production, troubleshooting, and testing are in [`/docs`](./docs/).
+## NotebookLM Integration
 
-## Project status
+This fork uses `notebooklm-mcp-cli` through `uvx` at runtime.
 
-Mission Control is under active development.
+### Profile model
 
-- Features and APIs may change between releases.
-- Validate and harden your configuration before production use.
+- `enterprise`
+- `personal`
+- `auto` (tries `personal` then `enterprise`)
 
-## Contributing
+### Persistent auth storage
 
-Issues and pull requests are welcome.
+Compose mounts a shared named volume:
 
-- [Contributing guide](./CONTRIBUTING.md)
-- [Open issues](https://github.com/abhi1693/openclaw-mission-control/issues)
+- `notebooklm_profiles:/var/lib/notebooklm/profiles`
+
+This keeps NotebookLM profile cookies across container restarts.
+
+### Initial profile login
+
+Run profile login in backend/worker-compatible environment where `nlm` is available:
+
+```bash
+uvx --from notebooklm-mcp-cli nlm login --profile personal
+uvx --from notebooklm-mcp-cli nlm login --profile enterprise
+```
+
+Then verify:
+
+```bash
+uvx --from notebooklm-mcp-cli nlm notebook list --profile personal
+```
+
+## Arena Execution Model
+
+Arena modes are worker-driven and persisted.
+
+### Inputs
+
+- Agent list (up to 4 from allowlist)
+- Rounds (`1..10`)
+- Final agent
+- Supermemory toggle
+
+### Reviewer policy
+
+- Fixed reviewer agent: `arsenal` (configurable with `ARENA_REVIEWER_AGENT`)
+- Auto-injected if not selected by user
+
+### VERDICT protocol
+
+Reviewer output must include:
+
+- `VERDICT: APPROVED`
+- `VERDICT: REVISE`
+
+If no valid verdict is found, execution records an `ERROR` verdict and task execution fails safely.
+
+### Cap behavior
+
+If no `APPROVED` before round cap, workflow finalizes with warning metadata and still runs the final agent.
+
+## UI Changes
+
+Task creation now includes mode tabs:
+
+- Standard
+- Notebook Task
+- Arena
+- Arena+Notebook
+- Create NotebookLM
+
+Additional form controls:
+
+- Arena agent multi-select
+- Arena rounds slider (1-10)
+- Final agent select
+- Supermemory toggle
+- Notebook profile selector
+- Notebook source URL/text inputs (for notebook creation mode)
+
+Task detail panel now includes:
+
+- Mode metadata
+- Notebook query UI (for notebook-enabled modes)
+- Arena iteration list with verdict badges
+
+## API Surface
+
+Existing endpoint extended:
+
+- `POST /api/v1/boards/{board_id}/tasks`
+
+New task-scoped endpoints:
+
+- `GET /api/v1/boards/{board_id}/tasks/{task_id}/iterations`
+- `POST /api/v1/boards/{board_id}/tasks/{task_id}/notebook/query`
+
+## Worker Runtime
+
+The compose worker now runs unified Python queue worker entrypoint:
+
+- `python -m app.services.queue_worker`
+
+This handles:
+
+- Webhook deliveries
+- Task mode orchestration jobs
+
+## Operational Playbook
+
+### Common issues
+
+1. Notebook command failures:
+   - Check `NOTEBOOKLM_RUNNER_CMD`
+   - Verify profile login state
+   - Verify profile volume mount
+2. Arena task not progressing:
+   - Ensure worker container is running
+   - Check Redis connectivity and `RQ_REDIS_URL`
+3. Tasks return to inbox:
+   - Mode execution failed by design-safe fallback
+   - Inspect task comments for `[Task Mode Error]`
+
+### Useful checks
+
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f webhook-worker
+```
+
+## Testing
+
+Backend examples:
+
+```bash
+python -m pytest backend/tests/test_task_mode_schema.py -q
+python -m pytest backend/tests/test_task_mode_arena_config.py -q
+python -m pytest backend/tests/test_task_mode_verdict.py -q
+```
+
+Frontend:
+
+```bash
+npm --prefix frontend run lint
+```
+
+## Open Source Fork Workflow
+
+If publishing as a new public repository:
+
+1. Create target repository in the `kr8tiv-ai` organization (for example `kr8tiv-mission-control`)
+2. Add new remote:
+
+```bash
+git remote add kr8tiv <new-repo-url>
+```
+
+3. Push branch:
+
+```bash
+git push -u kr8tiv <branch-name>
+```
+
+4. Open PR from feature branch to your default branch
 
 ## License
 
-This project is licensed under the MIT License. See [`LICENSE`](./LICENSE).
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=abhi1693/openclaw-mission-control&type=date&legend=top-left)](https://www.star-history.com/#abhi1693/openclaw-mission-control&type=date&legend=top-left)
+MIT. See `LICENSE` and attribution details in `NOTICE`.

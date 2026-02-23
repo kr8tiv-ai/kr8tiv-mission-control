@@ -27,8 +27,8 @@ import type {
   BoardWebhookRead,
   BoardWebhookUpdate,
   HTTPValidationError,
-  LimitOffsetPageTypeVarCustomizedBoardWebhookPayloadRead,
-  LimitOffsetPageTypeVarCustomizedBoardWebhookRead,
+  LimitOffsetPageTCustomizedBoardWebhookPayloadRead,
+  LimitOffsetPageTCustomizedBoardWebhookRead,
   ListBoardWebhookPayloadsApiV1BoardsBoardIdWebhooksWebhookIdPayloadsGetParams,
   ListBoardWebhooksApiV1BoardsBoardIdWebhooksGetParams,
   OkResponse,
@@ -43,7 +43,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary List Board Webhooks
  */
 export type listBoardWebhooksApiV1BoardsBoardIdWebhooksGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedBoardWebhookRead;
+  data: LimitOffsetPageTCustomizedBoardWebhookRead;
   status: 200;
 };
 
@@ -432,6 +432,163 @@ export const useCreateBoardWebhookApiV1BoardsBoardIdWebhooksPost = <
 > => {
   return useMutation(
     getCreateBoardWebhookApiV1BoardsBoardIdWebhooksPostMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Delete a webhook and its stored payload rows.
+ * @summary Delete Board Webhook
+ */
+export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse200 =
+  {
+    data: OkResponse;
+    status: 200;
+  };
+
+export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse422 =
+  {
+    data: HTTPValidationError;
+    status: 422;
+  };
+
+export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseSuccess =
+  deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse200 & {
+    headers: Headers;
+  };
+export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseError =
+  deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse422 & {
+    headers: Headers;
+  };
+
+export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse =
+
+    | deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseSuccess
+    | deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseError;
+
+export const getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteUrl =
+  (boardId: string, webhookId: string) => {
+    return `/api/v1/boards/${boardId}/webhooks/${webhookId}`;
+  };
+
+export const deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete =
+  async (
+    boardId: string,
+    webhookId: string,
+    options?: RequestInit,
+  ): Promise<deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse> => {
+    return customFetch<deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse>(
+      getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteUrl(
+        boardId,
+        webhookId,
+      ),
+      {
+        ...options,
+        method: "DELETE",
+      },
+    );
+  };
+
+export const getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
+        >
+      >,
+      TError,
+      { boardId: string; webhookId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
+      >
+    >,
+    TError,
+    { boardId: string; webhookId: string },
+    TContext
+  > => {
+    const mutationKey = [
+      "deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete",
+    ];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        "mutationKey" in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
+        >
+      >,
+      { boardId: string; webhookId: string }
+    > = (props) => {
+      const { boardId, webhookId } = props ?? {};
+
+      return deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete(
+        boardId,
+        webhookId,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type DeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
+      >
+    >
+  >;
+
+export type DeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Delete Board Webhook
+ */
+export const useDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
+        >
+      >,
+      TError,
+      { boardId: string; webhookId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<
+    ReturnType<
+      typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
+    >
+  >,
+  TError,
+  { boardId: string; webhookId: string },
+  TContext
+> => {
+  return useMutation(
+    getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationOptions(
+      options,
+    ),
     queryClient,
   );
 };
@@ -875,163 +1032,6 @@ export const useUpdateBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdPatch = <
   );
 };
 /**
- * Delete a webhook and its stored payload rows.
- * @summary Delete Board Webhook
- */
-export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse200 =
-  {
-    data: OkResponse;
-    status: 200;
-  };
-
-export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse422 =
-  {
-    data: HTTPValidationError;
-    status: 422;
-  };
-
-export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseSuccess =
-  deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse200 & {
-    headers: Headers;
-  };
-export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseError =
-  deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse422 & {
-    headers: Headers;
-  };
-
-export type deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse =
-
-    | deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseSuccess
-    | deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponseError;
-
-export const getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteUrl =
-  (boardId: string, webhookId: string) => {
-    return `/api/v1/boards/${boardId}/webhooks/${webhookId}`;
-  };
-
-export const deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete =
-  async (
-    boardId: string,
-    webhookId: string,
-    options?: RequestInit,
-  ): Promise<deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse> => {
-    return customFetch<deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteResponse>(
-      getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteUrl(
-        boardId,
-        webhookId,
-      ),
-      {
-        ...options,
-        method: "DELETE",
-      },
-    );
-  };
-
-export const getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationOptions =
-  <TError = HTTPValidationError, TContext = unknown>(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
-        >
-      >,
-      TError,
-      { boardId: string; webhookId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
-      >
-    >,
-    TError,
-    { boardId: string; webhookId: string },
-    TContext
-  > => {
-    const mutationKey = [
-      "deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete",
-    ];
-    const { mutation: mutationOptions, request: requestOptions } = options
-      ? options.mutation &&
-        "mutationKey" in options.mutation &&
-        options.mutation.mutationKey
-        ? options
-        : { ...options, mutation: { ...options.mutation, mutationKey } }
-      : { mutation: { mutationKey }, request: undefined };
-
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<
-          typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
-        >
-      >,
-      { boardId: string; webhookId: string }
-    > = (props) => {
-      const { boardId, webhookId } = props ?? {};
-
-      return deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete(
-        boardId,
-        webhookId,
-        requestOptions,
-      );
-    };
-
-    return { mutationFn, ...mutationOptions };
-  };
-
-export type DeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationResult =
-  NonNullable<
-    Awaited<
-      ReturnType<
-        typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
-      >
-    >
-  >;
-
-export type DeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Delete Board Webhook
- */
-export const useDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
-        >
-      >,
-      TError,
-      { boardId: string; webhookId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<
-    ReturnType<
-      typeof deleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete
-    >
-  >,
-  TError,
-  { boardId: string; webhookId: string },
-  TContext
-> => {
-  return useMutation(
-    getDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDeleteMutationOptions(
-      options,
-    ),
-    queryClient,
-  );
-};
-/**
  * Open inbound webhook endpoint that stores payloads and nudges the board lead.
  * @summary Ingest Board Webhook
  */
@@ -1192,7 +1192,7 @@ export const useIngestBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdPost = <
  */
 export type listBoardWebhookPayloadsApiV1BoardsBoardIdWebhooksWebhookIdPayloadsGetResponse200 =
   {
-    data: LimitOffsetPageTypeVarCustomizedBoardWebhookPayloadRead;
+    data: LimitOffsetPageTCustomizedBoardWebhookPayloadRead;
     status: 200;
   };
 

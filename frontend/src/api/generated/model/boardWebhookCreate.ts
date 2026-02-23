@@ -9,8 +9,8 @@
  * Payload for creating a board webhook.
  */
 export interface BoardWebhookCreate {
+  agent_id?: string | null;
   /** @minLength 1 */
   description: string;
   enabled?: boolean;
-  agent_id?: string | null;
 }

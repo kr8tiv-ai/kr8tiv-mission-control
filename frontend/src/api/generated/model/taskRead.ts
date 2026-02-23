@@ -4,30 +4,38 @@
  * Mission Control API
  * OpenAPI spec version: 0.1.0
  */
+import type { ArenaConfig } from "./arenaConfig";
 import type { TagRef } from "./tagRef";
 import type { TaskReadCustomFieldValues } from "./taskReadCustomFieldValues";
+import type { TaskReadNotebookProfile } from "./taskReadNotebookProfile";
 import type { TaskReadStatus } from "./taskReadStatus";
+import type { TaskReadTaskMode } from "./taskReadTaskMode";
 
 /**
  * Task payload returned from read endpoints.
  */
 export interface TaskRead {
-  title: string;
-  description?: string | null;
-  status?: TaskReadStatus;
-  priority?: string;
-  due_at?: string | null;
+  arena_config?: ArenaConfig | null;
   assigned_agent_id?: string | null;
-  depends_on_task_ids?: string[];
-  tag_ids?: string[];
-  id: string;
-  board_id: string | null;
-  created_by_user_id: string | null;
-  in_progress_at: string | null;
-  created_at: string;
-  updated_at: string;
   blocked_by_task_ids?: string[];
-  is_blocked?: boolean;
-  tags?: TagRef[];
+  board_id: string | null;
+  created_at: string;
+  created_by_user_id: string | null;
   custom_field_values?: TaskReadCustomFieldValues;
+  depends_on_task_ids?: string[];
+  description?: string | null;
+  due_at?: string | null;
+  id: string;
+  in_progress_at: string | null;
+  is_blocked?: boolean;
+  notebook_id?: string | null;
+  notebook_profile?: TaskReadNotebookProfile;
+  notebook_share_url?: string | null;
+  priority?: string;
+  status?: TaskReadStatus;
+  tag_ids?: string[];
+  tags?: TagRef[];
+  task_mode?: TaskReadTaskMode;
+  title: string;
+  updated_at: string;
 }

@@ -57,6 +57,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/api/mutator";
 import { streamAgentsApiV1AgentsStreamGet } from "@/api/generated/agents/agents";
@@ -82,6 +83,8 @@ import {
   createTaskCommentApiV1BoardsBoardIdTasksTaskIdCommentsPost,
   deleteTaskApiV1BoardsBoardIdTasksTaskIdDelete,
   listTaskCommentsApiV1BoardsBoardIdTasksTaskIdCommentsGet,
+  listTaskIterationsApiV1BoardsBoardIdTasksTaskIdIterationsGet,
+  queryTaskNotebookApiV1BoardsBoardIdTasksTaskIdNotebookQueryPost,
   streamTasksApiV1BoardsBoardIdTasksStreamGet,
   updateTaskApiV1BoardsBoardIdTasksTaskIdPatch,
 } from "@/api/generated/tasks/tasks";
@@ -103,6 +106,7 @@ import type {
   OrganizationMemberRead,
   TaskCardRead,
   TaskCommentRead,
+  TaskIterationRead,
   TaskCustomFieldDefinitionRead,
   TagRead,
   TaskRead,
@@ -135,6 +139,13 @@ import {
 type Board = BoardRead;
 
 type TaskStatus = Exclude<TaskCardRead["status"], undefined>;
+type TaskMode =
+  | "standard"
+  | "notebook"
+  | "arena"
+  | "arena_notebook"
+  | "notebook_creation";
+type NotebookProfile = "enterprise" | "personal" | "auto";
 
 type TaskCustomFieldPayload = {
   custom_field_values?: TaskCustomFieldValues;
@@ -152,6 +163,7 @@ type Task = Omit<
 };
 
 type Agent = AgentRead & { status: string };
+type TaskIteration = TaskIterationRead;
 
 type TaskComment = TaskCommentRead;
 
@@ -512,6 +524,19 @@ const priorities = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
 ];
+const taskModeTabs: { value: TaskMode; label: string }[] = [
+  { value: "standard", label: "Standard" },
+  { value: "notebook", label: "Notebook Task" },
+  { value: "arena", label: "Arena" },
+  { value: "arena_notebook", label: "Arena+Notebook" },
+  { value: "notebook_creation", label: "Create NotebookLM" },
+];
+const notebookProfiles: { value: NotebookProfile; label: string }[] = [
+  { value: "enterprise", label: "Enterprise" },
+  { value: "personal", label: "Personal" },
+  { value: "auto", label: "Auto" },
+];
+const arenaAgentOptions = ["friday", "arsenal", "edith", "jocasta"] as const;
 const statusOptions = [
   { value: "inbox", label: "Inbox" },
   { value: "in_progress", label: "In progress" },
@@ -1106,12 +1131,36 @@ export default function BoardDetailPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
+  const [taskMode, setTaskMode] = useState<TaskMode>("standard");
+  const [notebookProfile, setNotebookProfile] =
+    useState<NotebookProfile>("auto");
+  const [createNotebookId, setCreateNotebookId] = useState("");
+  const [arenaAgents, setArenaAgents] = useState<string[]>([
+    "friday",
+    "arsenal",
+    "edith",
+    "jocasta",
+  ]);
+  const [arenaRounds, setArenaRounds] = useState(3);
+  const [arenaFinalAgent, setArenaFinalAgent] = useState("jocasta");
+  const [arenaSupermemoryEnabled, setArenaSupermemoryEnabled] = useState(true);
+  const [notebookSourceUrls, setNotebookSourceUrls] = useState("");
+  const [notebookSourceTexts, setNotebookSourceTexts] = useState("");
   const [createDueDate, setCreateDueDate] = useState("");
   const [createTagIds, setCreateTagIds] = useState<string[]>([]);
   const [createCustomFieldValues, setCreateCustomFieldValues] =
     useState<TaskCustomFieldValues>({});
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [taskIterations, setTaskIterations] = useState<TaskIteration[]>([]);
+  const [isIterationsLoading, setIsIterationsLoading] = useState(false);
+  const [iterationsError, setIterationsError] = useState<string | null>(null);
+  const [notebookQuery, setNotebookQuery] = useState("");
+  const [notebookAnswer, setNotebookAnswer] = useState<string | null>(null);
+  const [notebookQueryError, setNotebookQueryError] = useState<string | null>(
+    null,
+  );
+  const [isNotebookQuerying, setIsNotebookQuerying] = useState(false);
 
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -1152,6 +1201,12 @@ export default function BoardDetailPage() {
     () => (board ? `${board.name} board` : "Board"),
     [board],
   );
+  const isArenaMode = taskMode === "arena" || taskMode === "arena_notebook";
+  const isNotebookEnabledMode =
+    taskMode === "notebook" ||
+    taskMode === "arena_notebook" ||
+    taskMode === "notebook_creation";
+  const isNotebookCreationMode = taskMode === "notebook_creation";
 
   useEffect(() => {
     if (!isSidePanelOpen) return;
@@ -1940,6 +1995,15 @@ export default function BoardDetailPage() {
     setTitle("");
     setDescription("");
     setPriority("medium");
+    setTaskMode("standard");
+    setNotebookProfile("auto");
+    setCreateNotebookId("");
+    setArenaAgents(["friday", "arsenal", "edith", "jocasta"]);
+    setArenaRounds(3);
+    setArenaFinalAgent("jocasta");
+    setArenaSupermemoryEnabled(true);
+    setNotebookSourceUrls("");
+    setNotebookSourceTexts("");
     setCreateDueDate("");
     setCreateTagIds([]);
     setCreateCustomFieldValues(defaultCreateCustomFieldValues);
@@ -1967,14 +2031,58 @@ export default function BoardDetailPage() {
       );
       return;
     }
+    if (isArenaMode) {
+      if (arenaAgents.length === 0) {
+        setCreateError("Arena mode requires at least one selected agent.");
+        return;
+      }
+      if (!arenaFinalAgent) {
+        setCreateError("Arena mode requires a final agent.");
+        return;
+      }
+    }
+    const sourceUrls = notebookSourceUrls
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const sourceTexts = notebookSourceTexts
+      .split("\n\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (isNotebookCreationMode && sourceUrls.length === 0 && sourceTexts.length === 0) {
+      setCreateError(
+        "Notebook creation mode requires at least one source URL or text snippet.",
+      );
+      return;
+    }
     setIsCreating(true);
     setCreateError(null);
     try {
+      const arenaConfig =
+        isArenaMode || isNotebookCreationMode
+          ? {
+              agents: isArenaMode ? arenaAgents : [],
+              rounds: arenaRounds,
+              final_agent: isArenaMode ? arenaFinalAgent : null,
+              supermemory_enabled: arenaSupermemoryEnabled,
+              sources:
+                sourceUrls.length > 0 || sourceTexts.length > 0
+                  ? {
+                      urls: sourceUrls,
+                      texts: sourceTexts,
+                    }
+                  : null,
+            }
+          : null;
       const payload: BoardTaskCreatePayload = {
         title: trimmed,
         description: description.trim() || null,
         status: "inbox",
         priority,
+        task_mode: taskMode,
+        arena_config: arenaConfig,
+        notebook_profile: notebookProfile,
+        notebook_id: createNotebookId.trim() || null,
         due_at: localDateInputToUtcIso(createDueDate),
         tag_ids: createTagIds,
         custom_field_values: createCustomFieldPayload,
@@ -2210,6 +2318,18 @@ export default function BoardDetailPage() {
     setCreateTagIds((prev) => prev.filter((value) => value !== tagId));
   }, []);
 
+  const toggleArenaAgent = useCallback((agentId: string) => {
+    setArenaAgents((prev) => {
+      if (prev.includes(agentId)) {
+        return prev.filter((value) => value !== agentId);
+      }
+      if (prev.length >= 4) {
+        return prev;
+      }
+      return [...prev, agentId];
+    });
+  }, []);
+
   const hasTaskChanges = useMemo(() => {
     if (!selectedTask) return false;
     const normalizedTitle = editTitle.trim();
@@ -2355,6 +2475,62 @@ export default function BoardDetailPage() {
     [boardId, isSignedIn],
   );
 
+  const loadTaskIterations = useCallback(
+    async (taskId: string) => {
+      if (!isSignedIn || !boardId) return;
+      setIsIterationsLoading(true);
+      setIterationsError(null);
+      try {
+        const result =
+          await listTaskIterationsApiV1BoardsBoardIdTasksTaskIdIterationsGet(
+            boardId,
+            taskId,
+          );
+        if (result.status !== 200) {
+          throw new Error("Unable to load task iterations.");
+        }
+        setTaskIterations(result.data ?? []);
+      } catch (err) {
+        setIterationsError(
+          err instanceof Error ? err.message : "Something went wrong.",
+        );
+      } finally {
+        setIsIterationsLoading(false);
+      }
+    },
+    [boardId, isSignedIn],
+  );
+
+  const handleNotebookQuery = useCallback(async () => {
+    if (!selectedTask || !boardId || !isSignedIn) return;
+    const trimmed = notebookQuery.trim();
+    if (!trimmed) {
+      setNotebookQueryError("Enter a notebook query.");
+      return;
+    }
+    setIsNotebookQuerying(true);
+    setNotebookQueryError(null);
+    try {
+      const result =
+        await queryTaskNotebookApiV1BoardsBoardIdTasksTaskIdNotebookQueryPost(
+          boardId,
+          selectedTask.id,
+          { query: trimmed },
+        );
+      if (result.status !== 200) {
+        throw new Error("Unable to query NotebookLM.");
+      }
+      setNotebookAnswer(result.data.answer);
+      await loadComments(selectedTask.id);
+    } catch (err) {
+      setNotebookQueryError(
+        err instanceof Error ? err.message : "Notebook query failed.",
+      );
+    } finally {
+      setIsNotebookQuerying(false);
+    }
+  }, [boardId, isSignedIn, loadComments, notebookQuery, selectedTask]);
+
   const openComments = useCallback(
     (task: { id: string }) => {
       setIsChatOpen(false);
@@ -2373,9 +2549,13 @@ export default function BoardDetailPage() {
       selectedTaskIdRef.current = fullTask.id;
       setSelectedTask(fullTask);
       setIsDetailOpen(true);
+      setNotebookAnswer(null);
+      setNotebookQuery("");
+      setNotebookQueryError(null);
       void loadComments(task.id);
+      void loadTaskIterations(task.id);
     },
-    [loadComments, pathname, router, searchParams],
+    [loadComments, loadTaskIterations, pathname, router, searchParams],
   );
 
   const selectedTaskDependencies = useMemo<DependencyBannerDependency[]>(() => {
@@ -2466,6 +2646,11 @@ export default function BoardDetailPage() {
     setSelectedTask(null);
     setComments([]);
     setCommentsError(null);
+    setTaskIterations([]);
+    setIterationsError(null);
+    setNotebookQuery("");
+    setNotebookAnswer(null);
+    setNotebookQueryError(null);
     setPostCommentError(null);
     setIsEditDialogOpen(false);
   };
@@ -3635,6 +3820,107 @@ export default function BoardDetailPage() {
             </div>
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Task mode
+              </p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <p className="font-medium">
+                  {(selectedTask?.task_mode ?? "standard").replace(/_/g, " ")}
+                </p>
+                {selectedTask?.notebook_profile ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Notebook profile: {selectedTask.notebook_profile}
+                  </p>
+                ) : null}
+                {selectedTask?.notebook_id ? (
+                  <p className="mt-1 break-all text-xs text-slate-500">
+                    Notebook ID: {selectedTask.notebook_id}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            {selectedTask &&
+            (selectedTask.task_mode === "notebook" ||
+              selectedTask.task_mode === "arena_notebook" ||
+              selectedTask.task_mode === "notebook_creation") ? (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Notebook query
+                </p>
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <Textarea
+                    value={notebookQuery}
+                    onChange={(event) => setNotebookQuery(event.target.value)}
+                    placeholder="Ask NotebookLM about this task..."
+                    className="min-h-[90px]"
+                    disabled={!canWrite || isNotebookQuerying}
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={handleNotebookQuery}
+                      disabled={!canWrite || isNotebookQuerying}
+                    >
+                      {isNotebookQuerying ? "Querying…" : "Run query"}
+                    </Button>
+                  </div>
+                  {notebookQueryError ? (
+                    <p className="text-xs text-rose-600">{notebookQueryError}</p>
+                  ) : null}
+                  {notebookAnswer ? (
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700">
+                      <Markdown content={notebookAnswer} variant="comment" />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {selectedTask &&
+            (selectedTask.task_mode === "arena" ||
+              selectedTask.task_mode === "arena_notebook") ? (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Arena iterations
+                </p>
+                {isIterationsLoading ? (
+                  <p className="text-sm text-slate-500">Loading iterations…</p>
+                ) : iterationsError ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                    {iterationsError}
+                  </div>
+                ) : taskIterations.length === 0 ? (
+                  <p className="text-sm text-slate-500">No iterations recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {taskIterations.map((iteration) => (
+                      <div
+                        key={iteration.id}
+                        className="rounded-xl border border-slate-200 bg-white p-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            Round {iteration.round_number}
+                          </p>
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                            {iteration.verdict}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-600">
+                          Reviewer: {iteration.agent_id}
+                        </p>
+                        <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-700">
+                          <Markdown
+                            content={iteration.output_text}
+                            variant="comment"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Custom fields
               </p>
               {customFieldDefinitionsQuery.isLoading ? (
@@ -4405,6 +4691,174 @@ export default function BoardDetailPage() {
                 disabled={!canWrite || isCreating}
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-strong">Task mode</label>
+              <Tabs
+                value={taskMode}
+                onValueChange={(value) => setTaskMode(value as TaskMode)}
+              >
+                <TabsList className="w-full flex-wrap rounded-xl">
+                  {taskModeTabs.map((mode) => (
+                    <TabsTrigger key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {taskModeTabs.map((mode) => (
+                  <TabsContent key={mode.value} value={mode.value} />
+                ))}
+              </Tabs>
+            </div>
+            {isNotebookEnabledMode ? (
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  NotebookLM
+                </p>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Profile
+                  </label>
+                  <Select
+                    value={notebookProfile}
+                    onValueChange={(value) =>
+                      setNotebookProfile(value as NotebookProfile)
+                    }
+                    disabled={!canWrite || isCreating}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select profile" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {notebookProfiles.map((profile) => (
+                        <SelectItem key={profile.value} value={profile.value}>
+                          {profile.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Existing notebook ID (optional)
+                  </label>
+                  <Input
+                    value={createNotebookId}
+                    onChange={(event) => setCreateNotebookId(event.target.value)}
+                    placeholder="Leave blank to auto-create"
+                    disabled={!canWrite || isCreating}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {isArenaMode ? (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Arena config
+                </p>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Agents (up to 4)
+                  </label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {arenaAgentOptions.map((agentId) => (
+                      <label
+                        key={agentId}
+                        className="flex items-center gap-2 text-xs text-slate-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={arenaAgents.includes(agentId)}
+                          onChange={() => toggleArenaAgent(agentId)}
+                          disabled={!canWrite || isCreating}
+                        />
+                        <span className="font-medium">{agentId}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Rounds: {arenaRounds}
+                  </label>
+                  <Input
+                    type="range"
+                    min={1}
+                    max={10}
+                    step={1}
+                    value={arenaRounds}
+                    onChange={(event) =>
+                      setArenaRounds(Number(event.target.value))
+                    }
+                    disabled={!canWrite || isCreating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Final agent
+                  </label>
+                  <Select
+                    value={arenaFinalAgent}
+                    onValueChange={setArenaFinalAgent}
+                    disabled={!canWrite || isCreating}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select final agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {arenaAgentOptions.map((agentId) => (
+                        <SelectItem key={agentId} value={agentId}>
+                          {agentId}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={arenaSupermemoryEnabled}
+                    onChange={(event) =>
+                      setArenaSupermemoryEnabled(event.target.checked)
+                    }
+                    disabled={!canWrite || isCreating}
+                  />
+                  <span className="font-medium">
+                    Enable Supermemory context persistence
+                  </span>
+                </label>
+              </div>
+            ) : null}
+            {isNotebookCreationMode ? (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Notebook sources
+                </p>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Source URLs (one per line)
+                  </label>
+                  <Textarea
+                    value={notebookSourceUrls}
+                    onChange={(event) => setNotebookSourceUrls(event.target.value)}
+                    placeholder="https://example.com/source-1"
+                    className="min-h-[80px]"
+                    disabled={!canWrite || isCreating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Source text snippets (separate paragraphs with blank lines)
+                  </label>
+                  <Textarea
+                    value={notebookSourceTexts}
+                    onChange={(event) => setNotebookSourceTexts(event.target.value)}
+                    placeholder="Paste source text snippets..."
+                    className="min-h-[120px]"
+                    disabled={!canWrite || isCreating}
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <label className="text-sm font-medium text-strong">
                 Custom fields

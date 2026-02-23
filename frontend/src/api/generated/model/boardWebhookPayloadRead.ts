@@ -11,12 +11,12 @@ import type { BoardWebhookPayloadReadPayload } from "./boardWebhookPayloadReadPa
  * Serialized stored webhook payload.
  */
 export interface BoardWebhookPayloadRead {
-  id: string;
   board_id: string;
-  webhook_id: string;
-  payload?: BoardWebhookPayloadReadPayload;
-  headers?: BoardWebhookPayloadReadHeaders;
-  source_ip?: string | null;
   content_type?: string | null;
+  headers?: BoardWebhookPayloadReadHeaders;
+  id: string;
+  payload?: BoardWebhookPayloadReadPayload;
   received_at: string;
+  source_ip?: string | null;
+  webhook_id: string;
 }

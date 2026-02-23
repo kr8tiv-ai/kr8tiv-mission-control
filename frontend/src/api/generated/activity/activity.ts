@@ -19,8 +19,8 @@ import type {
 
 import type {
   HTTPValidationError,
-  LimitOffsetPageTypeVarCustomizedActivityEventRead,
-  LimitOffsetPageTypeVarCustomizedActivityTaskCommentFeedItemRead,
+  LimitOffsetPageTCustomizedActivityEventRead,
+  LimitOffsetPageTCustomizedActivityTaskCommentFeedItemRead,
   ListActivityApiV1ActivityGetParams,
   ListTaskCommentFeedApiV1ActivityTaskCommentsGetParams,
   StreamTaskCommentFeedApiV1ActivityTaskCommentsStreamGetParams,
@@ -35,7 +35,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary List Activity
  */
 export type listActivityApiV1ActivityGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedActivityEventRead;
+  data: LimitOffsetPageTCustomizedActivityEventRead;
   status: 200;
 };
 
@@ -246,7 +246,7 @@ export function useListActivityApiV1ActivityGet<
  * @summary List Task Comment Feed
  */
 export type listTaskCommentFeedApiV1ActivityTaskCommentsGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedActivityTaskCommentFeedItemRead;
+  data: LimitOffsetPageTCustomizedActivityTaskCommentFeedItemRead;
   status: 200;
 };
 

@@ -4,33 +4,41 @@
  * Mission Control API
  * OpenAPI spec version: 0.1.0
  */
+import type { ArenaConfig } from "./arenaConfig";
 import type { TagRef } from "./tagRef";
 import type { TaskCardReadCustomFieldValues } from "./taskCardReadCustomFieldValues";
+import type { TaskCardReadNotebookProfile } from "./taskCardReadNotebookProfile";
 import type { TaskCardReadStatus } from "./taskCardReadStatus";
+import type { TaskCardReadTaskMode } from "./taskCardReadTaskMode";
 
 /**
  * Task read model enriched with assignee and approval counters.
  */
 export interface TaskCardRead {
-  title: string;
-  description?: string | null;
-  status?: TaskCardReadStatus;
-  priority?: string;
-  due_at?: string | null;
-  assigned_agent_id?: string | null;
-  depends_on_task_ids?: string[];
-  tag_ids?: string[];
-  id: string;
-  board_id: string | null;
-  created_by_user_id: string | null;
-  in_progress_at: string | null;
-  created_at: string;
-  updated_at: string;
-  blocked_by_task_ids?: string[];
-  is_blocked?: boolean;
-  tags?: TagRef[];
-  custom_field_values?: TaskCardReadCustomFieldValues;
-  assignee?: string | null;
   approvals_count?: number;
   approvals_pending_count?: number;
+  arena_config?: ArenaConfig | null;
+  assigned_agent_id?: string | null;
+  assignee?: string | null;
+  blocked_by_task_ids?: string[];
+  board_id: string | null;
+  created_at: string;
+  created_by_user_id: string | null;
+  custom_field_values?: TaskCardReadCustomFieldValues;
+  depends_on_task_ids?: string[];
+  description?: string | null;
+  due_at?: string | null;
+  id: string;
+  in_progress_at: string | null;
+  is_blocked?: boolean;
+  notebook_id?: string | null;
+  notebook_profile?: TaskCardReadNotebookProfile;
+  notebook_share_url?: string | null;
+  priority?: string;
+  status?: TaskCardReadStatus;
+  tag_ids?: string[];
+  tags?: TagRef[];
+  task_mode?: TaskCardReadTaskMode;
+  title: string;
+  updated_at: string;
 }

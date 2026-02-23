@@ -10,19 +10,19 @@ import type { GatewayLeadBroadcastRequestKind } from "./gatewayLeadBroadcastRequ
  * Request payload for broadcasting a message to multiple board leads.
  */
 export interface GatewayLeadBroadcastRequest {
-  /** Broadcast intent. `question` asks for responses; `handoff` requests transfer. */
-  kind?: GatewayLeadBroadcastRequestKind;
-  /** Optional correlation token shared with downstream handlers. */
-  correlation_id?: string | null;
+  /** Optional explicit list of board IDs; omit for lead-scoped defaults. */
+  board_ids?: string[] | null;
   /**
    * Message content distributed to selected board leads.
    * @minLength 1
    */
   content: string;
-  /** Optional explicit list of board IDs; omit for lead-scoped defaults. */
-  board_ids?: string[] | null;
-  /** Tags required by reply templates when each lead responds. */
-  reply_tags?: string[];
+  /** Optional correlation token shared with downstream handlers. */
+  correlation_id?: string | null;
+  /** Broadcast intent. `question` asks for responses; `handoff` requests transfer. */
+  kind?: GatewayLeadBroadcastRequestKind;
   /** Reply destination key for broadcast responses. */
   reply_source?: string | null;
+  /** Tags required by reply templates when each lead responds. */
+  reply_tags?: string[];
 }

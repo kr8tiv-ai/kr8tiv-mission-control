@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     rq_dispatch_retry_base_seconds: float = 10.0
     rq_dispatch_retry_max_seconds: float = 120.0
 
+    # Task mode orchestration
+    arena_allowed_agents: str = "friday,arsenal,edith,jocasta"
+    arena_reviewer_agent: str = "arsenal"
+    notebooklm_runner_cmd: str = "uvx --from notebooklm-mcp-cli nlm"
+    notebooklm_profiles_root: str = "/var/lib/notebooklm/profiles"
+    notebooklm_timeout_seconds: int = 120
+
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
 
@@ -93,6 +100,15 @@ class Settings(BaseSettings):
         if "db_auto_migrate" not in self.model_fields_set and self.environment == "dev":
             self.db_auto_migrate = True
         return self
+
+    def allowed_arena_agent_ids(self) -> tuple[str, ...]:
+        """Return normalized arena-eligible agent identifiers from config."""
+        values: list[str] = []
+        for raw in self.arena_allowed_agents.split(","):
+            normalized = raw.strip().lower()
+            if normalized and normalized not in values:
+                values.append(normalized)
+        return tuple(values)
 
 
 settings = Settings()

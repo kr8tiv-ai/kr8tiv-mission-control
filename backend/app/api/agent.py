@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
@@ -58,6 +59,7 @@ from app.services.task_dependencies import (
     dependency_status_by_id,
     validate_dependency_update,
 )
+from app.services.task_mode_queue import QueuedTaskModeExecution, enqueue_task_mode_execution
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -663,6 +665,10 @@ async def create_task(
     data = payload.model_dump(
         exclude={"depends_on_task_ids", "tag_ids", "custom_field_values"},
     )
+    data["arena_config"] = tasks_api._normalize_arena_config_for_storage(
+        config=payload.arena_config,
+        task_mode=payload.task_mode,
+    )
     depends_on_task_ids = list(payload.depends_on_task_ids)
     tag_ids = list(payload.tag_ids)
     custom_field_values = dict(payload.custom_field_values)
@@ -736,6 +742,14 @@ async def create_task(
     )
     await session.commit()
     await session.refresh(task)
+    if task.task_mode in tasks_api.MODE_EXECUTION_TASK_MODES:
+        enqueue_task_mode_execution(
+            QueuedTaskModeExecution(
+                board_id=board.id,
+                task_id=task.id,
+                queued_at=datetime.now(UTC),
+            ),
+        )
     record_activity(
         session,
         event_type="task.created",

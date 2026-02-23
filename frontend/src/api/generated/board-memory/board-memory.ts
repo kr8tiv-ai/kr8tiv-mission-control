@@ -24,7 +24,7 @@ import type {
   BoardMemoryCreate,
   BoardMemoryRead,
   HTTPValidationError,
-  LimitOffsetPageTypeVarCustomizedBoardMemoryRead,
+  LimitOffsetPageTCustomizedBoardMemoryRead,
   ListBoardMemoryApiV1BoardsBoardIdMemoryGetParams,
   StreamBoardMemoryApiV1BoardsBoardIdMemoryStreamGetParams,
 } from ".././model";
@@ -38,7 +38,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary List Board Memory
  */
 export type listBoardMemoryApiV1BoardsBoardIdMemoryGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedBoardMemoryRead;
+  data: LimitOffsetPageTCustomizedBoardMemoryRead;
   status: 200;
 };
 

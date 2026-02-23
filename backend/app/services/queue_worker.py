@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.services.queue import QueuedTask, dequeue_task
+from app.services.task_mode_execution import execute_task_mode
+from app.services.task_mode_queue import (
+    TASK_TYPE as TASK_MODE_TASK_TYPE,
+)
+from app.services.task_mode_queue import (
+    requeue_task_mode_execution,
+)
 from app.services.webhooks.dispatch import (
     process_webhook_queue_task,
     requeue_webhook_queue_task,
@@ -34,6 +41,14 @@ _TASK_HANDLERS: dict[str, _TaskHandler] = {
             settings.rq_dispatch_retry_max_seconds,
         ),
         requeue=lambda task, delay: requeue_webhook_queue_task(task, delay_seconds=delay),
+    ),
+    TASK_MODE_TASK_TYPE: _TaskHandler(
+        handler=execute_task_mode,
+        attempts_to_delay=lambda attempts: min(
+            settings.rq_dispatch_retry_base_seconds * (2 ** max(0, attempts)),
+            settings.rq_dispatch_retry_max_seconds,
+        ),
+        requeue=lambda task, delay: requeue_task_mode_execution(task, delay_seconds=delay),
     ),
 }
 
@@ -135,3 +150,7 @@ def run_worker() -> None:
         asyncio.run(_run_worker_loop())
     finally:
         logger.info("queue.worker.stopped", extra={"queue_name": settings.rq_queue_name})
+
+
+if __name__ == "__main__":  # pragma: no cover - module entrypoint
+    run_worker()

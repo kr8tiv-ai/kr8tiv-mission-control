@@ -23,6 +23,7 @@ from app.api.deps import (
     require_admin_auth,
     require_admin_or_agent,
 )
+from app.core.config import settings
 from app.core.time import utcnow
 from app.db import crud
 from app.db.pagination import paginate
@@ -40,6 +41,7 @@ from app.models.task_custom_fields import (
 )
 from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
+from app.models.task_iterations import TaskIteration
 from app.models.tasks import Task
 from app.schemas.activity_events import ActivityEventRead
 from app.schemas.common import OkResponse
@@ -50,17 +52,29 @@ from app.schemas.task_custom_fields import (
     TaskCustomFieldValues,
     validate_custom_field_value,
 )
-from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
+from app.schemas.tasks import (
+    ArenaConfig,
+    TaskCommentCreate,
+    TaskCommentRead,
+    TaskCreate,
+    TaskIterationRead,
+    TaskNotebookQuery,
+    TaskNotebookQueryRead,
+    TaskRead,
+    TaskUpdate,
+)
 from app.services.activity_log import record_activity
 from app.services.approval_task_links import (
     load_task_ids_by_approval,
     pending_approval_conflicts_by_task,
 )
 from app.services.mentions import extract_mentions, matches_agent_mention
+from app.services.notebooklm_adapter import NotebookLMError, query_notebook
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError
 from app.services.organizations import require_board_access
+from app.services.task_mode_queue import QueuedTaskModeExecution, enqueue_task_mode_execution
 from app.services.tags import (
     TagState,
     load_tag_state,
@@ -107,6 +121,9 @@ BOARD_WRITE_DEP = Depends(get_board_for_user_write)
 SESSION_DEP = Depends(get_session)
 ADMIN_AUTH_DEP = Depends(require_admin_auth)
 TASK_DEP = Depends(get_task_or_404)
+MODE_EXECUTION_TASK_MODES = {"notebook", "arena", "arena_notebook", "notebook_creation"}
+ARENA_TASK_MODES = {"arena", "arena_notebook"}
+NOTEBOOK_ENABLED_MODES = {"notebook", "arena_notebook", "notebook_creation"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +134,39 @@ class _BoardCustomFieldDefinition:
     validation_regex: str | None
     required: bool
     default_value: object | None
+
+
+def _normalize_arena_config_for_storage(
+    *,
+    config: ArenaConfig | None,
+    task_mode: str,
+) -> dict[str, object] | None:
+    if config is None:
+        return None
+    allowed = set(settings.allowed_arena_agent_ids())
+    selected: list[str] = []
+    for raw in config.agents:
+        candidate = raw.strip().lower()
+        if candidate in allowed and candidate not in selected:
+            selected.append(candidate)
+    if len(selected) > 4:
+        selected = selected[:4]
+    reviewer = settings.arena_reviewer_agent.strip().lower()
+    if task_mode in ARENA_TASK_MODES and reviewer in allowed and reviewer not in selected:
+        selected.append(reviewer)
+    final_agent = (config.final_agent or "").strip().lower() or None
+    if final_agent is not None and final_agent not in allowed:
+        final_agent = selected[0] if selected else None
+    normalized = config.model_copy(
+        update={
+            "agents": selected,
+            "final_agent": final_agent,
+        },
+    )
+    return cast(
+        dict[str, object],
+        normalized.model_dump(mode="json", exclude_none=True),
+    )
 
 
 def _comment_validation_error() -> HTTPException:
@@ -1276,6 +1326,11 @@ async def create_task(
 ) -> TaskRead:
     """Create a task and initialize dependency rows."""
     data = payload.model_dump(exclude={"depends_on_task_ids", "tag_ids", "custom_field_values"})
+    normalized_arena_config = _normalize_arena_config_for_storage(
+        config=payload.arena_config,
+        task_mode=payload.task_mode,
+    )
+    data["arena_config"] = normalized_arena_config
     depends_on_task_ids = list(payload.depends_on_task_ids)
     tag_ids = list(payload.tag_ids)
     custom_field_values = dict(payload.custom_field_values)
@@ -1332,6 +1387,15 @@ async def create_task(
     await session.commit()
     await session.refresh(task)
 
+    if task.task_mode in MODE_EXECUTION_TASK_MODES:
+        enqueue_task_mode_execution(
+            QueuedTaskModeExecution(
+                board_id=board.id,
+                task_id=task.id,
+                queued_at=datetime.now(UTC),
+            ),
+        )
+
     record_activity(
         session,
         event_type="task.created",
@@ -1356,6 +1420,86 @@ async def create_task(
         task=task,
         board_id=board.id,
     )
+
+
+@router.get("/{task_id}/iterations", response_model=list[TaskIterationRead])
+async def list_task_iterations(
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    actor: ActorContext = ACTOR_DEP,
+) -> list[TaskIterationRead]:
+    """Return arena iteration summaries for a task."""
+    if task.board_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Task board_id is required.",
+        )
+    if actor.actor_type == "user" and actor.user is not None:
+        await _require_task_user_write_access(
+            session,
+            board_id=task.board_id,
+            user=actor.user,
+        )
+    rows = list(
+        await session.exec(
+            select(TaskIteration)
+            .where(col(TaskIteration.task_id) == task.id)
+            .order_by(col(TaskIteration.round_number).asc(), col(TaskIteration.created_at).asc()),
+        )
+    )
+    return [TaskIterationRead.model_validate(row, from_attributes=True) for row in rows]
+
+
+@router.post("/{task_id}/notebook/query", response_model=TaskNotebookQueryRead)
+async def query_task_notebook(
+    payload: TaskNotebookQuery,
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    actor: ActorContext = ACTOR_DEP,
+) -> TaskNotebookQueryRead:
+    """Run a NotebookLM query against the task-linked notebook."""
+    if task.board_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Task board_id is required.",
+        )
+    if actor.actor_type == "user" and actor.user is not None:
+        await _require_task_user_write_access(
+            session,
+            board_id=task.board_id,
+            user=actor.user,
+        )
+    if task.task_mode not in NOTEBOOK_ENABLED_MODES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Notebook query is only available for notebook-enabled task modes.",
+        )
+    notebook_id = (task.notebook_id or "").strip()
+    if not notebook_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Task has no notebook_id configured.",
+        )
+    try:
+        answer = await query_notebook(
+            notebook_id=notebook_id,
+            query=payload.query,
+            profile=task.notebook_profile,
+        )
+    except NotebookLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    session.add(
+        ActivityEvent(
+            event_type="task.comment",
+            message=f"[NotebookLM Query] {answer}",
+            task_id=task.id,
+        )
+    )
+    await session.commit()
+    return TaskNotebookQueryRead(answer=answer, notebook_id=notebook_id)
 
 
 @router.patch(

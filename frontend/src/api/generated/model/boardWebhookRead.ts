@@ -9,13 +9,13 @@
  * Serialized board webhook configuration.
  */
 export interface BoardWebhookRead {
-  id: string;
-  board_id: string;
   agent_id?: string | null;
+  board_id: string;
+  created_at: string;
   description: string;
   enabled: boolean;
   endpoint_path: string;
   endpoint_url?: string | null;
-  created_at: string;
+  id: string;
   updated_at: string;
 }

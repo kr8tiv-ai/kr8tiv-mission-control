@@ -25,7 +25,7 @@ import type {
   ApprovalRead,
   ApprovalUpdate,
   HTTPValidationError,
-  LimitOffsetPageTypeVarCustomizedApprovalRead,
+  LimitOffsetPageTCustomizedApprovalRead,
   ListApprovalsApiV1BoardsBoardIdApprovalsGetParams,
   StreamApprovalsApiV1BoardsBoardIdApprovalsStreamGetParams,
 } from ".././model";
@@ -39,7 +39,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary List Approvals
  */
 export type listApprovalsApiV1BoardsBoardIdApprovalsGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedApprovalRead;
+  data: LimitOffsetPageTCustomizedApprovalRead;
   status: 200;
 };
 
