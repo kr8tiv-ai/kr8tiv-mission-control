@@ -6,7 +6,6 @@ import asyncio
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -33,6 +32,7 @@ from app.services.notebooklm_adapter import (
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig, get_chat_history
 from app.services.queue import QueuedTask
+from app.services.supermemory_adapter import retrieve_arena_context_lines
 from app.services.task_mode_queue import decode_task_mode_execution
 
 logger = get_logger(__name__)
@@ -86,82 +86,30 @@ def _parse_sources(task: Task) -> NotebookSourcesPayload:
     )
 
 
-async def _load_supermemory_context(task: Task, *, limit: int = 3) -> list[str]:
-    """Fetch compact context lines from supermemory.js for the current task.
-
-    Best-effort only: failures are logged and return an empty list.
-    """
-    script_path = Path("/data/.openclaw/workspace/supermemory.js")
-    if not script_path.exists():
-        return []
-
+async def _load_supermemory_context(
+    task: Task,
+    *,
+    board_id: UUID,
+    limit: int = 3,
+) -> list[str]:
+    """Fetch compact context lines from Supermemory with graceful fallback."""
     query_parts = [task.title.strip()]
     if task.description:
         query_parts.append(task.description.strip())
     query = "\n".join(part for part in query_parts if part)
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "node",
-            str(script_path),
-            "search",
-            query,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        return await retrieve_arena_context_lines(
+            query=query,
+            container_scope=str(board_id),
+            limit=limit,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=8)
-    except Exception as exc:  # pragma: no cover - env/runtime dependent
+    except Exception as exc:  # pragma: no cover - adapter degrades safely
         logger.warning(
             "task_mode.arena.supermemory.lookup_failed",
-            extra={"task_id": str(task.id), "error": str(exc)},
+            extra={"task_id": str(task.id), "board_id": str(board_id), "error": str(exc)},
         )
         return []
-
-    if proc.returncode != 0:
-        logger.warning(
-            "task_mode.arena.supermemory.nonzero_exit",
-            extra={
-                "task_id": str(task.id),
-                "returncode": proc.returncode,
-                "stderr": (stderr.decode("utf-8", errors="ignore") or "").strip(),
-            },
-        )
-        return []
-
-    try:
-        payload = json.loads(stdout.decode("utf-8", errors="ignore") or "{}")
-    except Exception as exc:  # pragma: no cover - malformed output
-        logger.warning(
-            "task_mode.arena.supermemory.parse_failed",
-            extra={"task_id": str(task.id), "error": str(exc)},
-        )
-        return []
-
-    candidates: list[str] = []
-    for key in ("results", "items", "data"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            for item in value:
-                if not isinstance(item, dict):
-                    continue
-                text = item.get("content") or item.get("text") or item.get("snippet")
-                if isinstance(text, str) and text.strip():
-                    compact = " ".join(text.strip().split())
-                    candidates.append(compact[:240])
-        if candidates:
-            break
-
-    # Deduplicate while preserving order
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for line in candidates:
-        if line in seen:
-            continue
-        seen.add(line)
-        deduped.append(line)
-        if len(deduped) >= limit:
-            break
-    return deduped
 
 
 def _select_arena_agents(config: ArenaConfig) -> list[str]:
@@ -487,7 +435,7 @@ async def _execute_arena_mode(
 
     # Supermemory integration
     if parsed_config.supermemory_enabled:
-        context_lines = await _load_supermemory_context(task)
+        context_lines = await _load_supermemory_context(task, board_id=ctx.board.id)
         if context_lines:
             summary_lines.append("Supermemory context:")
             for item in context_lines:

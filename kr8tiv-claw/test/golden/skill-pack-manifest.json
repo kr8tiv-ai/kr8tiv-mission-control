@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tenantId": "acme-support-1234abcd",
+  "installRoot": "<workspace>/skills",
+  "packs": [
+    {
+      "name": "kr8tiv-base",
+      "source": "https://github.com/kr8tiv-ai/skills-base",
+      "version": "1.2.0"
+    }
+  ]
+}

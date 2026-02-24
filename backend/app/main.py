@@ -21,6 +21,7 @@ from app.api.board_memory import router as board_memory_router
 from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
+from app.api.distribution import router as distribution_router
 from app.api.gateway import router as gateway_router
 from app.api.gateways import router as gateways_router
 from app.api.metrics import router as metrics_router
@@ -128,6 +129,13 @@ OPENAPI_TAGS = [
         "description": "User profile read/update operations and user-centric settings endpoints.",
     },
     {
+        "name": "distribution",
+        "description": (
+            "Kr8tiv-claw distribution bundle generation and artifact download endpoints for "
+            "tenant provisioning workflows."
+        ),
+    },
+    {
         "name": "agent",
         "description": (
             "Agent-scoped API surface. All endpoints require `X-Agent-Token` and are "
@@ -177,6 +185,7 @@ _OPENAPI_EXAMPLE_TAGS = {
     "custom-fields",
     "tags",
     "users",
+    "distribution",
 }
 _GENERIC_RESPONSE_DESCRIPTIONS = {"Successful Response", "Validation Error"}
 _HTTP_RESPONSE_DESCRIPTIONS = {
@@ -543,6 +552,7 @@ api_v1.include_router(tasks_router)
 api_v1.include_router(task_custom_fields_router)
 api_v1.include_router(tags_router)
 api_v1.include_router(users_router)
+api_v1.include_router(distribution_router)
 app.include_router(api_v1)
 
 add_pagination(app)

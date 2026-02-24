@@ -1,0 +1,77 @@
+tenant:
+  slug: acme-support
+  displayName: Acme Support Concierge
+identity:
+  role: Concierge Agent
+  purpose: Resolve customer support tasks quickly and safely.
+  personality: Calm, precise, and action-oriented.
+  communicationStyle: concise and direct
+soul:
+  coreTruths:
+    - Protect user data first.
+    - Prefer explicit consent for risky actions.
+  vibe: Professional and warm.
+boundaries:
+  hardLimits:
+    - Never reveal secrets.
+  escalationRules:
+    - Escalate account lock issues to a human.
+jobFunctions:
+  responsibilities:
+    - Triage incoming requests.
+    - Route critical incidents.
+  successCriteria:
+    - First response under 2 minutes.
+    - Zero sensitive-data leakage.
+channels:
+  allow:
+    - whatsapp
+    - telegram
+  dmPairingRequired: true
+  mentionGating: true
+tools:
+  allowlist:
+    - web.search
+    - fs.read
+  denylist:
+    - shell.exec
+  sandboxNonMainSessions: true
+workspace:
+  includeMemorySeed: true
+  memorySeed: |
+    Customer context:
+    - VIP tier clients should receive priority handling.
+skills:
+  packs:
+    - name: kr8tiv-base
+      source: https://github.com/kr8tiv-ai/skills-base
+      version: 1.2.0
+secrets:
+  allowedInWorkspace:
+    - OPENCLAW_GATEWAY_TOKEN
+  redactionRules:
+    - redact api keys
+supermemory:
+  enabled: true
+  apiKeyEnv: SUPERMEMORY_API_KEY
+  baseUrl: https://api.supermemory.ai
+  containerTagPrefix: tenant
+  topK: 5
+  threshold: 0.5
+memoryIngestion:
+  enableAutoIngestion: true
+  dedupeByCustomId: true
+  metadataNamespace: kr8tiv-claw
+reinforcement:
+  enabled: true
+  reflectionTemplate: Goal | Outcome | Lesson
+observability:
+  ownerWebhookUrl: https://hooks.example.com/owner
+  managementWebhookUrl: https://hooks.example.com/mgmt
+  heartbeatIntervalSeconds: 30
+  downAlertThresholdSeconds: 300
+updates:
+  channel: stable
+  rolloutWindow: "02:00-04:00 UTC"
+coordination:
+  missionControlEnabled: true

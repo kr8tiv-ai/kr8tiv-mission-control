@@ -1,0 +1,12 @@
+{
+  "tenantId": "acme-support-1234abcd",
+  "containerTag": "tenant:acme-support-1234abcd",
+  "workspaceFiles": [
+    "AGENTS.md",
+    "HEARTBEAT.md",
+    "MEMORY.md",
+    "SOUL.md",
+    "TOOLS.md",
+    "USER.md"
+  ]
+}

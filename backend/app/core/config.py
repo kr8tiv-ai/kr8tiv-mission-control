@@ -69,6 +69,18 @@ class Settings(BaseSettings):
     notebooklm_profiles_root: str = "/var/lib/notebooklm/profiles"
     notebooklm_timeout_seconds: int = 120
 
+    # Kr8tiv distribution layer
+    distribution_cli_command: str = "node kr8tiv-claw/dist/index.js"
+    distribution_artifacts_root: str = str(BACKEND_ROOT / "artifacts" / "tenants")
+
+    # Supermemory runtime retrieval
+    supermemory_api_key: str = ""
+    supermemory_base_url: str = "https://api.supermemory.ai"
+    supermemory_top_k: int = 3
+    supermemory_threshold: float = 0.45
+    supermemory_timeout_seconds: int = 8
+    supermemory_container_tag_prefix: str = "tenant"
+
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
 
