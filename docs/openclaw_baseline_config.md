@@ -354,16 +354,24 @@ Baseline choice:
 #### Control UI Security
 
 - `controlUi.allowInsecureAuth: true` allows token-only auth over insecure HTTP.
+- `controlUi.dangerouslyDisableDeviceAuth: true` bypasses Control UI device-identity checks.
 
 Security implication:
 
 - Good for local development convenience.
 - Not recommended for exposed environments.
+- `dangerouslyDisableDeviceAuth` should only be used when you fully trust the network path and have compensating controls.
 
 #### Auth
 
 - `gateway.auth.mode`: `token` or `password`.
 - With `token` mode, set `gateway.auth.token` (or provide via env/CLI override) before non-local usage.
+
+Provider auth nuance (important for mixed CLI/API fleets):
+
+- `google-gemini-cli/*` models in recent OpenClaw builds use Google Cloud Code Assist OAuth credentials, not a plain `GEMINI_API_KEY`.
+- A valid profile for `google-gemini-cli` must include OAuth material (`token` + `projectId`) from `openclaw models auth login --provider google-gemini-cli --method oauth`.
+- If you only have `GEMINI_API_KEY`, use `google/*` models instead of `google-gemini-cli/*` to avoid `Invalid Google Cloud Code Assist credentials` failures.
 
 #### Reverse Proxy Awareness
 
@@ -397,7 +405,7 @@ Baseline intent:
 
 Compatibility warning:
 
-- In newer OpenClaw core schemas, top-level `memory` may not be a built-in key.
+- In OpenClaw stable `2026.2.22` (and `2026.2.23-beta.1`), top-level `memory` is not a built-in key.
 - Without a plugin that extends schema for this section, config validation reports:
   `Unrecognized key: "memory"`.
 

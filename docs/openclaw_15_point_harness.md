@@ -1,31 +1,73 @@
 # OpenClaw 15-Point Harness
 
-Use this harness after deployment to verify Mission Control + OpenClaw behavior end to end.
+Use this checklist after deploys, image upgrades, credential rotation, or config changes to confirm Mission Control and OpenClaw are still aligned.
 
 ## Preconditions
 
-- Mission Control backend is reachable.
-- Gateway URL/token are configured in Mission Control.
-- Agent templates have been synced at least once.
+- Mission Control API is reachable.
+- OpenClaw gateway URL and token are configured.
+- Templates have been synced at least once for the target board.
+- You can inspect container logs and current OpenClaw config state.
 
-## Harness Steps
+## 15 Verification Checks
 
-1. Gateway health check: `openclaw health` returns healthy.
-2. Mission Control health check: `GET /api/v1/health` returns `ok`.
-3. Gateway is registered in Mission Control with correct `workspace_root`.
-4. Main gateway agent exists (`board_id = null`) and is online.
-5. Friday agent exists and has `model_policy.model=openai-codex/gpt-5.3-codex`.
-6. Arsenal agent exists and has `model_policy.model=openai-codex/gpt-5.3-codex`.
-7. Edith agent exists and has `model_policy.model=google-gemini-cli/gemini-3.1`.
-8. Jocasta agent exists and has `model_policy.model=nvidia/moonshotai/kimi-k2-5`.
-9. Friday/Arsenal/Edith policies report `transport=cli` and `locked=true`.
-10. Jocasta policy reports `transport=api` and `locked=true`.
-11. `POST /api/v1/gateways/{gateway_id}/templates/sync` completes without fatal errors.
-12. OpenClaw `config.get` shows each locked agent under `agents.list` with the expected `model`.
-13. Attempting to patch a locked agent `model_policy` via `PATCH /api/v1/agents/{id}` returns `403`.
-14. Restart gateway/container, then run template sync; locked model assignments remain unchanged.
-15. Send one routed task per agent class (lead, worker, main) and confirm responses arrive through Mission Control pathways.
+1. **Container health**
+   All Mission Control and OpenClaw containers are `Up` and healthy.
 
-## Expected Outcome
+2. **Mission Control health endpoint**
+   `GET /api/v1/health` returns `ok`.
 
-All 15 checks pass. Any failure is a blocker for production rollout.
+3. **Gateway connectivity**
+   `GET /api/v1/gateways/status?board_id=<board_id>` reports `connected=true`.
+
+4. **Main agent availability**
+   The gateway main agent exists (`board_id = null`) and responds.
+
+5. **Friday model policy lock**
+   Friday is locked to `openai-codex/gpt-5.3-codex`.
+
+6. **Arsenal model policy lock**
+   Arsenal is locked to `openai-codex/gpt-5.3-codex`.
+
+7. **Edith model policy lock**
+   Edith is locked to the configured Gemini route for your environment.
+
+8. **Jocasta model policy lock**
+   Jocasta is locked to `nvidia/moonshotai/kimi-k2-5`.
+
+9. **Locked policy enforcement**
+   `PATCH /api/v1/agents/{id}` rejects model-policy overrides for locked agents with `403`.
+
+10. **Template sync enforcement**
+    `POST /api/v1/gateways/{gateway_id}/templates/sync` rewrites drifted models back to policy targets.
+
+11. **OpenClaw runtime model alignment**
+    `config.get` shows `agents.list[].model` values matching locked policies.
+
+12. **Config write hardening**
+    Runtime config writes are disabled for bot-controlled channels in production.
+
+13. **Telegram delivery check**
+    One probe per configured bot token succeeds (`ok=true`).
+
+14. **Restart persistence**
+    After restart, gateway reconnects and locked model assignments remain unchanged.
+
+15. **Log sanity**
+    Last 15-20 minutes of logs show no repeated auth/routing/delivery failure loops.
+
+## Evidence Capture
+
+Capture these artifacts for each validation run:
+
+- `docker ps --format '{{.Names}}|{{.Status}}|{{.Image}}'`
+- Gateway status payloads for relevant board and main agent paths
+- Locked agent policy snapshot (before and after template sync)
+- Telegram probe responses
+- Tail logs for each OpenClaw container
+
+## Gemini Route Note
+
+- `google-gemini-cli/*` requires OAuth profile auth.
+- `google/*` is API-key based.
+- Pick one route intentionally in policy docs and keep the enforcer aligned to prevent silent drift.
