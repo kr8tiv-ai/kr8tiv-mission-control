@@ -160,6 +160,8 @@ class GatewayConfig:
 
     url: str
     token: str | None = None
+    origin: str | None = "http://localhost:3100"
+    client_id: str = "openclaw-control-ui"
 
 
 def _build_gateway_url(config: GatewayConfig) -> str:
@@ -238,7 +240,7 @@ def _build_connect_params(config: GatewayConfig) -> dict[str, Any]:
         "role": "operator",
         "scopes": list(GATEWAY_OPERATOR_SCOPES),
         "client": {
-            "id": "gateway-client",
+            "id": config.client_id,
             "version": "1.0.0",
             "platform": "web",
             "mode": "ui",
@@ -290,7 +292,10 @@ async def openclaw_call(
         _redacted_url_for_log(gateway_url),
     )
     try:
-        async with websockets.connect(gateway_url, ping_interval=None) as ws:
+        connect_kwargs: dict[str, Any] = {"ping_interval": None}
+        if config.origin:
+            connect_kwargs["origin"] = config.origin
+        async with websockets.connect(gateway_url, **connect_kwargs) as ws:
             first_message = None
             try:
                 first_message = await asyncio.wait_for(ws.recv(), timeout=2)
