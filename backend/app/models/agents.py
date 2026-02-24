@@ -31,6 +31,10 @@ class Agent(QueryModel, table=True):
         default=None,
         sa_column=Column(JSON),
     )
+    model_policy: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+    )
     identity_profile: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(JSON),

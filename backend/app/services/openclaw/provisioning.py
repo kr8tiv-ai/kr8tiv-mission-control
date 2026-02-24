@@ -49,6 +49,13 @@ from app.services.openclaw.internal.session_keys import (
     board_agent_session_key,
     board_lead_session_key,
 )
+from app.services.openclaw.model_policy import (
+    is_model_policy_locked,
+    model_id_for_policy,
+    normalize_model_policy,
+    provider_for_policy,
+    transport_for_policy,
+)
 from app.services.openclaw.shared import GatewayAgentIdentity
 
 if TYPE_CHECKING:
@@ -237,6 +244,24 @@ def _identity_context(agent: Agent) -> dict[str, str]:
     return {**identity_context, **extra_identity_context}
 
 
+def _model_policy_context(agent: Agent) -> dict[str, str]:
+    policy = normalize_model_policy(getattr(agent, "model_policy", None))
+    model_id = model_id_for_policy(policy) or ""
+    provider = provider_for_policy(policy)
+    transport = transport_for_policy(policy)
+    locked = "true" if is_model_policy_locked(policy) else "false"
+    summary = ""
+    if model_id:
+        summary = model_id if not transport else f"{model_id} ({transport})"
+    return {
+        "model_id": model_id,
+        "model_provider": provider,
+        "model_transport": transport,
+        "model_locked": locked,
+        "model_summary": summary,
+    }
+
+
 def _role_slug(role: str) -> str:
     tokens = _ROLE_SOUL_WORD_RE.findall(role.strip().lower())
     return "-".join(tokens)
@@ -320,6 +345,7 @@ def _build_context(
     base_url = settings.base_url or "REPLACE_WITH_BASE_URL"
     main_session_key = GatewayAgentIdentity.session_key(gateway)
     identity_context = _identity_context(agent)
+    model_context = _model_policy_context(agent)
     user_context = _user_context(user)
     return {
         "agent_name": agent.name,
@@ -348,6 +374,7 @@ def _build_context(
         "workspace_root": workspace_root,
         **user_context,
         **identity_context,
+        **model_context,
     }
 
 
@@ -359,6 +386,7 @@ def _build_main_context(
 ) -> dict[str, str]:
     base_url = settings.base_url or "REPLACE_WITH_BASE_URL"
     identity_context = _identity_context(agent)
+    model_context = _model_policy_context(agent)
     user_context = _user_context(user)
     return {
         "agent_name": agent.name,
@@ -371,6 +399,7 @@ def _build_main_context(
         "workspace_root": gateway.workspace_root or "",
         **user_context,
         **identity_context,
+        **model_context,
     }
 
 
@@ -442,6 +471,7 @@ class GatewayAgentRegistration:
     name: str
     workspace_path: str
     heartbeat: dict[str, Any]
+    model_id: str | None = None
 
 
 class GatewayControlPlane(ABC):
@@ -490,7 +520,7 @@ class GatewayControlPlane(ABC):
     @abstractmethod
     async def patch_agent_heartbeats(
         self,
-        entries: list[tuple[str, str, dict[str, Any]]],
+        entries: list[tuple[str, str, dict[str, Any], str | None]],
     ) -> None:
         raise NotImplementedError
 
@@ -548,7 +578,14 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
             config=self._config,
         )
         await self.patch_agent_heartbeats(
-            [(registration.agent_id, registration.workspace_path, registration.heartbeat)],
+            [
+                (
+                    registration.agent_id,
+                    registration.workspace_path,
+                    registration.heartbeat,
+                    registration.model_id,
+                ),
+            ],
         )
 
     async def delete_agent(self, agent_id: str, *, delete_files: bool = True) -> None:
@@ -603,7 +640,7 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
 
     async def patch_agent_heartbeats(
         self,
-        entries: list[tuple[str, str, dict[str, Any]]],
+        entries: list[tuple[str, str, dict[str, Any], str | None]],
     ) -> None:
         base_hash, raw_list, config_data = await _gateway_config_agent_list(self._config)
         entry_by_id = _heartbeat_entry_map(entries)
@@ -641,16 +678,17 @@ async def _gateway_config_agent_list(
 
 
 def _heartbeat_entry_map(
-    entries: list[tuple[str, str, dict[str, Any]]],
-) -> dict[str, tuple[str, dict[str, Any]]]:
+    entries: list[tuple[str, str, dict[str, Any], str | None]],
+) -> dict[str, tuple[str, dict[str, Any], str | None]]:
     return {
-        agent_id: (workspace_path, heartbeat) for agent_id, workspace_path, heartbeat in entries
+        agent_id: (workspace_path, heartbeat, model_id)
+        for agent_id, workspace_path, heartbeat, model_id in entries
     }
 
 
 def _updated_agent_list(
     raw_list: list[object],
-    entry_by_id: dict[str, tuple[str, dict[str, Any]]],
+    entry_by_id: dict[str, tuple[str, dict[str, Any], str | None]],
 ) -> list[object]:
     updated_ids: set[str] = set()
     new_list: list[object] = []
@@ -664,19 +702,26 @@ def _updated_agent_list(
             new_list.append(raw_entry)
             continue
 
-        workspace_path, heartbeat = entry_by_id[agent_id]
+        workspace_path, heartbeat, model_id = entry_by_id[agent_id]
         new_entry = dict(raw_entry)
         new_entry["workspace"] = workspace_path
         new_entry["heartbeat"] = heartbeat
+        if model_id:
+            new_entry["model"] = model_id
         new_list.append(new_entry)
         updated_ids.add(agent_id)
 
-    for agent_id, (workspace_path, heartbeat) in entry_by_id.items():
+    for agent_id, (workspace_path, heartbeat, model_id) in entry_by_id.items():
         if agent_id in updated_ids:
             continue
-        new_list.append(
-            {"id": agent_id, "workspace": workspace_path, "heartbeat": heartbeat},
-        )
+        new_entry: dict[str, Any] = {
+            "id": agent_id,
+            "workspace": workspace_path,
+            "heartbeat": heartbeat,
+        }
+        if model_id:
+            new_entry["model"] = model_id
+        new_list.append(new_entry)
 
     return new_list
 
@@ -822,12 +867,14 @@ class BaseAgentLifecycleManager(ABC):
         agent_id = self._agent_id(agent)
         workspace_path = _workspace_path(agent, self._gateway.workspace_root)
         heartbeat = _heartbeat_config(agent)
+        model_id = model_id_for_policy(getattr(agent, "model_policy", None))
         await self._control_plane.upsert_agent(
             GatewayAgentRegistration(
                 agent_id=agent_id,
                 name=agent.name,
                 workspace_path=workspace_path,
                 heartbeat=heartbeat,
+                model_id=model_id,
             ),
         )
 
@@ -977,11 +1024,11 @@ def _control_plane_for_gateway(gateway: Gateway) -> OpenClawGatewayControlPlane:
 async def _patch_gateway_agent_heartbeats(
     gateway: Gateway,
     *,
-    entries: list[tuple[str, str, dict[str, Any]]],
+    entries: list[tuple[str, str, dict[str, Any], str | None]],
 ) -> None:
     """Patch multiple agent heartbeat configs in a single gateway config.patch call.
 
-    Each entry is (agent_id, workspace_path, heartbeat_dict).
+    Each entry is (agent_id, workspace_path, heartbeat_dict, model_id).
     """
     control_plane = _control_plane_for_gateway(gateway)
     await control_plane.patch_agent_heartbeats(entries)
@@ -1017,12 +1064,13 @@ class OpenClawGatewayProvisioner:
         if not gateway.workspace_root:
             msg = "gateway workspace_root is required"
             raise OpenClawGatewayError(msg)
-        entries: list[tuple[str, str, dict[str, Any]]] = []
+        entries: list[tuple[str, str, dict[str, Any], str | None]] = []
         for agent in agents:
             agent_id = _agent_key(agent)
             workspace_path = _workspace_path(agent, gateway.workspace_root)
             heartbeat = _heartbeat_config(agent)
-            entries.append((agent_id, workspace_path, heartbeat))
+            model_id = model_id_for_policy(getattr(agent, "model_policy", None))
+            entries.append((agent_id, workspace_path, heartbeat, model_id))
         if not entries:
             return
         await _patch_gateway_agent_heartbeats(gateway, entries=entries)
