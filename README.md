@@ -10,7 +10,7 @@ This repository now includes:
 - an org-admin API for generating tenant bundles and downloading artifacts
 - bounded Supermemory arena context retrieval with graceful fallback
 
-[![CI](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml/badge.svg)](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml)
+[![CI](https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/workflows/ci.yml/badge.svg)](https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/workflows/ci.yml)
 
 ## Fork Attribution
 
@@ -281,6 +281,7 @@ Additional docs:
 - `docs/openclaw_15_point_harness.md`
 - `docs/openclaw_baseline_config.md`
 - `docs/openclaw_gateway_ws.md`
+- `docs/security/2026-02-23-security-audit.md`
 
 ## Verification Commands
 
