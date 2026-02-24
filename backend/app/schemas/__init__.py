@@ -70,6 +70,7 @@ from app.schemas.souls_directory import (
 )
 from app.schemas.tags import TagCreate, TagRead, TagRef, TagUpdate
 from app.schemas.tasks import TaskCreate, TaskRead, TaskUpdate
+from app.schemas.tier_quotas import TierQuotaRead, TierQuotaUpsert
 from app.schemas.users import UserCreate, UserRead, UserUpdate
 
 __all__ = [
@@ -143,6 +144,8 @@ __all__ = [
     "TaskCreate",
     "TaskRead",
     "TaskUpdate",
+    "TierQuotaRead",
+    "TierQuotaUpsert",
     "UserCreate",
     "UserRead",
     "UserUpdate",

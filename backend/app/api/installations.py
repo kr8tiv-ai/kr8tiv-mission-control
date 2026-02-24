@@ -14,6 +14,7 @@ from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.installations import InstallationRequest
 from app.models.override_sessions import OverrideSession
+from app.models.tier_quotas import TierQuota
 from app.schemas.installations import (
     InstallationExecuteRequest,
     InstallationExecuteResponse,
@@ -60,6 +61,25 @@ def _to_override_read(session: OverrideSession) -> OverrideSessionRead:
     )
 
 
+def _storage_mb_from_payload(payload: dict[str, object]) -> int:
+    raw = payload.get("storage_mb")
+    if isinstance(raw, bool):
+        return 0
+    if isinstance(raw, int):
+        return max(0, raw)
+    if isinstance(raw, float):
+        return max(0, int(raw))
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return 0
+        try:
+            return max(0, int(float(text)))
+        except ValueError:
+            return 0
+    return 0
+
+
 @router.post(
     "/requests",
     response_model=InstallationRequestRead,
@@ -70,6 +90,42 @@ async def create_installation_request(
     org_ctx: OrganizationContext = ORG_ADMIN_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> InstallationRequestRead:
+    quota = (
+        await session.exec(
+            select(TierQuota).where(col(TierQuota.organization_id) == org_ctx.organization.id),
+        )
+    ).first()
+    if quota is not None:
+        existing_requests = (
+            await session.exec(
+                select(InstallationRequest).where(
+                    col(InstallationRequest.organization_id) == org_ctx.organization.id,
+                    col(InstallationRequest.status).in_(
+                        ["pending_owner_approval", "approved", "executed"],
+                    ),
+                ),
+            )
+        ).all()
+        current_ability_slots = len(existing_requests)
+        if current_ability_slots >= quota.max_abilities:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ability slots exhausted for current tier quota",
+            )
+
+        current_storage = sum(
+            _storage_mb_from_payload(request.requested_payload) for request in existing_requests
+        )
+        requested_storage = _storage_mb_from_payload(payload.requested_payload)
+        if current_storage + requested_storage > quota.max_storage_mb:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Storage quota exceeded "
+                    f"({current_storage + requested_storage}MB > {quota.max_storage_mb}MB)"
+                ),
+            )
+
     now = utcnow()
     request = InstallationRequest(
         organization_id=org_ctx.organization.id,
