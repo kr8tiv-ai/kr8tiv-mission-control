@@ -40,6 +40,8 @@ from app.services.openclaw.gateway_resolver import (
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError
 from app.services.openclaw.shared import GatewayAgentIdentity
 from app.services.organizations import OrganizationContext
+from app.services.skills_hot_ingest import ingest_skill
+from app.services.task_mode_queue import is_skill_route_eligible
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -878,6 +880,11 @@ async def _run_marketplace_skill_action(
     gateway = await _require_gateway_for_org(gateway_id=gateway_id, session=session, ctx=ctx)
     require_gateway_workspace_root(gateway)
     skill = await _require_marketplace_skill_for_org(skill_id=skill_id, session=session, ctx=ctx)
+    if installed and not is_skill_route_eligible(skill.metadata_):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Skill is quarantined and cannot be installed until validation succeeds.",
+        )
     instruction = (
         _install_instruction(skill=skill, gateway=gateway)
         if installed
@@ -1032,17 +1039,37 @@ async def create_marketplace_skill(
 ) -> MarketplaceSkill:
     """Register or update a direct marketplace skill URL in the catalog."""
     source_url = str(payload.source_url).strip()
+    normalized_name = payload.name or _infer_skill_name(source_url)
+    ingest_result = ingest_skill(
+        {
+            "name": normalized_name,
+            "risk_tier": "medium",
+            "source_url": source_url,
+        }
+    )
+    ingest_metadata = dict(ingest_result.metadata)
+    if payload.description is not None:
+        ingest_metadata["description_provided"] = True
+
     existing = await MarketplaceSkill.objects.filter_by(
         organization_id=ctx.organization.id,
         source_url=source_url,
     ).first(session)
     if existing is not None:
         changed = False
-        if payload.name and existing.name != payload.name:
-            existing.name = payload.name
+        if existing.name != normalized_name:
+            existing.name = normalized_name
             changed = True
         if payload.description is not None and existing.description != payload.description:
             existing.description = payload.description
+            changed = True
+        if existing.risk != str(ingest_result.normalized_skill.get("risk_tier")):
+            existing.risk = str(ingest_result.normalized_skill.get("risk_tier"))
+            changed = True
+        merged_metadata = dict(existing.metadata_ or {})
+        merged_metadata.update(ingest_metadata)
+        if existing.metadata_ != merged_metadata:
+            existing.metadata_ = merged_metadata
             changed = True
         if changed:
             existing.updated_at = utcnow()
@@ -1055,9 +1082,10 @@ async def create_marketplace_skill(
     skill = MarketplaceSkill(
         organization_id=ctx.organization.id,
         source_url=source_url,
-        name=payload.name or _infer_skill_name(source_url),
+        name=normalized_name,
         description=payload.description,
-        metadata_={},
+        risk=str(ingest_result.normalized_skill.get("risk_tier")),
+        metadata_=ingest_metadata,
     )
     session.add(skill)
     await session.commit()

@@ -95,3 +95,10 @@ def requeue_task_mode_execution(
         redis_url=settings.rq_redis_url,
         delay_seconds=delay_seconds,
     )
+
+
+def is_skill_route_eligible(skill_metadata: dict[str, Any] | None) -> bool:
+    """Return whether a skill passed ingest validation and can be routed."""
+    if not isinstance(skill_metadata, dict):
+        return False
+    return str(skill_metadata.get("ingest_status", "")).strip().lower() == "accepted"
