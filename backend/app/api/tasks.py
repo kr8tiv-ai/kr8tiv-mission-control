@@ -113,6 +113,7 @@ SSE_SEEN_MAX = 2000
 TASK_SNIPPET_MAX_LEN = 500
 TASK_SNIPPET_TRUNCATED_LEN = 497
 TASK_EVENT_ROW_LEN = 2
+TASK_MANAGER_NAME_ALIASES = ("friday",)
 BOARD_READ_DEP = Depends(get_board_for_actor_read)
 ACTOR_DEP = Depends(require_admin_or_agent)
 SINCE_QUERY = Query(default=None)
@@ -134,6 +135,13 @@ class _BoardCustomFieldDefinition:
     validation_regex: str | None
     required: bool
     default_value: object | None
+
+
+@dataclass(frozen=True, slots=True)
+class _TaskManagerResolution:
+    agent: Agent | None
+    source: str
+    reason: str | None = None
 
 
 def _normalize_arena_config_for_storage(
@@ -550,17 +558,116 @@ def _serialize_comment(event: ActivityEvent) -> dict[str, object]:
     return TaskCommentRead.model_validate(event).model_dump(mode="json")
 
 
+def _agent_matches_task_manager(agent: Agent) -> bool:
+    name = (agent.name or "").strip().lower()
+    if not name:
+        return False
+    return any(alias in name for alias in TASK_MANAGER_NAME_ALIASES)
+
+
+def _resolve_task_manager_from_agents(agents: list[Agent]) -> _TaskManagerResolution:
+    friday_with_session = next(
+        (
+            agent
+            for agent in agents
+            if _agent_matches_task_manager(agent)
+            and (agent.openclaw_session_id or "").strip()
+        ),
+        None,
+    )
+    if friday_with_session is not None:
+        return _TaskManagerResolution(agent=friday_with_session, source="friday")
+
+    lead_with_session = next(
+        (
+            agent
+            for agent in agents
+            if agent.is_board_lead and (agent.openclaw_session_id or "").strip()
+        ),
+        None,
+    )
+    if lead_with_session is not None:
+        return _TaskManagerResolution(agent=lead_with_session, source="board_lead")
+
+    friday_without_session = next(
+        (agent for agent in agents if _agent_matches_task_manager(agent)),
+        None,
+    )
+    if friday_without_session is not None:
+        return _TaskManagerResolution(
+            agent=None,
+            source="none",
+            reason="friday_missing_session",
+        )
+
+    lead_without_session = next((agent for agent in agents if agent.is_board_lead), None)
+    if lead_without_session is not None:
+        return _TaskManagerResolution(
+            agent=None,
+            source="none",
+            reason="lead_missing_session",
+        )
+
+    if agents:
+        return _TaskManagerResolution(
+            agent=None,
+            source="none",
+            reason="no_friday_or_board_lead",
+        )
+
+    return _TaskManagerResolution(
+        agent=None,
+        source="none",
+        reason="no_board_agents",
+    )
+
+
+async def _resolve_task_manager_agent(
+    session: AsyncSession,
+    *,
+    board_id: UUID,
+) -> _TaskManagerResolution:
+    rows = list(
+        await session.exec(
+            select(Agent)
+            .where(col(Agent.board_id) == board_id)
+            .order_by(col(Agent.created_at).asc(), col(Agent.id).asc()),
+        ),
+    )
+    return _resolve_task_manager_from_agents(rows)
+
+
+async def _record_task_manager_notify_skipped(
+    session: AsyncSession,
+    *,
+    board: Board,
+    task: Task,
+    reason: str,
+) -> None:
+    record_activity(
+        session,
+        event_type="task.manager_notify_skipped",
+        message=(
+            "Task manager notify skipped for "
+            f"'{task.title}' on board '{board.name}': {reason}."
+        ),
+        task_id=task.id,
+    )
+    await session.commit()
+
+
 async def _send_lead_task_message(
     *,
     dispatch: GatewayDispatchService,
     session_key: str,
     config: GatewayClientConfig,
+    agent_name: str,
     message: str,
 ) -> OpenClawGatewayError | None:
     return await dispatch.try_send_agent_message(
         session_key=session_key,
         config=config,
-        agent_name="Lead Agent",
+        agent_name=agent_name,
         message=message,
         deliver=False,
     )
@@ -659,16 +766,35 @@ async def _notify_lead_on_task_create(
     board: Board,
     task: Task,
 ) -> None:
-    lead = (
-        await Agent.objects.filter_by(board_id=board.id)
-        .filter(col(Agent.is_board_lead).is_(True))
-        .first(session)
+    manager = await _resolve_task_manager_agent(
+        session,
+        board_id=board.id,
     )
-    if lead is None or not lead.openclaw_session_id:
+    if manager.agent is None:
+        await _record_task_manager_notify_skipped(
+            session,
+            board=board,
+            task=task,
+            reason=manager.reason or "no_manager_candidate",
+        )
+        return
+    if not manager.agent.openclaw_session_id:
+        await _record_task_manager_notify_skipped(
+            session,
+            board=board,
+            task=task,
+            reason="manager_missing_session",
+        )
         return
     dispatch = GatewayDispatchService(session)
     config = await dispatch.optional_gateway_config_for_board(board)
     if config is None:
+        await _record_task_manager_notify_skipped(
+            session,
+            board=board,
+            task=task,
+            reason="no_gateway_config",
+        )
         return
     description = _truncate_snippet(task.description or "")
     details = [
@@ -686,16 +812,17 @@ async def _notify_lead_on_task_create(
     )
     error = await _send_lead_task_message(
         dispatch=dispatch,
-        session_key=lead.openclaw_session_id,
+        session_key=manager.agent.openclaw_session_id,
         config=config,
+        agent_name=manager.agent.name,
         message=message,
     )
     if error is None:
         record_activity(
             session,
             event_type="task.lead_notified",
-            message=f"Lead agent notified for task: {task.title}.",
-            agent_id=lead.id,
+            message=f"Task manager notified for task: {task.title}.",
+            agent_id=manager.agent.id,
             task_id=task.id,
         )
         await session.commit()
@@ -704,7 +831,7 @@ async def _notify_lead_on_task_create(
             session,
             event_type="task.lead_notify_failed",
             message=f"Lead notify failed: {error}",
-            agent_id=lead.id,
+            agent_id=manager.agent.id,
             task_id=task.id,
         )
         await session.commit()
@@ -716,16 +843,35 @@ async def _notify_lead_on_task_unassigned(
     board: Board,
     task: Task,
 ) -> None:
-    lead = (
-        await Agent.objects.filter_by(board_id=board.id)
-        .filter(col(Agent.is_board_lead).is_(True))
-        .first(session)
+    manager = await _resolve_task_manager_agent(
+        session,
+        board_id=board.id,
     )
-    if lead is None or not lead.openclaw_session_id:
+    if manager.agent is None:
+        await _record_task_manager_notify_skipped(
+            session,
+            board=board,
+            task=task,
+            reason=manager.reason or "no_manager_candidate",
+        )
+        return
+    if not manager.agent.openclaw_session_id:
+        await _record_task_manager_notify_skipped(
+            session,
+            board=board,
+            task=task,
+            reason="manager_missing_session",
+        )
         return
     dispatch = GatewayDispatchService(session)
     config = await dispatch.optional_gateway_config_for_board(board)
     if config is None:
+        await _record_task_manager_notify_skipped(
+            session,
+            board=board,
+            task=task,
+            reason="no_gateway_config",
+        )
         return
     description = _truncate_snippet(task.description or "")
     details = [
@@ -743,8 +889,9 @@ async def _notify_lead_on_task_unassigned(
     )
     error = await _send_lead_task_message(
         dispatch=dispatch,
-        session_key=lead.openclaw_session_id,
+        session_key=manager.agent.openclaw_session_id,
         config=config,
+        agent_name=manager.agent.name,
         message=message,
     )
     if error is None:
@@ -752,7 +899,7 @@ async def _notify_lead_on_task_unassigned(
             session,
             event_type="task.lead_unassigned_notified",
             message=f"Lead notified task returned to inbox: {task.title}.",
-            agent_id=lead.id,
+            agent_id=manager.agent.id,
             task_id=task.id,
         )
         await session.commit()
@@ -761,7 +908,7 @@ async def _notify_lead_on_task_unassigned(
             session,
             event_type="task.lead_unassigned_notify_failed",
             message=f"Lead notify failed: {error}",
-            agent_id=lead.id,
+            agent_id=manager.agent.id,
             task_id=task.id,
         )
         await session.commit()
