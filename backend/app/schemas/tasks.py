@@ -14,6 +14,7 @@ from app.schemas.tags import TagRef
 from app.schemas.task_custom_fields import TaskCustomFieldValues
 
 TaskStatus = Literal["inbox", "in_progress", "review", "done"]
+TaskGSDStage = Literal["spec", "plan", "execute", "verify", "done"]
 TaskMode = Literal[
     "standard",
     "notebook",
@@ -21,6 +22,7 @@ TaskMode = Literal[
     "arena_notebook",
     "notebook_creation",
 ]
+DeploymentMode = Literal["team", "individual"]
 NotebookProfile = Literal["enterprise", "personal", "auto"]
 TaskIterationVerdict = Literal["APPROVED", "REVISE", "ERROR"]
 STATUS_REQUIRED_ERROR = "status is required"
@@ -78,6 +80,8 @@ class ArenaConfig(SQLModel):
     final_agent: str | None = None
     supermemory_enabled: bool = True
     sources: NotebookSources | None = None
+    done_gate_checks: dict[str, bool] = Field(default_factory=dict)
+    ui_labeled: bool = False
 
     @field_validator("agents", mode="before")
     @classmethod
@@ -105,6 +109,13 @@ class TaskBase(SQLModel):
     status: TaskStatus = "inbox"
     priority: str = "medium"
     task_mode: TaskMode = "standard"
+    gsd_stage: TaskGSDStage = "spec"
+    spec_doc_ref: str | None = None
+    plan_doc_ref: str | None = None
+    verification_ref: str | None = None
+    deployment_mode: DeploymentMode = "team"
+    owner_approval_required: bool = False
+    owner_approved_at: datetime | None = None
     arena_config: ArenaConfig | None = None
     notebook_profile: NotebookProfile = "auto"
     notebook_id: str | None = None
@@ -153,6 +164,13 @@ class TaskUpdate(SQLModel):
     status: TaskStatus | None = None
     priority: str | None = None
     task_mode: TaskMode | None = None
+    gsd_stage: TaskGSDStage | None = None
+    spec_doc_ref: str | None = None
+    plan_doc_ref: str | None = None
+    verification_ref: str | None = None
+    deployment_mode: DeploymentMode | None = None
+    owner_approval_required: bool | None = None
+    owner_approved_at: datetime | None = None
     arena_config: ArenaConfig | None = None
     notebook_profile: NotebookProfile | None = None
     notebook_id: str | None = None
