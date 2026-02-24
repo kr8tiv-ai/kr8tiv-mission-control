@@ -9,6 +9,9 @@ from dataclasses import dataclass
 
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.services.deterministic_eval_execution import execute_deterministic_eval
+from app.services.deterministic_eval_queue import TASK_TYPE as DETERMINISTIC_EVAL_TASK_TYPE
+from app.services.deterministic_eval_queue import requeue_deterministic_eval
 from app.services.queue import QueuedTask, dequeue_task
 from app.services.task_mode_execution import execute_task_mode
 from app.services.task_mode_queue import (
@@ -49,6 +52,14 @@ _TASK_HANDLERS: dict[str, _TaskHandler] = {
             settings.rq_dispatch_retry_max_seconds,
         ),
         requeue=lambda task, delay: requeue_task_mode_execution(task, delay_seconds=delay),
+    ),
+    DETERMINISTIC_EVAL_TASK_TYPE: _TaskHandler(
+        handler=execute_deterministic_eval,
+        attempts_to_delay=lambda attempts: min(
+            settings.rq_dispatch_retry_base_seconds * (2 ** max(0, attempts)),
+            settings.rq_dispatch_retry_max_seconds,
+        ),
+        requeue=lambda task, delay: requeue_deterministic_eval(task, delay_seconds=delay),
     ),
 }
 

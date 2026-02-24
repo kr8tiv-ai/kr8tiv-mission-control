@@ -123,6 +123,65 @@ This keeps high-agency behavior and personality while preventing uncontrolled dr
 - [`docs/openclaw_15_point_harness.md`](docs/openclaw_15_point_harness.md)
 - [`docs/openclaw_baseline_config.md`](docs/openclaw_baseline_config.md)
 
+## KR8TIV Platform Plan (Implemented Base)
+
+Mission Control is the control plane for all lanes:
+
+- internal engineering swarm delivery
+- personal KIN deployments
+- enterprise domain deployments
+
+`kr8tivclaw` compiles harnesses, OpenClaw executes tasks, and Mission Control governs runtime policy/prompt packs.
+
+### Ownership split
+
+- `kr8tiv-mission-control`: policy registry, pack resolution, telemetry ingest, deterministic eval, promotion/rollback
+- `kr8tivclaw`: harness schema/compiler/templates/compose output
+- OpenClaw runtime: execution only, no uncontrolled self-mutation
+
+### New control-plane persistence
+
+- `prompt_packs`
+- `pack_bindings` (scope precedence `global -> domain -> organization -> user`)
+- `run_telemetry`
+- `deterministic_evals`
+- `promotion_events`
+
+### New API surface
+
+- `POST /api/v1/runtime/runs`
+- `GET /api/v1/runtime/packs/resolve`
+- `POST /api/v1/packs`
+- `POST /api/v1/packs/{id}/promote`
+- `POST /api/v1/packs/{id}/rollback`
+
+### Deterministic evaluator (no-new-cost mode)
+
+Evaluation is queue-worker driven and model-call free:
+
+- score inputs: success, retries, latency regression, format compliance, approval gate compliance
+- hard regression flags block promotion unless force override
+- promotion gate requires challenger improvement threshold (default `>=5%`) with configurable strictness
+
+### Engineering done-gate
+
+Engineering swarm task completion now enforces done checks for `arena` and `arena_notebook` tasks:
+
+- required: `pr_created`, `ci_passed`, `human_reviewed`
+- conditional: if `ui_labeled=true`, then `ui_screenshot_present=true` is required
+
+### Tier policy baseline
+
+- `personal`: balanced autonomy, external writes should be ask-first
+- `enterprise`: ask-first for medium/high-risk actions by default
+
+## Iterative Rollout Stages
+
+1. Stage 1 (current): deterministic control-plane foundation and tiered runtime contracts
+2. Stage 2: canary tenants (1 personal, 1 enterprise), KPI tracking and rollback drills
+3. Stage 3: wider tenant rollout with scoped pack libraries per domain
+4. Stage 4: optional local-only prompt challenger loops when budget policy permits
+
 ## Quick Start
 
 ### 1) Configure Environment

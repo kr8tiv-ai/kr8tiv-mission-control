@@ -11,12 +11,17 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
+from app.models.pack_bindings import PackBinding
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
+from app.models.promotion_events import PromotionEvent
+from app.models.prompt_packs import PromptPack
+from app.models.run_telemetry import RunTelemetry
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
 from app.models.tags import Tag
@@ -43,7 +48,12 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "DeterministicEval",
     "Gateway",
+    "PackBinding",
+    "PromptPack",
+    "RunTelemetry",
+    "PromotionEvent",
     "GatewayInstalledSkill",
     "MarketplaceSkill",
     "SkillPack",
