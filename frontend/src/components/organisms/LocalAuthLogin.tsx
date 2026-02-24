@@ -82,14 +82,8 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app px-4 py-10">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[color:var(--accent-soft)] to-transparent" />
-        <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-[color:var(--accent-soft)] blur-3xl" />
-        <div className="absolute -right-20 -bottom-20 h-72 w-72 rounded-full bg-[color:var(--accent-soft)] blur-3xl" />
-      </div>
-
-      <Card className="relative w-full max-w-md animate-fade-in-up border border-[color:var(--border-strong)]">
+    <main className="flex min-h-screen items-center justify-center bg-app px-4 py-10">
+      <Card className="w-full max-w-md border border-[color:var(--border)]">
         <CardHeader className="space-y-4 border-b border-[color:var(--border)] pb-5">
           <div className="flex items-center justify-between">
             <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
