@@ -9,7 +9,9 @@ from app.schemas.board_onboarding import (
     BoardOnboardingAnswer,
     BoardOnboardingConfirm,
     BoardOnboardingRead,
+    BoardOnboardingRecommendation,
     BoardOnboardingStart,
+    OnboardingRecommendationRead,
 )
 from app.schemas.board_webhooks import (
     BoardWebhookCreate,
@@ -81,7 +83,9 @@ __all__ = [
     "BoardOnboardingAnswer",
     "BoardOnboardingConfirm",
     "BoardOnboardingRead",
+    "BoardOnboardingRecommendation",
     "BoardOnboardingStart",
+    "OnboardingRecommendationRead",
     "BoardCreate",
     "BoardRead",
     "BoardUpdate",

@@ -92,6 +92,7 @@ LeadAgentAutonomyLevel = Literal["ask_first", "balanced", "autonomous"]
 LeadAgentVerbosity = Literal["concise", "balanced", "detailed"]
 LeadAgentOutputFormat = Literal["bullets", "mixed", "narrative"]
 LeadAgentUpdateCadence = Literal["asap", "hourly", "daily", "weekly"]
+DeploymentMode = Literal["team", "individual"]
 
 
 class BoardOnboardingLeadAgentDraft(SQLModel):
@@ -143,12 +144,45 @@ class BoardOnboardingLeadAgentDraft(SQLModel):
         return normalized or None
 
 
+class OnboardingCapabilityRecommendation(SQLModel):
+    """Capability recommendation emitted from onboarding Q&A."""
+
+    key: NonEmptyStr
+    required: bool = True
+    install_command: str | None = None
+
+    @field_validator("install_command", mode="before")
+    @classmethod
+    def normalize_install_command(cls, value: object) -> object | None:
+        return _normalize_optional_text(value)
+
+
+class BoardOnboardingRecommendation(SQLModel):
+    """Recommended persona preset and capability bundle from onboarding."""
+
+    deployment_mode: DeploymentMode = "team"
+    recommended_preset: NonEmptyStr
+    capabilities: list[OnboardingCapabilityRecommendation] = Field(default_factory=list)
+    voice_enabled: bool = False
+    computer_automation_profile: str | None = None
+    supermemory_plugin_command: NonEmptyStr = (
+        "openclaw plugins install @supermemory/openclaw-supermemory"
+    )
+
+    @field_validator("computer_automation_profile", mode="before")
+    @classmethod
+    def normalize_automation_profile(cls, value: object) -> object | None:
+        return _normalize_optional_text(value)
+
+
 class BoardOnboardingAgentComplete(BoardOnboardingConfirm):
     """Complete onboarding draft produced by the onboarding assistant."""
 
     status: Literal["complete"]
+    deployment_mode: DeploymentMode | None = None
     user_profile: BoardOnboardingUserProfile | None = None
     lead_agent: BoardOnboardingLeadAgentDraft | None = None
+    recommendation: BoardOnboardingRecommendation | None = None
 
 
 BoardOnboardingAgentUpdate = BoardOnboardingAgentComplete | BoardOnboardingAgentQuestion
@@ -163,5 +197,21 @@ class BoardOnboardingRead(SQLModel):
     status: str
     messages: list[dict[str, object]] | None = None
     draft_goal: BoardOnboardingAgentComplete | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OnboardingRecommendationRead(SQLModel):
+    """Stored onboarding recommendation response model."""
+
+    id: UUID
+    board_id: UUID
+    onboarding_session_id: UUID | None = None
+    deployment_mode: DeploymentMode
+    recommended_preset: str
+    capabilities: list[OnboardingCapabilityRecommendation]
+    voice_enabled: bool
+    computer_automation_profile: str | None = None
+    supermemory_plugin_command: str
     created_at: datetime
     updated_at: datetime

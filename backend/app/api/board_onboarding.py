@@ -21,12 +21,15 @@ from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.board_onboarding import BoardOnboardingSession
+from app.models.onboarding_recommendations import OnboardingRecommendation
 from app.schemas.board_onboarding import (
     BoardOnboardingAgentComplete,
     BoardOnboardingAgentUpdate,
     BoardOnboardingAnswer,
     BoardOnboardingConfirm,
     BoardOnboardingLeadAgentDraft,
+    OnboardingCapabilityRecommendation,
+    OnboardingRecommendationRead,
     BoardOnboardingRead,
     BoardOnboardingStart,
     BoardOnboardingUserProfile,
@@ -56,6 +59,9 @@ BOARD_OR_404_DEP = Depends(get_board_or_404)
 SESSION_DEP = Depends(get_session)
 ACTOR_DEP = Depends(require_admin_or_agent)
 ADMIN_AUTH_DEP = Depends(require_admin_auth)
+
+_SUPERMEMORY_PLUGIN_COMMAND = "openclaw plugins install @supermemory/openclaw-supermemory"
+_PERSONALIZED_MODE_TOKENS = {"individual", "personalized", "personal"}
 
 
 def _parse_draft_user_profile(
@@ -174,6 +180,116 @@ def _lead_agent_options(
     )
 
 
+def _normalize_deployment_mode(raw_mode: object) -> str:
+    if not isinstance(raw_mode, str):
+        return "team"
+    token = raw_mode.strip().lower()
+    if token in _PERSONALIZED_MODE_TOKENS:
+        return "individual"
+    return "team"
+
+
+def _build_onboarding_recommendation(draft_goal: dict[str, object] | None) -> dict[str, object]:
+    mode = _normalize_deployment_mode((draft_goal or {}).get("deployment_mode"))
+    capabilities: list[dict[str, object]] = [
+        {
+            "key": "supermemory_plugin",
+            "required": True,
+            "install_command": _SUPERMEMORY_PLUGIN_COMMAND,
+        },
+    ]
+    voice_enabled = False
+    computer_automation_profile: str | None = None
+    recommended_preset = "team_orchestrated_default"
+
+    if mode == "individual":
+        voice_enabled = True
+        computer_automation_profile = "uplay_chromium"
+        recommended_preset = "individual_default"
+        capabilities.append({"key": "voice_model", "required": True})
+        capabilities.append({"key": "uplay_chromium_automation", "required": True})
+
+    return {
+        "deployment_mode": mode,
+        "recommended_preset": recommended_preset,
+        "capabilities": capabilities,
+        "voice_enabled": voice_enabled,
+        "computer_automation_profile": computer_automation_profile,
+        "supermemory_plugin_command": _SUPERMEMORY_PLUGIN_COMMAND,
+    }
+
+
+async def _upsert_onboarding_recommendation(
+    *,
+    session: AsyncSession,
+    board_id: object,
+    onboarding_session_id: object | None,
+    recommendation: dict[str, object],
+) -> OnboardingRecommendation:
+    existing = (
+        await OnboardingRecommendation.objects.filter_by(board_id=board_id).first(session)
+    )
+    if existing is None:
+        existing = OnboardingRecommendation(
+            board_id=board_id,
+            onboarding_session_id=onboarding_session_id,
+            deployment_mode=str(recommendation.get("deployment_mode") or "team"),
+            recommended_preset=str(recommendation.get("recommended_preset") or "team_orchestrated_default"),
+            capabilities=list(recommendation.get("capabilities") or []),
+            voice_enabled=bool(recommendation.get("voice_enabled")),
+            computer_automation_profile=(
+                str(recommendation.get("computer_automation_profile"))
+                if recommendation.get("computer_automation_profile") is not None
+                else None
+            ),
+            supermemory_plugin_command=str(
+                recommendation.get("supermemory_plugin_command") or _SUPERMEMORY_PLUGIN_COMMAND
+            ),
+        )
+    else:
+        existing.onboarding_session_id = onboarding_session_id
+        existing.deployment_mode = str(recommendation.get("deployment_mode") or "team")
+        existing.recommended_preset = str(
+            recommendation.get("recommended_preset") or "team_orchestrated_default"
+        )
+        existing.capabilities = list(recommendation.get("capabilities") or [])
+        existing.voice_enabled = bool(recommendation.get("voice_enabled"))
+        existing.computer_automation_profile = (
+            str(recommendation.get("computer_automation_profile"))
+            if recommendation.get("computer_automation_profile") is not None
+            else None
+        )
+        existing.supermemory_plugin_command = str(
+            recommendation.get("supermemory_plugin_command") or _SUPERMEMORY_PLUGIN_COMMAND
+        )
+        existing.updated_at = utcnow()
+
+    session.add(existing)
+    return existing
+
+
+def _to_recommendation_read(
+    recommendation: OnboardingRecommendation,
+) -> OnboardingRecommendationRead:
+    capabilities = [
+        OnboardingCapabilityRecommendation.model_validate(cap)
+        for cap in recommendation.capabilities
+    ]
+    return OnboardingRecommendationRead(
+        id=recommendation.id,
+        board_id=recommendation.board_id,
+        onboarding_session_id=recommendation.onboarding_session_id,
+        deployment_mode=recommendation.deployment_mode,  # type: ignore[arg-type]
+        recommended_preset=recommendation.recommended_preset,
+        capabilities=capabilities,
+        voice_enabled=recommendation.voice_enabled,
+        computer_automation_profile=recommendation.computer_automation_profile,
+        supermemory_plugin_command=recommendation.supermemory_plugin_command,
+        created_at=recommendation.created_at,
+        updated_at=recommendation.updated_at,
+    )
+
+
 @router.get("", response_model=BoardOnboardingRead)
 async def get_onboarding(
     board: Board = BOARD_USER_READ_DEP,
@@ -188,6 +304,21 @@ async def get_onboarding(
     if onboarding is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return onboarding
+
+
+@router.get("/recommendation", response_model=OnboardingRecommendationRead)
+async def get_onboarding_recommendation(
+    board: Board = BOARD_USER_READ_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> OnboardingRecommendationRead:
+    recommendation = (
+        await OnboardingRecommendation.objects.filter_by(board_id=board.id)
+        .order_by(col(OnboardingRecommendation.updated_at).desc())
+        .first(session)
+    )
+    if recommendation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return _to_recommendation_read(recommendation)
 
 
 @router.post("/start", response_model=BoardOnboardingRead)
@@ -398,6 +529,16 @@ async def agent_onboarding_update(
     )
     if isinstance(payload, BoardOnboardingAgentComplete):
         onboarding.draft_goal = payload_data
+        recommendation_payload = payload_data.get("recommendation")
+        if not isinstance(recommendation_payload, dict):
+            recommendation_payload = _build_onboarding_recommendation(payload_data)
+            onboarding.draft_goal["recommendation"] = recommendation_payload
+        await _upsert_onboarding_recommendation(
+            session=session,
+            board_id=board.id,
+            onboarding_session_id=onboarding.id,
+            recommendation=recommendation_payload,
+        )
         onboarding.status = "completed"
         messages.append(
             {"role": "assistant", "content": payload_text, "timestamp": now},

@@ -93,6 +93,13 @@ def test_soul_template_declares_persona_precedence_contract() -> None:
     assert "SOUL.md > USER.md > IDENTITY.md > AGENTS.md" in template
 
 
+def test_bootstrap_template_requires_supermemory_plugin_install() -> None:
+    template_path = agent_provisioning._templates_root() / "BOARD_BOOTSTRAP.md.j2"
+    template = template_path.read_text(encoding="utf-8")
+
+    assert "openclaw plugins install @supermemory/openclaw-supermemory" in template
+
+
 def test_user_context_uses_email_fallback_when_name_is_missing():
     user = SimpleNamespace(
         name=None,
