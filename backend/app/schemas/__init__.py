@@ -33,6 +33,16 @@ from app.schemas.organizations import (
     OrganizationMemberUpdate,
     OrganizationRead,
 )
+from app.schemas.persona_presets import (
+    PersonaPresetApplyRequest,
+    PersonaPresetApplyResponse,
+    PersonaPresetCreate,
+    PersonaPresetRead,
+)
+from app.schemas.persona_integrity import (
+    PersonaIntegrityBaselineRead,
+    PersonaIntegrityDriftResult,
+)
 from app.schemas.skills_marketplace import (
     MarketplaceSkillActionResponse,
     MarketplaceSkillCardRead,
@@ -89,6 +99,12 @@ __all__ = [
     "OrganizationMemberRead",
     "OrganizationMemberUpdate",
     "OrganizationRead",
+    "PersonaPresetApplyRequest",
+    "PersonaPresetApplyResponse",
+    "PersonaPresetCreate",
+    "PersonaPresetRead",
+    "PersonaIntegrityBaselineRead",
+    "PersonaIntegrityDriftResult",
     "SoulsDirectoryMarkdownResponse",
     "SoulsDirectorySearchResponse",
     "SoulsDirectorySoulRef",

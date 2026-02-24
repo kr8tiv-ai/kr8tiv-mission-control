@@ -56,6 +56,7 @@ from app.services.openclaw.model_policy import (
     provider_for_policy,
     transport_for_policy,
 )
+from app.services.openclaw.reasoning_policy import resolve_reasoning_mode
 from app.services.openclaw.shared import GatewayAgentIdentity
 
 if TYPE_CHECKING:
@@ -135,6 +136,27 @@ def _channel_heartbeat_visibility_patch(config_data: dict[str, Any]) -> dict[str
     if not changed:
         return None
     return {"defaults": {"heartbeat": merged}}
+
+
+def _agent_thinking_default_patch(config_data: dict[str, Any]) -> dict[str, Any] | None:
+    agents_section = config_data.get("agents")
+    if not isinstance(agents_section, dict):
+        return None
+
+    defaults = agents_section.get("defaults")
+    if not isinstance(defaults, dict):
+        return None
+
+    supported_modes = defaults.get("supportedReasoningModes")
+    thinking_default = resolve_reasoning_mode(supported_modes, preferred="max")
+    if not thinking_default:
+        return None
+
+    current = defaults.get("thinkingDefault")
+    if isinstance(current, str) and current.strip().lower() == thinking_default:
+        return None
+
+    return {"defaults": {"thinkingDefault": thinking_default}}
 
 
 def _template_env() -> Environment:
@@ -647,6 +669,9 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         new_list = _updated_agent_list(raw_list, entry_by_id)
 
         patch: dict[str, Any] = {"agents": {"list": new_list}}
+        thinking_default_patch = _agent_thinking_default_patch(config_data)
+        if thinking_default_patch is not None:
+            patch["agents"].update(thinking_default_patch)
         channels_patch = _channel_heartbeat_visibility_patch(config_data)
         if channels_patch is not None:
             patch["channels"] = channels_patch

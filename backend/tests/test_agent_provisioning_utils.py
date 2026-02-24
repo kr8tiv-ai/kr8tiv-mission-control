@@ -79,6 +79,20 @@ def test_templates_root_points_to_repo_templates_dir():
     assert (root / "BOARD_AGENTS.md.j2").exists()
 
 
+def test_agents_template_declares_persona_precedence_contract() -> None:
+    template_path = agent_provisioning._templates_root() / "BOARD_AGENTS.md.j2"
+    template = template_path.read_text(encoding="utf-8")
+
+    assert "SOUL.md > USER.md > IDENTITY.md > AGENTS.md" in template
+
+
+def test_soul_template_declares_persona_precedence_contract() -> None:
+    template_path = agent_provisioning._templates_root() / "BOARD_SOUL.md.j2"
+    template = template_path.read_text(encoding="utf-8")
+
+    assert "SOUL.md > USER.md > IDENTITY.md > AGENTS.md" in template
+
+
 def test_user_context_uses_email_fallback_when_name_is_missing():
     user = SimpleNamespace(
         name=None,
@@ -485,6 +499,50 @@ async def test_control_plane_upsert_agent_create_then_update(monkeypatch):
 
     assert calls[0][0] == "agents.create"
     assert calls[1][0] == "agents.update"
+
+
+def test_heartbeat_config_defaults_include_reasoning() -> None:
+    config = agent_provisioning._heartbeat_config(SimpleNamespace(heartbeat_config=None))
+    assert config["includeReasoning"] is True
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_sets_thinking_default_from_supported_modes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {
+                        "list": [],
+                        "defaults": {"supportedReasoningModes": ["off", "medium", "high"]},
+                    },
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    cp = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+    await cp.patch_agent_heartbeats(
+        entries=[("board-agent-a", "/tmp/workspace-board-agent-a", {"every": "10m"}, None)],
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert payload["agents"]["defaults"]["thinkingDefault"] == "high"
 
 
 @pytest.mark.asyncio
