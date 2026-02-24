@@ -12,6 +12,7 @@ def test_build_connect_params_sets_explicit_operator_role_and_scopes() -> None:
 
     assert params["role"] == "operator"
     assert params["scopes"] == list(GATEWAY_OPERATOR_SCOPES)
+    assert params["client"]["id"] == "openclaw-control-ui"
     assert "auth" not in params
 
 
@@ -22,3 +23,14 @@ def test_build_connect_params_includes_auth_token_when_provided() -> None:
 
     assert params["auth"] == {"token": "secret-token"}
     assert params["scopes"] == list(GATEWAY_OPERATOR_SCOPES)
+
+
+def test_build_connect_params_allows_client_id_override() -> None:
+    params = _build_connect_params(
+        GatewayConfig(
+            url="ws://gateway.example/ws",
+            client_id="gateway-client",
+        ),
+    )
+
+    assert params["client"]["id"] == "gateway-client"
