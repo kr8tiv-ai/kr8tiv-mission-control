@@ -74,6 +74,7 @@ from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError
 from app.services.organizations import require_board_access
+from app.services.prompt_evolution import record_task_completion_telemetry
 from app.services.task_mode_queue import QueuedTaskModeExecution, enqueue_task_mode_execution
 from app.services.tags import (
     TagState,
@@ -2532,6 +2533,11 @@ async def _finalize_updated_task(
         )
 
     session.add(update.task)
+    await record_task_completion_telemetry(
+        session,
+        task=update.task,
+        previous_status=update.previous_status,
+    )
     await session.commit()
     await session.refresh(update.task)
     await _record_task_comment_from_update(session, update=update)

@@ -26,6 +26,7 @@ from app.api.gateway import router as gateway_router
 from app.api.gateways import router as gateways_router
 from app.api.metrics import router as metrics_router
 from app.api.organizations import router as organizations_router
+from app.api.prompt_evolution import router as prompt_evolution_router
 from app.api.skills_marketplace import router as skills_marketplace_router
 from app.api.souls_directory import router as souls_directory_router
 from app.api.tags import router as tags_router
@@ -117,6 +118,12 @@ OPENAPI_TAGS = [
         "description": "Task CRUD, dependency management, and task workflow operations.",
     },
     {
+        "name": "prompt-evolution",
+        "description": (
+            "Prompt/context registry, versioning, telemetry, and manual promotion gate endpoints."
+        ),
+    },
+    {
         "name": "custom-fields",
         "description": "Organization custom-field definitions and board assignment endpoints.",
     },
@@ -182,6 +189,7 @@ _OPENAPI_EXAMPLE_TAGS = {
     "board-onboarding",
     "approvals",
     "tasks",
+    "prompt-evolution",
     "custom-fields",
     "tags",
     "users",
@@ -549,6 +557,7 @@ api_v1.include_router(board_webhooks_router)
 api_v1.include_router(board_onboarding_router)
 api_v1.include_router(approvals_router)
 api_v1.include_router(tasks_router)
+api_v1.include_router(prompt_evolution_router)
 api_v1.include_router(task_custom_fields_router)
 api_v1.include_router(tags_router)
 api_v1.include_router(users_router)

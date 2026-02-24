@@ -71,6 +71,14 @@ At execution time, Mission Control resolves and injects effective champion pack 
 - `optimization_runs`
 - `promotion_events`
 
+## Implementation Status (2026-02-24)
+
+Phase-2 scaffolding is now in-progress in code:
+- Prompt registry tables + Alembic migration
+- Prompt evolution API endpoints (packs, versions, promote, task eval listing)
+- Task completion telemetry hook on status transitions to `done`
+- Manual promotion gate endpoint (auto-promotion intentionally deferred)
+
 ## MVP Rollout Plan
 
 ### Phase 1 (now): docs + alignment
