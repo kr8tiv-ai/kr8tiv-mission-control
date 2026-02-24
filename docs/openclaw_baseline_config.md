@@ -23,11 +23,11 @@ The config below is your provided baseline, normalized into valid JSON.
   "agents": {
     "defaults": {
       "model": {
-        "primary": "",
+        "primary": "openai-codex/gpt-5.3-codex",
         "fallbacks": []
       },
       "models": {
-        "": {}
+        "openai-codex/gpt-5.3-codex": {}
       },
       "workspace": "/home/asaharan/.openclaw/workspace",
       "contextPruning": {
@@ -397,7 +397,7 @@ Baseline intent:
 
 Compatibility warning:
 
-- In OpenClaw `2026.1.30` core schema, top-level `memory` is not a built-in key.
+- In newer OpenClaw core schemas, top-level `memory` may not be a built-in key.
 - Without a plugin that extends schema for this section, config validation reports:
   `Unrecognized key: "memory"`.
 
@@ -435,9 +435,9 @@ If invalid, OpenClaw reports exact keys/paths and remediation.
 These fields should be set before using this in production-like workflows:
 
 1. `agents.defaults.model.primary`
-   Set a concrete model id, for example `openai-codex/gpt-5.2`.
+   Set a concrete model id, for example `openai-codex/gpt-5.3-codex`.
 2. `agents.defaults.models`
-   Replace the empty key (`""`) with your model id so per-model config is mapped correctly.
+   Ensure the map includes your primary model id so per-model config is mapped correctly.
 3. `gateway.auth`
    If token auth is enabled, provide the token value (for example `gateway.auth.token`) via your preferred secret handling approach.
 4. `memory` (top-level)
@@ -480,6 +480,18 @@ When adding a gateway in Mission Control:
 - URL: `ws://127.0.0.1:18789` (or your host/IP with explicit port)
 - Token: provide only if your gateway requires token auth
 - Workspace root (in Mission Control gateway config): align with `agents.defaults.workspace` when possible
+
+### Mission Control Locked Agent Profiles
+
+This repository pins specific agent model policies in backend provisioning logic.
+
+- `friday`: `openai-codex/gpt-5.3-codex` (`transport=cli`, locked)
+- `arsenal`: `openai-codex/gpt-5.3-codex` (`transport=cli`, locked)
+- `edith`: `google-gemini-cli/gemini-3.1` (`transport=cli`, locked)
+- `jocasta`: `nvidia/moonshotai/kimi-k2-5` (`transport=api`, locked)
+
+When these agents are provisioned or template-synced, Mission Control rewrites the OpenClaw
+`agents.list[].model` value to the locked target so drift is corrected.
 
 ## Security Notes
 

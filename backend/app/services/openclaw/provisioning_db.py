@@ -74,6 +74,12 @@ from app.services.openclaw.internal.session_keys import (
     board_agent_session_key,
     board_lead_session_key,
 )
+from app.services.openclaw.model_policy import (
+    enforce_agent_model_policy,
+    is_model_policy_locked,
+    normalize_model_policy,
+    resolve_agent_model_policy,
+)
 from app.services.openclaw.policies import OpenClawAuthorizationPolicy
 from app.services.openclaw.provisioning import (
     OpenClawGatewayControlPlane,
@@ -182,6 +188,8 @@ class OpenClawProvisioningService(OpenClawDBService):
             if existing.openclaw_session_id != desired_session_key:
                 existing.openclaw_session_id = desired_session_key
                 changed = True
+            if enforce_agent_model_policy(existing):
+                changed = True
             if changed:
                 existing.updated_at = utcnow()
                 self.session.add(existing)
@@ -209,6 +217,10 @@ class OpenClawProvisioningService(OpenClawDBService):
             gateway_id=request.gateway.id,
             is_board_lead=True,
             heartbeat_config=DEFAULT_HEARTBEAT_CONFIG.copy(),
+            model_policy=resolve_agent_model_policy(
+                agent_name=config_options.agent_name or self.lead_agent_name(board),
+                requested=None,
+            ),
             identity_profile=merged_identity_profile,
             openclaw_session_id=self.lead_session_key(board),
         )
@@ -1031,7 +1043,12 @@ class AgentLifecycleService(OpenClawDBService):
         *,
         data: dict[str, Any],
     ) -> tuple[Agent, str]:
-        agent = Agent.model_validate(data)
+        payload = dict(data)
+        payload["model_policy"] = resolve_agent_model_policy(
+            agent_name=str(payload.get("name", "")),
+            requested=payload.get("model_policy"),
+        )
+        agent = Agent.model_validate(payload)
         raw_token = mint_agent_token(agent)
         mark_provision_requested(agent, action="provision", status="provisioning")
         agent.openclaw_session_id = self.resolve_session_key(agent)
@@ -1208,6 +1225,18 @@ class AgentLifecycleService(OpenClawDBService):
     ) -> tuple[Gateway | None, Gateway | None]:
         main_gateway = await self.get_main_agent_gateway(agent)
         gateway_for_main: Gateway | None = None
+        current_model_policy = normalize_model_policy(getattr(agent, "model_policy", None))
+        if "model_policy" in updates:
+            requested_model_policy = normalize_model_policy(updates.get("model_policy"))
+            if (
+                is_model_policy_locked(current_model_policy)
+                and requested_model_policy != current_model_policy
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="model_policy is locked for this agent",
+                )
+            updates["model_policy"] = requested_model_policy
 
         if make_main:
             board_source = updates.get("board_id") or agent.board_id
@@ -1244,6 +1273,11 @@ class AgentLifecycleService(OpenClawDBService):
                     detail="Board gateway_id is required",
                 )
             updates["gateway_id"] = board.gateway_id
+        target_name = str(updates.get("name", agent.name))
+        updates["model_policy"] = resolve_agent_model_policy(
+            agent_name=target_name,
+            requested=updates.get("model_policy", current_model_policy),
+        )
         for key, value in updates.items():
             setattr(agent, key, value)
 
@@ -1257,8 +1291,9 @@ class AgentLifecycleService(OpenClawDBService):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="Board gateway_id is required",
-                )
+            )
             agent.gateway_id = board.gateway_id
+        enforce_agent_model_policy(agent)
         agent.updated_at = utcnow()
         if agent.heartbeat_config is None:
             agent.heartbeat_config = DEFAULT_HEARTBEAT_CONFIG.copy()
@@ -1420,6 +1455,22 @@ class AgentLifecycleService(OpenClawDBService):
         await self.session.commit()
         await self.session.refresh(agent)
 
+    async def sync_locked_agent_runtime_policy(self, *, agent: Agent) -> None:
+        if not is_model_policy_locked(getattr(agent, "model_policy", None)):
+            return
+        gateway = await Gateway.objects.by_id(agent.gateway_id).first(self.session)
+        if gateway is None or not gateway.url or not gateway.workspace_root:
+            return
+        try:
+            await OpenClawGatewayProvisioner().sync_gateway_agent_heartbeats(gateway, [agent])
+        except (OpenClawGatewayError, OSError, RuntimeError, ValueError) as exc:
+            self.logger.warning(
+                "agent.heartbeat.model_policy_sync_failed agent_id=%s gateway_id=%s error=%s",
+                agent.id,
+                gateway.id,
+                str(exc),
+            )
+
     async def commit_heartbeat(
         self,
         *,
@@ -1432,6 +1483,7 @@ class AgentLifecycleService(OpenClawDBService):
             agent.status = "online"
         agent.last_seen_at = utcnow()
         agent.updated_at = utcnow()
+        await self.sync_locked_agent_runtime_policy(agent=agent)
         self.record_heartbeat(self.session, agent)
         self.session.add(agent)
         await self.session.commit()
