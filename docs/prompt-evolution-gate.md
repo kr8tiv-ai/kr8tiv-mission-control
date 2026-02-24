@@ -73,11 +73,14 @@ At execution time, Mission Control resolves and injects effective champion pack 
 
 ## Implementation Status (2026-02-24)
 
-Phase-2 scaffolding is now in-progress in code:
+Phase-2/3 scaffolding is now in-progress in code:
 - Prompt registry tables + Alembic migration
 - Prompt evolution API endpoints (packs, versions, promote, task eval listing)
 - Task completion telemetry hook on status transitions to `done`
+- Evaluator queue scaffold (`prompt_eval_task`) with deterministic baseline scoring worker
+- Promotion guardrails (min score delta + non-regression checks, with explicit `force` override)
 - Manual promotion gate endpoint (auto-promotion intentionally deferred)
+- Frontend board-level Prompt Evolution panel route for visibility
 
 ## MVP Rollout Plan
 

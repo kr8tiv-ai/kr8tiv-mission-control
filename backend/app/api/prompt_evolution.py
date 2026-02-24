@@ -5,9 +5,10 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 
 from app.api.deps import get_board_for_actor_read, get_board_for_user_write, require_admin_auth
+from app.core.config import settings
 from app.db.session import get_session
 from app.models.boards import Board
 from app.models.prompt_evolution import PromotionEvent, PromptPack, PromptVersion, TaskEvalScore
@@ -26,6 +27,30 @@ if False:  # pragma: no cover
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 router = APIRouter(prefix="/boards/{board_id}/prompt-evolution", tags=["prompt-evolution"])
+
+
+async def _avg_score_for_prompt_version(
+    session: AsyncSession,
+    *,
+    board_id: UUID,
+    prompt_version_id: UUID | None,
+) -> float | None:
+    if prompt_version_id is None:
+        return None
+    value = (
+        await session.exec(
+            select(func.avg(TaskEvalScore.score))
+            .where(col(TaskEvalScore.board_id) == board_id)
+            .where(col(TaskEvalScore.prompt_version_id) == prompt_version_id)
+            .where(col(TaskEvalScore.score).is_not(None)),
+        )
+    ).first()
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/packs", response_model=list[PromptPackRead])
@@ -147,6 +172,42 @@ async def promote_challenger(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="to_version_id must belong to the same prompt pack.",
         )
+
+    champion_score = await _avg_score_for_prompt_version(
+        session,
+        board_id=board.id,
+        prompt_version_id=pack.champion_version_id,
+    )
+    challenger_score = await _avg_score_for_prompt_version(
+        session,
+        board_id=board.id,
+        prompt_version_id=to_version.id,
+    )
+
+    if not payload.force:
+        if (
+            settings.prompt_promotion_require_non_regression
+            and champion_score is not None
+            and challenger_score is not None
+            and challenger_score < champion_score
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    "Promotion blocked: challenger regresses champion score "
+                    f"({challenger_score:.3f} < {champion_score:.3f})."
+                ),
+            )
+        if champion_score is not None and challenger_score is not None:
+            delta = challenger_score - champion_score
+            if delta < settings.prompt_promotion_min_score_delta:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=(
+                        "Promotion blocked: score delta below threshold "
+                        f"({delta:.3f} < {settings.prompt_promotion_min_score_delta:.3f})."
+                    ),
+                )
 
     event = PromotionEvent(
         board_id=board.id,

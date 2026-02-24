@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
 
+    # Prompt evolution gate guardrails
+    prompt_eval_enabled: bool = True
+    prompt_promotion_min_score_delta: float = 0.03
+    prompt_promotion_require_non_regression: bool = True
+    prompt_optimization_default_budget_usd: float = 5.0
+
     # Logging
     log_level: str = "INFO"
     log_format: str = "text"

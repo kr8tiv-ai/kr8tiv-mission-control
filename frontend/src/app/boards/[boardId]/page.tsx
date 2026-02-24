@@ -3308,6 +3308,15 @@ export default function BoardDetailPage() {
                   >
                     <Activity className="h-4 w-4" />
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/boards/${boardId}/prompt-evolution`)}
+                    className="h-9 px-2 text-xs"
+                    aria-label="Prompt evolution"
+                    title="Prompt evolution"
+                  >
+                    PE
+                  </Button>
                   {isOrgAdmin ? (
                     <button
                       type="button"

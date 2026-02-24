@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlmodel import col, select
 
+from app.core.logging import get_logger
+from app.db.session import async_session_maker
 from app.models.prompt_evolution import PromptPack, TaskEvalScore
 from app.models.tasks import Task
+from app.services.prompt_evolution_queue import QueuedPromptEvalTask, enqueue_prompt_eval_task
 
 if False:  # pragma: no cover
     from sqlmodel.ext.asyncio.session import AsyncSession
+
+logger = get_logger(__name__)
 
 
 async def record_task_completion_telemetry(
@@ -54,3 +61,64 @@ async def record_task_completion_telemetry(
         },
     )
     session.add(telemetry)
+    await session.flush()
+
+    enqueue_prompt_eval_task(
+        QueuedPromptEvalTask(
+            eval_score_id=telemetry.id,
+            queued_at=datetime.now(UTC),
+        )
+    )
+
+
+async def process_prompt_eval_task(eval_score_id: object) -> None:
+    """Background evaluator stub to compute deterministic baseline score."""
+
+    async with async_session_maker() as session:
+        eval_row = await session.get(TaskEvalScore, eval_score_id)
+        if eval_row is None:
+            return
+        if eval_row.score is not None:
+            return
+
+        task = await session.get(Task, eval_row.task_id)
+        if task is None:
+            eval_row.score = 0.0
+            eval_row.passed = False
+            eval_row.detail_payload = {
+                **eval_row.detail_payload,
+                "error": "task_not_found",
+            }
+            session.add(eval_row)
+            await session.commit()
+            return
+
+        title_len = len((task.title or "").strip())
+        description_len = len((task.description or "").strip())
+        score = 0.0
+        if task.status == "done":
+            score += 0.6
+        if title_len >= 8:
+            score += 0.2
+        if description_len >= 20:
+            score += 0.2
+
+        eval_row.score = float(min(1.0, score))
+        eval_row.passed = bool(eval_row.score >= 0.7)
+        eval_row.detail_payload = {
+            **eval_row.detail_payload,
+            "title_len": title_len,
+            "description_len": description_len,
+            "scoring_version": "v0",
+        }
+        session.add(eval_row)
+        await session.commit()
+        logger.info(
+            "prompt_evolution.eval.completed",
+            extra={
+                "eval_score_id": str(eval_row.id),
+                "task_id": str(eval_row.task_id),
+                "score": eval_row.score,
+                "passed": eval_row.passed,
+            },
+        )

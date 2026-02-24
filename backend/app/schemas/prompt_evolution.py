@@ -56,6 +56,7 @@ class PromotionRequest(BaseModel):
 
     to_version_id: UUID
     reason: str | None = None
+    force: bool = False
 
 
 class PromotionEventRead(BaseModel):
