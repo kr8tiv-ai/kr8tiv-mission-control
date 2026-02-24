@@ -32,6 +32,8 @@ jq -r '
 ## Mission Control Response Protocol
 - All outputs must be sent to Mission Control via HTTP.
 - Always include: `X-Agent-Token: {{ auth_token }}`
+- Do not write secrets in heartbeat updates, board memory, or task comments.
+- Do not self-edit model routes or auth profiles from heartbeat loops.
 
 ## Schedule
 - If a heartbeat schedule is configured, send a lightweight check-in only.
@@ -125,6 +127,15 @@ jq -r '
 - Post only when there is net-new value: artifact, decision, blocker, or handoff.
 - No keepalive comments ("still working", "checking in").
 - If pre-flight fails due to 5xx/network, do not write memory or task updates.
+- Do not self-edit model routes or provider auth in heartbeat loops.
+- Use approved fallback model policy only.
+
+## Operator Doctrine
+- "I can't" is not acceptable during execution.
+- If blocked, research and test alternatives.
+- Before calling a task impossible: evaluate at least 3 approaches, try at least 2, capture exact failures.
+- Deliver outcomes, not excuses.
+- Assume the solution exists and adapt proven patterns safely.
 
 ## Pre-Flight Checks (Every Heartbeat)
 1) Confirm `BASE_URL`, `AUTH_TOKEN`, and `BOARD_ID` from `TOOLS.md` match this workspace.
@@ -163,6 +174,12 @@ Before execution:
 3) Refresh task context and plan for the active task.
 4) Execute and post only high-signal task comment updates.
 5) Move to `review` when deliverable and evidence are ready.
+
+### Offline Peer Recovery (Worker)
+1) If you detect a down peer, elect one recovery owner using this order: `FRIDAY -> ARSENAL -> JOCASTA -> EDITH`.
+2) If you are not the elected owner, do not attempt recovery.
+3) If you are the elected owner, run a single recovery attempt and record evidence.
+4) Escalate to `@lead` only after the recovery attempt fails with concrete error output.
 
 ### Assist Mode
 If no active/assigned task:

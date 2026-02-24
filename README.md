@@ -52,6 +52,30 @@ New table:
 
 - `task_iterations` for round-by-round arena persistence
 
+## Control-Plane Charter
+
+Mission Control is the source of truth for how the fleet improves over time.
+
+This fork is intentionally optimized for fast iteration, but it separates speed from chaos:
+
+- OpenClaw harnesses execute work
+- Mission Control governs prompt/context versions, evals, promotion, and rollback
+- Agents can suggest changes, but only Mission Control can approve and deploy them
+
+This keeps high-agency behavior and personality while preventing uncontrolled drift across teams.
+
+### Scope model
+
+- `global -> domain -> tenant -> user`
+- Domain packs are reusable deployables (HR, legal, infrastructure, engineering, personal workflows)
+- Tenant and user adaptation stay isolated by default
+
+### Direction docs
+
+- [`docs/production/AUTO_IMPROVE_CONTROL_PLANE.md`](docs/production/AUTO_IMPROVE_CONTROL_PLANE.md)
+- [`docs/openclaw_15_point_harness.md`](docs/openclaw_15_point_harness.md)
+- [`docs/openclaw_baseline_config.md`](docs/openclaw_baseline_config.md)
+
 ## Quick Start
 
 ### Prerequisites

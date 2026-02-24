@@ -9,6 +9,7 @@ This folder is the starting point for Mission Control documentation.
 - [Coverage policy](./coverage-policy.md)
 - [Deployment](./deployment/README.md)
 - [Production notes](./production/README.md)
+- [Auto-improve control plane](./production/AUTO_IMPROVE_CONTROL_PLANE.md)
 - [Troubleshooting](./troubleshooting/README.md)
 - [Gateway WebSocket protocol](./openclaw_gateway_ws.md)
 - [OpenClaw baseline configuration](./openclaw_baseline_config.md)
