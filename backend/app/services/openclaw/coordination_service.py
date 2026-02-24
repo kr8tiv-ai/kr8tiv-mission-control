@@ -45,9 +45,24 @@ from app.services.openclaw.provisioning_db import (
     LeadAgentRequest,
     OpenClawProvisioningService,
 )
+from app.services.openclaw.routing_policy import choose_agent
 from app.services.openclaw.shared import GatewayAgentIdentity
 
 _T = TypeVar("_T")
+
+
+def select_routing_candidate(
+    *,
+    task_type: str,
+    candidates: list[dict[str, object]],
+    fallback_order: list[str] | None = None,
+) -> str | None:
+    """Thin wrapper for routing policy to keep coordination call sites stable."""
+    return choose_agent(
+        task_type=task_type,
+        candidates=candidates,
+        fallback_order=fallback_order,
+    )
 
 
 class AbstractGatewayMessagingService(OpenClawDBService, ABC):
