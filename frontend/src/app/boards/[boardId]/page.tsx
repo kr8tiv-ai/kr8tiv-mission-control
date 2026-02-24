@@ -159,6 +159,11 @@ type Task = Omit<
   priority: string;
   approvals_count: number;
   approvals_pending_count: number;
+  gsd_stage?: "spec" | "plan" | "execute" | "verify" | "done" | null;
+  deployment_mode?: "team" | "individual" | null;
+  spec_doc_ref?: string | null;
+  plan_doc_ref?: string | null;
+  verification_ref?: string | null;
   custom_field_values?: TaskCustomFieldValues | null;
 };
 

@@ -8,6 +8,11 @@ interface TaskCardProps {
   title: string;
   status?: TaskStatus;
   priority?: string;
+  gsdStage?: "spec" | "plan" | "execute" | "verify" | "done";
+  deploymentMode?: "team" | "individual" | string;
+  missingSpec?: boolean;
+  missingPlan?: boolean;
+  verifyFailed?: boolean;
   assignee?: string;
   due?: string;
   isOverdue?: boolean;
@@ -26,6 +31,11 @@ export function TaskCard({
   title,
   status,
   priority,
+  gsdStage,
+  deploymentMode,
+  missingSpec = false,
+  missingPlan = false,
+  verifyFailed = false,
   assignee,
   due,
   isOverdue = false,
@@ -66,6 +76,9 @@ export function TaskCard({
 
   const priorityLabel = priority ? priority.toUpperCase() : "MEDIUM";
   const visibleTags = tags.slice(0, 3);
+  const normalizedMode = (deploymentMode ?? "").trim().toLowerCase();
+  const modeLabel = normalizedMode === "individual" ? "Individual" : "Team";
+  const showModePill = normalizedMode === "individual" || normalizedMode === "team";
 
   return (
     <div
@@ -102,6 +115,36 @@ export function TaskCard({
           <p className="text-sm font-medium text-slate-900 line-clamp-2 break-words">
             {title}
           </p>
+          {showModePill ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                {modeLabel}
+              </span>
+              {gsdStage ? (
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">
+                  GSD: {gsdStage}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {missingSpec ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              Missing spec
+            </div>
+          ) : null}
+          {missingPlan ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              Missing plan
+            </div>
+          ) : null}
+          {verifyFailed ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Verify failed
+            </div>
+          ) : null}
           {isBlocked ? (
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />

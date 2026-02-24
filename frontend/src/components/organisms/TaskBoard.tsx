@@ -14,12 +14,18 @@ import { parseApiDatetime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 type TaskStatus = "inbox" | "in_progress" | "review" | "done";
+type GSDStage = "spec" | "plan" | "execute" | "verify" | "done";
 
 type Task = {
   id: string;
   title: string;
   status: TaskStatus;
   priority: string;
+  gsd_stage?: GSDStage | null;
+  deployment_mode?: "team" | "individual" | null;
+  spec_doc_ref?: string | null;
+  plan_doc_ref?: string | null;
+  verification_ref?: string | null;
   description?: string | null;
   due_at?: string | null;
   assigned_agent_id?: string | null;
@@ -38,7 +44,13 @@ type TaskBoardProps = {
   readOnly?: boolean;
 };
 
-type ReviewBucket = "all" | "approval_needed" | "waiting_lead" | "blocked";
+type ReviewBucket =
+  | "all"
+  | "approval_needed"
+  | "waiting_lead"
+  | "blocked"
+  | "verify_failed";
+type GSDFilter = "all" | GSDStage;
 
 const columns: Array<{
   title: string;
@@ -139,6 +151,7 @@ export const TaskBoard = memo(function TaskBoard({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [activeColumn, setActiveColumn] = useState<TaskStatus | null>(null);
   const [reviewBucket, setReviewBucket] = useState<ReviewBucket>("all");
+  const [gsdFilter, setGsdFilter] = useState<GSDFilter>("all");
 
   const setCardRef = useCallback(
     (taskId: string) => (node: HTMLDivElement | null) => {
@@ -295,12 +308,16 @@ export const TaskBoard = memo(function TaskBoard({
     for (const column of columns) {
       buckets[column.status] = [];
     }
-    tasks.forEach((task) => {
+    const visibleTasks =
+      gsdFilter === "all"
+        ? tasks
+        : tasks.filter((task) => (task.gsd_stage ?? "spec") === gsdFilter);
+    visibleTasks.forEach((task) => {
       const bucket = buckets[task.status] ?? buckets.inbox;
       bucket.push(task);
     });
     return buckets;
-  }, [tasks]);
+  }, [gsdFilter, tasks]);
 
   // Keep drag/drop state and payload handling centralized for column move interactions.
   const handleDragStart =
@@ -370,6 +387,29 @@ export const TaskBoard = memo(function TaskBoard({
         "sm:grid-flow-col sm:auto-cols-[minmax(260px,320px)] sm:grid-cols-none sm:overflow-x-auto",
       )}
     >
+      <div className="col-span-full rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          <span className="mr-1 text-slate-600">GSD stage</span>
+          {(["all", "spec", "plan", "execute", "verify", "done"] as const).map(
+            (stage) => (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => setGsdFilter(stage)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 transition",
+                  gsdFilter === stage
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
+                )}
+                aria-pressed={gsdFilter === stage}
+              >
+                {stage}
+              </button>
+            ),
+          )}
+        </div>
+      </div>
       {columns.map((column) => {
         const columnTasks = grouped[column.status] ?? [];
         // Derive review tab counts and the active subset from one canonical task list.
@@ -377,6 +417,12 @@ export const TaskBoard = memo(function TaskBoard({
           column.status === "review"
             ? columnTasks.reduce(
                 (acc, task) => {
+                  if (
+                    (task.gsd_stage ?? "spec") === "verify" &&
+                    !(task.verification_ref ?? "").trim()
+                  ) {
+                    acc.verify_failed += 1;
+                  }
                   if (task.is_blocked) {
                     acc.blocked += 1;
                     return acc;
@@ -393,6 +439,7 @@ export const TaskBoard = memo(function TaskBoard({
                   approval_needed: 0,
                   waiting_lead: 0,
                   blocked: 0,
+                  verify_failed: 0,
                 },
               )
             : null;
@@ -409,6 +456,11 @@ export const TaskBoard = memo(function TaskBoard({
                   return (
                     !task.is_blocked &&
                     (task.approvals_pending_count ?? 0) === 0
+                  );
+                if (reviewBucket === "verify_failed")
+                  return (
+                    (task.gsd_stage ?? "spec") === "verify" &&
+                    !(task.verification_ref ?? "").trim()
                   );
                 return true;
               })
@@ -467,6 +519,11 @@ export const TaskBoard = memo(function TaskBoard({
                         label: "Blocked",
                         count: reviewCounts.blocked,
                       },
+                      {
+                        key: "verify_failed",
+                        label: "Verify failed",
+                        count: reviewCounts.verify_failed,
+                      },
                     ] as const
                   ).map((option) => (
                     <button
@@ -497,6 +554,22 @@ export const TaskBoard = memo(function TaskBoard({
                         title={task.title}
                         status={task.status}
                         priority={task.priority}
+                        gsdStage={task.gsd_stage ?? undefined}
+                        deploymentMode={task.deployment_mode ?? undefined}
+                        missingSpec={
+                          ["plan", "execute", "verify", "done"].includes(
+                            task.gsd_stage ?? "spec",
+                          ) && !(task.spec_doc_ref ?? "").trim()
+                        }
+                        missingPlan={
+                          ["execute", "verify", "done"].includes(
+                            task.gsd_stage ?? "spec",
+                          ) && !(task.plan_doc_ref ?? "").trim()
+                        }
+                        verifyFailed={
+                          (task.gsd_stage ?? "spec") === "verify" &&
+                          !(task.verification_ref ?? "").trim()
+                        }
                         assignee={task.assignee ?? undefined}
                         due={dueState.due}
                         isOverdue={dueState.isOverdue}

@@ -48,4 +48,23 @@ describe("TaskBoard", () => {
     // Ensure we didn't accidentally keep unscoped sticky behavior.
     expect(header?.className).not.toContain("sticky top-0");
   });
+
+  it("shows blocked-by-missing-spec badge", () => {
+    render(
+      <TaskBoard
+        tasks={[
+          {
+            id: "1",
+            title: "T",
+            status: "inbox",
+            priority: "medium",
+            gsd_stage: "plan",
+            spec_doc_ref: null,
+            plan_doc_ref: "p",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/missing spec/i)).toBeInTheDocument();
+  });
 });
