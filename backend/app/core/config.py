@@ -64,7 +64,8 @@ class Settings(BaseSettings):
     # Task mode orchestration
     arena_allowed_agents: str = "friday,arsenal,edith,jocasta"
     arena_reviewer_agent: str = "arsenal"
-    notebooklm_runner_cmd: str = "uvx --from notebooklm-mcp-cli nlm"
+    # Pin to @latest for stability; consider pinning to specific version in production
+    notebooklm_runner_cmd: str = "uvx --from notebooklm-mcp-cli@latest nlm"
     notebooklm_profiles_root: str = "/var/lib/notebooklm/profiles"
     notebooklm_timeout_seconds: int = 120
 

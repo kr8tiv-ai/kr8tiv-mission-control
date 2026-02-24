@@ -40,7 +40,8 @@ services:
       RQ_REDIS_URL: redis://redis:6379/0
       ARENA_ALLOWED_AGENTS: ${ARENA_ALLOWED_AGENTS:-friday,arsenal,edith,jocasta}
       ARENA_REVIEWER_AGENT: ${ARENA_REVIEWER_AGENT:-arsenal}
-      NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli nlm}
+      # Pin to @latest for stability; consider pinning to specific version in production
+      NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli@latest nlm}
       NOTEBOOKLM_PROFILES_ROOT: ${NOTEBOOKLM_PROFILES_ROOT:-/var/lib/notebooklm/profiles}
       NOTEBOOKLM_TIMEOUT_SECONDS: ${NOTEBOOKLM_TIMEOUT_SECONDS:-120}
     depends_on:
@@ -95,7 +96,8 @@ services:
       RQ_DISPATCH_MAX_RETRIES: ${RQ_DISPATCH_MAX_RETRIES:-3}
       ARENA_ALLOWED_AGENTS: ${ARENA_ALLOWED_AGENTS:-friday,arsenal,edith,jocasta}
       ARENA_REVIEWER_AGENT: ${ARENA_REVIEWER_AGENT:-arsenal}
-      NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli nlm}
+      # Pin to @latest for stability; consider pinning to specific version in production
+      NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli@latest nlm}
       NOTEBOOKLM_PROFILES_ROOT: ${NOTEBOOKLM_PROFILES_ROOT:-/var/lib/notebooklm/profiles}
       NOTEBOOKLM_TIMEOUT_SECONDS: ${NOTEBOOKLM_TIMEOUT_SECONDS:-120}
     restart: unless-stopped
