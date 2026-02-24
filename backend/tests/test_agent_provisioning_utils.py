@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -518,6 +519,45 @@ async def test_control_plane_upsert_agent_handles_already_exists(monkeypatch):
 
     assert calls[0][0] == "agents.create"
     assert calls[1][0] == "agents.update"
+
+
+@pytest.mark.asyncio
+async def test_control_plane_upsert_agent_patches_model_when_present(monkeypatch):
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "agents.create":
+            return {"ok": True}
+        if method == "agents.update":
+            return {"ok": True}
+        if method == "config.get":
+            return {"hash": "cfg-hash", "config": {"agents": {"list": []}}}
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    cp = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+    await cp.upsert_agent(
+        agent_provisioning.GatewayAgentRegistration(
+            agent_id="board-agent-a",
+            name="Board Agent A",
+            workspace_path="/tmp/workspace-board-agent-a",
+            heartbeat={"every": "10m", "target": "last", "includeReasoning": False},
+            model_id="openai-codex/gpt-5.3-codex",
+        ),
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert payload["agents"]["list"][0]["model"] == "openai-codex/gpt-5.3-codex"
 
 
 def test_is_missing_agent_error_matches_gateway_agent_not_found() -> None:

@@ -9,6 +9,12 @@
 {% if board_id is defined %}
 - `BOARD_ID={{ board_id }}`
 {% endif %}
+{% if model_id %}
+- `MODEL_ID={{ model_id }}`
+- `MODEL_PROVIDER={{ model_provider }}`
+- `MODEL_TRANSPORT={{ model_transport }}`
+- `MODEL_LOCKED={{ model_locked }}`
+{% endif %}
 - `WORKSPACE_ROOT={{ workspace_root }}`
 {% if workspace_path is defined %}
 - `WORKSPACE_PATH={{ workspace_path }}`

@@ -14,6 +14,7 @@ This folder is the starting point for Mission Control documentation.
 - [Gateway WebSocket protocol](./openclaw_gateway_ws.md)
 - [OpenClaw baseline configuration](./openclaw_baseline_config.md)
 - [OpenClaw 15-point runtime harness](./openclaw_15_point_harness.md)
+- [Mission Control task modes](./mission-control-task-modes.md)
 
 ## Status
 

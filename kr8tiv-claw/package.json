@@ -1,0 +1,24 @@
+{
+  "name": "kr8tiv-claw",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "kr8tiv-claw": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --environment node",
+    "cli": "node dist/index.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.17.2",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.0"
+  }
+}

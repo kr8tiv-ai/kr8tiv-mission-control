@@ -1,0 +1,59 @@
+{
+  "update": {
+    "channel": "stable"
+  },
+  "gateway": {
+    "auth": {
+      "mode": "token"
+    },
+    "pairing": {
+      "required": true
+    },
+    "group": {
+      "mentionGating": true
+    }
+  },
+  "agents": {
+    "defaults": {
+      "sandbox": {
+        "nonMainSessions": "strict"
+      },
+      "tools": {
+        "allow": [
+          "web.search",
+          "fs.read"
+        ],
+        "deny": [
+          "shell.exec"
+        ]
+      }
+    }
+  },
+  "channels": {
+    "allow": [
+      "whatsapp",
+      "telegram"
+    ],
+    "defaults": {
+      "heartbeat": {
+        "showOk": true,
+        "showAlerts": true,
+        "useIndicator": true
+      }
+    }
+  },
+  "kr8tiv": {
+    "tenant": "acme-support",
+    "observability": {
+      "ownerWebhookUrl": "https://hooks.example.com/owner",
+      "managementWebhookUrl": "https://hooks.example.com/mgmt"
+    },
+    "supermemory": {
+      "enabled": true,
+      "apiKeyEnv": "SUPERMEMORY_API_KEY",
+      "baseUrl": "https://api.supermemory.ai",
+      "topK": 5,
+      "threshold": 0.5
+    }
+  }
+}

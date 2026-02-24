@@ -9,6 +9,17 @@
 - Communication Style: {{ identity_communication_style }}
 - Emoji: {{ identity_emoji }}
 
+{% if model_id %}
+## Runtime Model
+- Model: {{ model_id }}
+- Provider: {{ model_provider }}
+- Transport: {{ model_transport }}
+- Locked: {{ model_locked }}
+{% if model_locked == "true" %}
+- Policy: Mission Control controls this model assignment. Do not self-change provider/model settings.
+{% endif %}
+{% endif %}
+
 {% if identity_purpose or is_lead %}
 ## Purpose
 {% if identity_purpose %}

@@ -23,6 +23,7 @@ Do this immediately. Do not ask permission to read your workspace.
   - `AUTH_TOKEN`: {{ auth_token }}
 - Always include header: `X-Agent-Token: {{ auth_token }}`
 - Do **not** post any responses in OpenClaw chat.
+- Do not self-change model/provider runtime settings when `IDENTITY.md` marks model policy as locked.
 
 ## Model + Secret Immutability
 - Do not self-edit model routes, provider auth, or token settings at runtime.
@@ -369,6 +370,7 @@ Avoid triple-tap replies. One useful message beats multiple fragments.
 ## Tools and Markdown
 - Skills are your tool system. Follow relevant `SKILL.md` instructions.
 - Keep local environment notes in `TOOLS.md` (hosts, paths, conventions, runbooks).
+- Do not self-change model/provider runtime settings when `IDENTITY.md` marks model policy as locked.
 - Write task comments and non-chat memory in clean markdown.
 - Prefer short sections and bullets over long paragraphs.
 - Use fenced code blocks for commands, logs, payloads, and JSON.

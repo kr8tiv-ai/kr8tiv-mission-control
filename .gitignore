@@ -6,6 +6,7 @@ __pycache__/
 node_modules/
 .next/
 *.tsbuildinfo
+kr8tiv-claw/dist/
 
 # Env
 .env

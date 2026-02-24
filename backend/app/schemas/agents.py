@@ -12,6 +12,7 @@ from sqlmodel import SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from app.schemas.common import NonEmptyStr
+from app.services.openclaw.model_policy import normalize_model_policy
 
 _RUNTIME_TYPE_REFERENCES = (datetime, UUID, NonEmptyStr)
 
@@ -38,6 +39,12 @@ def _normalize_identity_profile(
         if value:
             normalized[key] = value
     return normalized or None
+
+
+def _normalize_model_policy_payload(
+    policy: object,
+) -> dict[str, Any] | None:
+    return normalize_model_policy(policy)
 
 
 class AgentBase(SQLModel):
@@ -91,6 +98,19 @@ class AgentBase(SQLModel):
         description="Optional profile hints used by routing and policy checks.",
         examples=[{"role": "incident_lead", "skill": "triage"}],
     )
+    model_policy: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional model/provider runtime policy for this agent.",
+        examples=[
+            {
+                "provider": "openai-codex",
+                "model": "openai-codex/gpt-5.3-codex",
+                "transport": "cli",
+                "locked": True,
+                "allow_self_change": False,
+            },
+        ],
+    )
     identity_template: str | None = Field(
         default=None,
         description="Template that helps define initial intent and behavior.",
@@ -121,6 +141,15 @@ class AgentBase(SQLModel):
     ) -> dict[str, str] | None:
         """Normalize identity-profile values into trimmed string mappings."""
         return _normalize_identity_profile(value)
+
+    @field_validator("model_policy", mode="before")
+    @classmethod
+    def normalize_model_policy(
+        cls,
+        value: object,
+    ) -> dict[str, Any] | None:
+        """Normalize model policy into a compact provider/model/transport mapping."""
+        return _normalize_model_policy_payload(value)
 
 
 class AgentCreate(AgentBase):
@@ -180,6 +209,18 @@ class AgentUpdate(SQLModel):
         description="Optional identity profile update values.",
         examples=[{"role": "coordinator"}],
     )
+    model_policy: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional model/provider runtime policy update.",
+        examples=[
+            {
+                "provider": "google-gemini-cli",
+                "model": "google-gemini-cli/gemini-3.1",
+                "transport": "cli",
+                "locked": True,
+            },
+        ],
+    )
     identity_template: str | None = Field(
         default=None,
         description="Optional replacement identity template.",
@@ -210,6 +251,15 @@ class AgentUpdate(SQLModel):
     ) -> dict[str, str] | None:
         """Normalize identity-profile values into trimmed string mappings."""
         return _normalize_identity_profile(value)
+
+    @field_validator("model_policy", mode="before")
+    @classmethod
+    def normalize_model_policy(
+        cls,
+        value: object,
+    ) -> dict[str, Any] | None:
+        """Normalize model policy updates into provider/model/transport values."""
+        return _normalize_model_policy_payload(value)
 
 
 class AgentRead(AgentBase):

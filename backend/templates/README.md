@@ -35,6 +35,7 @@ Defined in `backend/app/services/openclaw/provisioning.py` (`_template_env()`):
 - Main agent context: `_build_main_context()`
 - User mapping: `_user_context()`
 - Identity mapping: `_identity_context()`
+- Model policy mapping: `_model_policy_context()`
 
 ## Sync entry points
 
@@ -124,6 +125,10 @@ This avoids relying on startup hooks to populate `api/openapi.json`.
 - `identity_role`, `identity_communication_style`, `identity_emoji`
 - `identity_autonomy_level`, `identity_verbosity`, `identity_output_format`, `identity_update_cadence`
 - `identity_purpose`, `identity_personality`, `identity_custom_instructions`
+
+### Model policy keys
+
+- `model_id`, `model_provider`, `model_transport`, `model_locked`, `model_summary`
 
 ### Board-agent-only keys
 

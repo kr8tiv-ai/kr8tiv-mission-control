@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 
 import { setLocalAuthToken } from "@/auth/localAuth";
 import { Button } from "@/components/ui/button";
@@ -49,14 +49,17 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [showToken, setShowToken] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const cleaned = token.trim();
+
     if (!cleaned) {
       setError("Bearer token is required.");
       return;
     }
+
     if (cleaned.length < LOCAL_AUTH_TOKEN_MIN_LENGTH) {
       setError(
         `Bearer token must be at least ${LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.`,
@@ -67,6 +70,7 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
     setIsValidating(true);
     const validationError = await validateLocalToken(cleaned);
     setIsValidating(false);
+
     if (validationError) {
       setError(validationError);
       return;
@@ -78,17 +82,12 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app px-4 py-10">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-28 -left-24 h-72 w-72 rounded-full bg-[color:var(--accent-soft)] blur-3xl" />
-        <div className="absolute -right-28 -bottom-24 h-80 w-80 rounded-full bg-[rgba(14,165,233,0.12)] blur-3xl" />
-      </div>
-
-      <Card className="relative w-full max-w-lg animate-fade-in-up">
-        <CardHeader className="space-y-5 border-b border-[color:var(--border)] pb-5">
+    <main className="flex min-h-screen items-center justify-center bg-app px-4 py-10">
+      <Card className="w-full max-w-md border border-[color:var(--border)]">
+        <CardHeader className="space-y-4 border-b border-[color:var(--border)] pb-5">
           <div className="flex items-center justify-between">
-            <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-              Self-host mode
+            <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+              Mission Control · Local Mode
             </span>
             <div className="rounded-xl bg-[color:var(--accent-soft)] p-2 text-[color:var(--accent)]">
               <Lock className="h-5 w-5" />
@@ -96,13 +95,14 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
           </div>
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-strong">
-              Local Authentication
+              Authorization Portal
             </h1>
             <p className="text-sm text-muted">
-              Enter your access token to unlock Mission Control.
+              Paste your local auth token to access the control panel.
             </p>
           </div>
         </CardHeader>
+
         <CardContent className="pt-5">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -112,19 +112,35 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
               >
                 Access token
               </label>
-              <Input
-                id="local-auth-token"
-                type="password"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                placeholder="Paste token"
-                autoFocus
-                disabled={isValidating}
-                className="font-mono"
-              />
+              <div className="relative">
+                <Input
+                  id="local-auth-token"
+                  type={showToken ? "text" : "password"}
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  placeholder="Paste token"
+                  autoFocus
+                  disabled={isValidating}
+                  className="pr-11 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center text-muted hover:text-strong"
+                  aria-label={showToken ? "Hide token" : "Show token"}
+                  disabled={isValidating}
+                >
+                  {showToken ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
+
             {error ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p className="rounded-lg border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 px-3 py-2 text-sm text-[color:var(--danger)]">
                 {error}
               </p>
             ) : (
@@ -132,17 +148,13 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
                 Token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
               </p>
             )}
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={isValidating}
-            >
-              {isValidating ? "Validating..." : "Continue"}
+
+            <Button type="submit" className="w-full" size="lg" disabled={isValidating}>
+              {isValidating ? "Validating token..." : "Enter Mission Control"}
             </Button>
           </form>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

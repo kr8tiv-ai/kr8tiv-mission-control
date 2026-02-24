@@ -1,0 +1,52 @@
+name: acme-support-1234abcd
+
+services:
+  openclaw-gateway:
+    image: ghcr.io/openclaw/openclaw:latest
+    restart: unless-stopped
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      TENANT_CONTAINER_TAG: tenant:acme-support-1234abcd
+      SUPERMEMORY_API_KEY: ${SUPERMEMORY_API_KEY}
+    volumes:
+      - acme-support-1234abcd_state:/data/state
+      - acme-support-1234abcd_workspace:/data/workspace
+      - ./openclaw.json:/data/openclaw.json:ro
+      - ./workspace:/data/workspace-seed:ro
+    healthcheck:
+      test: ["CMD-SHELL", "node dist/index.js health --token $$OPENCLAW_GATEWAY_TOKEN"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  agent-watchdog:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OWNER_WEBHOOK_URL: ${OWNER_WEBHOOK_URL}
+      MANAGEMENT_WEBHOOK_URL: ${MANAGEMENT_WEBHOOK_URL}
+    command:
+      - node
+      - dist/index.js
+      - watchdog
+      - --tenant
+      - acme-support-1234abcd
+      - --owner-webhook
+      - ${OWNER_WEBHOOK_URL}
+      - --management-webhook
+      - ${MANAGEMENT_WEBHOOK_URL}
+      - --interval-seconds
+      - 30
+    volumes:
+      - ./:/app
+    depends_on:
+      openclaw-gateway:
+        condition: service_healthy
+
+volumes:
+  acme-support-1234abcd_state:
+  acme-support-1234abcd_workspace:
+

@@ -53,35 +53,39 @@ Use it after any restart, image update, config change, or credential rotation.
 8. **Per-bot config primary models are pinned**
    - Arsenal: `openai-codex/gpt-5.3-codex`
    - Friday: `openai-codex/gpt-5.3-codex`
-   - Jocasta: `nvidia/moonshotai/kimi-k2.5`
+   - Jocasta: `nvidia/moonshotai/kimi-k2-5`
    - Edith: chosen Gemini route (`google/*` or `google-gemini-cli/*`) matches your policy.
    - If Mission Control connects with a non-local Host header, set Friday gateway `controlUi.dangerouslyDisableDeviceAuth=true` (or use full device-identity auth).
 
-9. **Telegram bot tokens are present**
+9. **Locked policy enforcement**
+   - Expected: `PATCH /api/v1/agents/{id}` rejects model-policy overrides for locked agents with `403`.
+
+10. **Template sync enforcement**
+   - Expected: `POST /api/v1/gateways/{gateway_id}/templates/sync` rewrites drifted model routes back to policy targets.
+
+11. **Telegram bot tokens are present**
    - Expected: `channels.telegram.accounts.default.botToken` exists for each bot config.
 
-10. **Telegram delivery test succeeds for each bot**
-    - Send one probe message per bot token to an operator chat ID.
-    - Expected: Telegram API returns `ok=true` for all probes.
+12. **Telegram delivery test succeeds for each bot**
+   - Send one probe message per bot token to an operator chat ID.
+   - Expected: Telegram API returns `ok=true` for all probes.
 
-11. **Runtime config writes are disabled**
-    - Expected: `commands.config=false` in each OpenClaw config.
+13. **Runtime config writes are disabled**
+   - Expected: `commands.config=false` in each OpenClaw config.
 
-12. **Telegram config writes are disabled**
-    - Expected: `channels.telegram.configWrites=false` and `channels.telegram.accounts.default.configWrites=false`.
+14. **Telegram config writes are disabled**
+   - Expected: `channels.telegram.configWrites=false` and `channels.telegram.accounts.default.configWrites=false`.
 
-13. **Enforcer timer is active and persistent**
-    - Service: `openclaw-config-enforcer.timer`
-    - Expected: `active (waiting)`, `Persistent=true`, `OnBootSec` and `OnUnitActiveSec` configured.
+15. **Enforcer timer is active, persistent, and reboot-safe**
+   - Service: `openclaw-config-enforcer.timer`
+   - Expected: `active (waiting)`, `Persistent=true`, `OnBootSec` and `OnUnitActiveSec` configured.
 
-14. **Drift auto-revert works**
-    - Temporarily set one pinned model to an incorrect value.
-    - Wait one enforcer interval.
-    - Expected: value reverts to pinned model automatically.
+## Additional Runtime Validation (recommended)
 
-15. **Recent logs show no critical routing/auth/delivery failures**
-    - Check last 15-20 minutes of all OpenClaw bot logs.
-    - Expected: no recurring `chat not found`, `token missing`, `No available auth profile`, or provider cooldown loops for active lanes.
+- Drift auto-revert works:
+  Temporarily set one pinned model to an incorrect value, wait one enforcer interval, verify the route is auto-reverted.
+- Recent logs show no critical routing/auth/delivery failures:
+  Check last 15-20 minutes of all OpenClaw bot logs for recurring `chat not found`, `token missing`, `No available auth profile`, or provider cooldown loops.
 
 ## Evidence Capture Template
 

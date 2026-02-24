@@ -71,7 +71,35 @@ if TYPE_CHECKING:
     from app.models.board_memory import BoardMemory
     from app.models.board_onboarding import BoardOnboardingSession
 
-router = APIRouter(prefix="/agent", tags=["agent"])
+# Security documentation for OpenAPI spec
+# Note: All agent routes require authentication via X-Agent-Token header.
+# This is enforced by AGENT_CTX_DEP = Depends(get_agent_auth_context) which
+# raises HTTPException(401) when token is missing/invalid.
+#
+# We use HTTPBearer(auto_error=False) in the auth module for flexible error
+# handling, but this prevents FastAPI from auto-generating security requirements
+# in the OpenAPI spec. Adding responses here ensures the spec documents auth.
+router = APIRouter(
+    prefix="/agent",
+    tags=["agent"],
+    responses={
+        401: {
+            "description": "Unauthorized - Missing or invalid agent token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "code": "unauthorized",
+                            "message": "Not authenticated"
+                        },
+                        "code": "unauthorized",
+                        "retryable": False
+                    }
+                }
+            }
+        }
+    }
+)
 SESSION_DEP = Depends(get_session)
 AGENT_CTX_DEP = Depends(get_agent_auth_context)
 BOARD_DEP = Depends(get_board_or_404)
