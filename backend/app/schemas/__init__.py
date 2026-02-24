@@ -20,9 +20,18 @@ from app.schemas.board_webhooks import (
     BoardWebhookRead,
     BoardWebhookUpdate,
 )
+from app.schemas.capabilities import CapabilityCreate, CapabilityRead
 from app.schemas.boards import BoardCreate, BoardRead, BoardUpdate
 from app.schemas.gateways import GatewayCreate, GatewayRead, GatewayUpdate
 from app.schemas.metrics import DashboardMetrics
+from app.schemas.installations import (
+    InstallationExecuteRequest,
+    InstallationExecuteResponse,
+    InstallationRequestCreate,
+    InstallationRequestRead,
+    OverrideSessionCreate,
+    OverrideSessionRead,
+)
 from app.schemas.organizations import (
     OrganizationActiveUpdate,
     OrganizationCreate,
@@ -80,12 +89,20 @@ __all__ = [
     "BoardWebhookPayloadRead",
     "BoardWebhookRead",
     "BoardWebhookUpdate",
+    "CapabilityCreate",
+    "CapabilityRead",
+    "InstallationExecuteRequest",
+    "InstallationExecuteResponse",
+    "InstallationRequestCreate",
+    "InstallationRequestRead",
     "BoardOnboardingAnswer",
     "BoardOnboardingConfirm",
     "BoardOnboardingRead",
     "BoardOnboardingRecommendation",
     "BoardOnboardingStart",
     "OnboardingRecommendationRead",
+    "OverrideSessionCreate",
+    "OverrideSessionRead",
     "BoardCreate",
     "BoardRead",
     "BoardUpdate",

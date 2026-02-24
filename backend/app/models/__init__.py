@@ -12,13 +12,16 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.capabilities import Capability
 from app.models.gateways import Gateway
+from app.models.installations import InstallationRequest
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.onboarding_recommendations import OnboardingRecommendation
+from app.models.override_sessions import OverrideSession
 from app.models.persona_presets import PersonaPreset
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
@@ -47,12 +50,15 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "Capability",
     "Gateway",
+    "InstallationRequest",
     "GatewayInstalledSkill",
     "MarketplaceSkill",
     "SkillPack",
     "Organization",
     "OnboardingRecommendation",
+    "OverrideSession",
     "PersonaPreset",
     "BoardTaskCustomField",
     "TaskCustomFieldDefinition",
