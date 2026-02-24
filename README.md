@@ -21,12 +21,23 @@ This repository now includes:
 
 ## Why This Architecture
 
-The distribution layer is intentionally thin and plugin/template-oriented:
+Kr8tiv Mission Control is a production-ready fork direction for OpenClaw Mission Control with mode-aware task orchestration and a central prompt/context governance direction. The distribution layer is intentionally thin and plugin/template-oriented:
 
 1. Keep divergence from upstream OpenClaw low.
 2. Put tenant customization in generated workspace/config/compose artifacts.
 3. Avoid adding mandatory infrastructure (no required Postgres/Redis/Kafka beyond existing stack).
 4. Allow controlled adoption of upstream updates and selected fork patterns without deep core rewrites.
+
+## Auto-Improvement Gate (New Direction)
+
+We are implementing Mission Control as the mandatory quality gate for both market segments:
+
+- **Individuals**: single-agent or small-agent deployments still route through Mission Control
+- **Enterprise**: centralized governance across many agents/workspaces with scoped inheritance
+
+This allows iterative prompt/context improvement for any model provider while keeping tenant privacy boundaries and rollback safety.
+
+- Design document: [`docs/prompt-evolution-gate.md`](docs/prompt-evolution-gate.md)
 
 ## Architecture Overview
 
