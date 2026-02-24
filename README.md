@@ -38,6 +38,7 @@ We are implementing Mission Control as the mandatory quality gate for both marke
 This allows iterative prompt/context improvement for any model provider while keeping tenant privacy boundaries and rollback safety.
 
 - Design document: [`docs/prompt-evolution-gate.md`](docs/prompt-evolution-gate.md)
+- Preserved strategy verdict + source set: [`docs/EVOLUTION-VERDICT-2026-02-24.md`](docs/EVOLUTION-VERDICT-2026-02-24.md)
 
 ## Architecture Overview
 
