@@ -1,0 +1,49 @@
+# Runtime Image Policy
+
+## Objective
+
+Production deploys must be reproducible and restart-safe. Mission Control runtime services must run from immutable, pullable image tags.
+
+## Rules
+
+1. Never deploy production with local-only image names.
+2. Never rely on floating tags (`latest`, `main`) for production rollout.
+3. Backend and frontend images must be tagged with:
+   - git SHA
+   - UTC timestamp
+4. Rollout compose must pin exact image tags for:
+   - `backend`
+   - `webhook-worker` (same backend image)
+   - `frontend`
+
+## Tag Format
+
+1. Backend:
+   - `ghcr.io/<owner>/<repo>:kr8tiv-mc-backend-<sha>-<utc>`
+2. Frontend:
+   - `ghcr.io/<owner>/<repo>:kr8tiv-mc-frontend-<sha>-<utc>`
+
+## Release Flow
+
+1. Build backend image from repo root using `backend/Dockerfile`.
+2. Build frontend image from `frontend/` using `frontend/Dockerfile`.
+3. Push both tags to GHCR.
+4. Update runtime compose to exact published tags.
+5. Deploy and verify:
+   - `/health` => `200`
+   - frontend root => `200`
+   - control-plane OpenAPI routes present
+
+## Verification Gates
+
+1. `docker pull <backend_tag>` succeeds from target host.
+2. `docker pull <frontend_tag>` succeeds from target host.
+3. `docker compose ps` shows all services on expected tags.
+4. Mission Control API and board/task endpoints return expected status with auth.
+
+## Rollback
+
+1. Keep previous known-good backend + frontend tags.
+2. Roll back by pinning previous tags in compose.
+3. Re-run `docker compose up -d`.
+
