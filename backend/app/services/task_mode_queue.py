@@ -100,9 +100,15 @@ def requeue_task_mode_execution(
 
 def is_skill_route_eligible(skill_metadata: dict[str, Any] | None) -> bool:
     """Return whether a skill passed ingest validation and can be routed."""
+    # Backward compatibility: skills created before ingest metadata was introduced
+    # remain installable unless they are explicitly marked as non-accepted.
     if not isinstance(skill_metadata, dict):
-        return False
-    return str(skill_metadata.get("ingest_status", "")).strip().lower() == "accepted"
+        return True
+
+    ingest_status = str(skill_metadata.get("ingest_status", "")).strip().lower()
+    if not ingest_status:
+        return True
+    return ingest_status == "accepted"
 
 
 def normalize_channel_event(
