@@ -15,6 +15,9 @@ This folder is the starting point for Mission Control documentation.
 - [OpenClaw baseline configuration](./openclaw_baseline_config.md)
 - [OpenClaw 15-point runtime harness](./openclaw_15_point_harness.md)
 - [Mission Control task modes](./mission-control-task-modes.md)
+- [Persona integrity protocol](./policy/persona-integrity-protocol.md)
+- [Device access broker policy](./security/device-access-broker.md)
+- [Customer backup policy](./operations/customer-backup-policy.md)
 
 ## Status
 

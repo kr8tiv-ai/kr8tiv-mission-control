@@ -80,6 +80,23 @@ Use it after any restart, image update, config change, or credential rotation.
    - Service: `openclaw-config-enforcer.timer`
    - Expected: `active (waiting)`, `Persistent=true`, `OnBootSec` and `OnUnitActiveSec` configured.
 
+## Policy Overlay Checks (required for 2026 rollout)
+
+- **Persona integrity baseline exists**
+  - Expected: each active agent has checksum baseline row in `agent_persona_integrity`.
+- **Persona precedence is present in rendered workspace docs**
+  - Expected: `SOUL.md > USER.md > IDENTITY.md > AGENTS.md` appears in generated contract artifacts.
+- **Reasoning default is max-capacity**
+  - Expected: runtime config resolves `thinkingDefault=max` with fallback behavior `highest_or_model_default`.
+- **Supermemory plugin bootstrap is enforced**
+  - Expected bootstrap task includes `openclaw plugins install @supermemory/openclaw-supermemory`.
+- **Install governance is ask-first by default**
+  - Expected: installation requests default to `pending_owner_approval`.
+- **Tier quota controls are active**
+  - Expected: install requests over ability/storage limits are rejected with clear quota messages.
+- **Backup reminder workflow is active**
+  - Expected: unconfirmed tenants receive twice-weekly warning prompts and destination confirmation options.
+
 ## Additional Runtime Validation (recommended)
 
 - Drift auto-revert works:
