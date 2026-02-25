@@ -5,6 +5,7 @@ from app.models.agent_persona_integrity import AgentPersonaIntegrity
 from app.models.agents import Agent
 from app.models.approval_task_links import ApprovalTaskLink
 from app.models.approvals import Approval
+from app.models.backups import BackupPolicy
 from app.models.board_group_memory import BoardGroupMemory
 from app.models.board_groups import BoardGroup
 from app.models.board_memory import BoardMemory
@@ -49,6 +50,7 @@ __all__ = [
     "Agent",
     "ApprovalTaskLink",
     "Approval",
+    "BackupPolicy",
     "BoardGroupMemory",
     "BoardWebhook",
     "BoardWebhookPayload",

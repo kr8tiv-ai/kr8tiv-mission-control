@@ -15,6 +15,7 @@ from app.api.agent import router as agent_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
 from app.api.auth import router as auth_router
+from app.api.backups import router as backups_router
 from app.api.board_group_memory import router as board_group_memory_router
 from app.api.board_groups import router as board_groups_router
 from app.api.board_memory import router as board_memory_router
@@ -566,6 +567,7 @@ api_v1.include_router(board_onboarding_router)
 api_v1.include_router(capabilities_router)
 api_v1.include_router(installations_router)
 api_v1.include_router(tier_quotas_router)
+api_v1.include_router(backups_router)
 api_v1.include_router(approvals_router)
 api_v1.include_router(tasks_router)
 api_v1.include_router(task_custom_fields_router)
