@@ -91,3 +91,24 @@ Verification snapshot:
    - `76.13.106.100:48651`
    - `76.13.106.100:48652`
    - `76.13.106.100:48653`
+
+## 2026-02-25 Rollout Update (Task 4)
+
+After Phase 15 Task 4 merge, runtime was rolled again to immutable SHA tags:
+- Commit: `134439b85180cfb1ed9708babb0eecea62577657`
+- Backend/Webhook image: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:134439b`
+- Frontend image: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:134439b`
+
+Verification snapshot:
+1. Hostinger action `docker_compose_up` completed with `success` at `2026-02-25T22:14:12Z`.
+2. Mission Control containers running on `134439b` image tags:
+   - backend, db, frontend, redis, webhook-worker
+3. Public checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+4. OpenAPI checks:
+   - `/api/v1/runtime/ops/disk-guard` present
+   - `/api/v1/boards/{board_id}/agent-continuity` present
+   - `/api/v1/gsd-runs` present
+   - `/api/v1/gsd-runs/{run_id}` present
