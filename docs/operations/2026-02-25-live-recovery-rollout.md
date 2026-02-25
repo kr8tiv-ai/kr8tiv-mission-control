@@ -63,3 +63,31 @@ Notable files:
 - `vps-recover-mission-control-20260225T1943Z.log`
 - `vps-frontend-ghcr-hardening-20260225T1952Z.log`
 
+## 2026-02-25 Rollout Update (Task 2/3)
+
+Latest runtime rollout was executed through Hostinger Docker Manager for:
+- Commit: `bcf26cda7741d7cb6c471cb328e12ddca1727a2d`
+- Backend/Webhook image: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:bcf26cd`
+- Frontend image: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:bcf26cd`
+
+Verification snapshot:
+1. Hostinger action `docker_compose_up` completed with `success` at `2026-02-25T21:57:32Z`.
+2. Mission Control containers running on new immutable tags:
+   - `kr8tiv-mission-control-backend-1`
+   - `kr8tiv-mission-control-db-1`
+   - `kr8tiv-mission-control-frontend-1`
+   - `kr8tiv-mission-control-redis-1`
+   - `kr8tiv-mission-control-webhook-worker-1`
+3. Live endpoint checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+   - OpenAPI paths present:
+     - `/api/v1/runtime/ops/disk-guard`
+     - `/api/v1/boards/{board_id}/agent-continuity`
+     - `/api/v1/runtime/packs/resolve`
+4. Agent runtime TCP checks passed:
+   - `76.13.106.100:48650`
+   - `76.13.106.100:48651`
+   - `76.13.106.100:48652`
+   - `76.13.106.100:48653`
