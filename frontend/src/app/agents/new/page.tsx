@@ -131,7 +131,7 @@ export default function NewAgentPage() {
         heartbeat_config: {
           every: heartbeatEvery.trim() || "10m",
           target: "last",
-          includeReasoning: false,
+          includeReasoning: true,
         },
         identity_profile: normalizeIdentityProfile(
           identityProfile,

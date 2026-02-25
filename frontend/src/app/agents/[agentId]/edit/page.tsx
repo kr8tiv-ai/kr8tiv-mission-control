@@ -237,7 +237,7 @@ export default function EditAgentPage() {
         includeReasoning:
           typeof existingHeartbeat.includeReasoning === "boolean"
             ? existingHeartbeat.includeReasoning
-            : false,
+            : true,
       } as unknown as Record<string, unknown>,
       identity_profile: mergeIdentityProfile(
         loadedAgent.identity_profile,

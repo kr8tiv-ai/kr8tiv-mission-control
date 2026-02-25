@@ -14,7 +14,7 @@ _GATEWAY_AGENT_SUFFIX = ":main"
 DEFAULT_HEARTBEAT_CONFIG: dict[str, Any] = {
     "every": "10m",
     "target": "last",
-    "includeReasoning": False,
+    "includeReasoning": True,
 }
 
 OFFLINE_AFTER = timedelta(minutes=10)
