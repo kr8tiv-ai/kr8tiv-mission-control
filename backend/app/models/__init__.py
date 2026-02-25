@@ -12,6 +12,7 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.capabilities import Capability
 from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
 from app.models.pack_bindings import PackBinding
@@ -52,6 +53,7 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "Capability",
     "DeterministicEval",
     "Gateway",
     "PackBinding",
