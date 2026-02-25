@@ -15,6 +15,7 @@ from app.models.boards import Board
 from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
 from app.models.pack_bindings import PackBinding
+from app.models.persona_presets import PersonaPreset
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
@@ -53,6 +54,7 @@ __all__ = [
     "DeterministicEval",
     "Gateway",
     "PackBinding",
+    "PersonaPreset",
     "PromptPack",
     "RunTelemetry",
     "PromotionEvent",
