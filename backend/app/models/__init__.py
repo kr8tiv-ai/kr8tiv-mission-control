@@ -15,6 +15,7 @@ from app.models.boards import Board
 from app.models.capabilities import Capability
 from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
+from app.models.installations import InstallationRequest
 from app.models.pack_bindings import PackBinding
 from app.models.persona_presets import PersonaPreset
 from app.models.organization_board_access import OrganizationBoardAccess
@@ -26,6 +27,7 @@ from app.models.onboarding_recommendations import OnboardingRecommendation
 from app.models.promotion_events import PromotionEvent
 from app.models.prompt_packs import PromptPack
 from app.models.run_telemetry import RunTelemetry
+from app.models.override_sessions import OverrideSession
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
 from app.models.tags import Tag
@@ -56,10 +58,12 @@ __all__ = [
     "Capability",
     "DeterministicEval",
     "Gateway",
+    "InstallationRequest",
     "PackBinding",
     "PersonaPreset",
     "PromptPack",
     "RunTelemetry",
+    "OverrideSession",
     "PromotionEvent",
     "GatewayInstalledSkill",
     "MarketplaceSkill",

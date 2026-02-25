@@ -25,6 +25,7 @@ from app.api.capabilities import router as capabilities_router
 from app.api.distribution import router as distribution_router
 from app.api.gateway import router as gateway_router
 from app.api.gateways import router as gateways_router
+from app.api.installations import router as installations_router
 from app.api.metrics import router as metrics_router
 from app.api.organizations import router as organizations_router
 from app.api.packs import router as packs_router
@@ -562,6 +563,7 @@ api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
 api_v1.include_router(board_onboarding_router)
 api_v1.include_router(capabilities_router)
+api_v1.include_router(installations_router)
 api_v1.include_router(approvals_router)
 api_v1.include_router(tasks_router)
 api_v1.include_router(task_custom_fields_router)
