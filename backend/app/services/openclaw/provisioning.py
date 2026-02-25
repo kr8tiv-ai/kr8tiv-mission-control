@@ -56,6 +56,7 @@ from app.services.openclaw.model_policy import (
     provider_for_policy,
     transport_for_policy,
 )
+from app.services.openclaw.reasoning_policy import resolve_reasoning_mode
 from app.services.openclaw.shared import GatewayAgentIdentity
 
 if TYPE_CHECKING:
@@ -73,6 +74,13 @@ class ProvisionOptions:
 
 _ROLE_SOUL_MAX_CHARS = 24_000
 _ROLE_SOUL_WORD_RE = re.compile(r"[a-z0-9]+")
+_REASONING_CAPABILITY_KEYS = (
+    "thinkingModes",
+    "thinking_modes",
+    "reasoningModes",
+    "reasoning_modes",
+)
+_REASONING_DEFAULT = "max"
 
 
 def _is_missing_session_error(exc: OpenClawGatewayError) -> bool:
@@ -135,6 +143,67 @@ def _channel_heartbeat_visibility_patch(config_data: dict[str, Any]) -> dict[str
     if not changed:
         return None
     return {"defaults": {"heartbeat": merged}}
+
+
+def _extract_model_reasoning_modes(config_data: dict[str, Any], model_id: str | None) -> list[str]:
+    if not model_id:
+        return []
+    agents = config_data.get("agents")
+    if not isinstance(agents, dict):
+        return []
+    defaults = agents.get("defaults")
+    if not isinstance(defaults, dict):
+        return []
+    models = defaults.get("models")
+    if not isinstance(models, dict):
+        return []
+    model_entry = models.get(model_id)
+    if not isinstance(model_entry, dict):
+        return []
+    for key in _REASONING_CAPABILITY_KEYS:
+        value = model_entry.get(key)
+        if isinstance(value, list):
+            return [str(mode).strip() for mode in value if str(mode).strip()]
+    return []
+
+
+def _thinking_default_patch(
+    config_data: dict[str, Any],
+    entries: list[tuple[str, str, dict[str, Any], str | None]],
+) -> dict[str, str] | None:
+    agents = config_data.get("agents")
+    if not isinstance(agents, dict):
+        agents = {}
+    defaults = agents.get("defaults")
+    if not isinstance(defaults, dict):
+        defaults = {}
+
+    current = defaults.get("thinkingDefault")
+    if isinstance(current, str) and current.strip():
+        return {"thinkingDefault": current.strip()}
+
+    preferred_models: list[str] = []
+    primary_model = defaults.get("model")
+    if isinstance(primary_model, dict):
+        primary_value = primary_model.get("primary")
+        if isinstance(primary_value, str) and primary_value.strip():
+            preferred_models.append(primary_value.strip())
+
+    for _agent_id, _workspace, _heartbeat, model_id in entries:
+        if isinstance(model_id, str) and model_id.strip():
+            normalized_model = model_id.strip()
+            if normalized_model not in preferred_models:
+                preferred_models.append(normalized_model)
+
+    for model_id in preferred_models:
+        resolved = resolve_reasoning_mode(
+            _extract_model_reasoning_modes(config_data, model_id),
+            preferred=_REASONING_DEFAULT,
+        )
+        if resolved:
+            return {"thinkingDefault": resolved}
+
+    return {"thinkingDefault": resolve_reasoning_mode([], preferred=_REASONING_DEFAULT)}
 
 
 def _template_env() -> Environment:
@@ -647,6 +716,9 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         new_list = _updated_agent_list(raw_list, entry_by_id)
 
         patch: dict[str, Any] = {"agents": {"list": new_list}}
+        thinking_patch = _thinking_default_patch(config_data, entries)
+        if thinking_patch is not None:
+            patch["agents"]["defaults"] = thinking_patch
         channels_patch = _channel_heartbeat_visibility_patch(config_data)
         if channels_patch is not None:
             patch["channels"] = channels_patch

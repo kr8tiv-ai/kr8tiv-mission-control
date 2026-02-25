@@ -1,9 +1,11 @@
 """Model exports for SQLAlchemy/SQLModel metadata discovery."""
 
 from app.models.activity_events import ActivityEvent
+from app.models.agent_persona_integrity import AgentPersonaIntegrity
 from app.models.agents import Agent
 from app.models.approval_task_links import ApprovalTaskLink
 from app.models.approvals import Approval
+from app.models.backups import BackupPolicy
 from app.models.board_group_memory import BoardGroupMemory
 from app.models.board_groups import BoardGroup
 from app.models.board_memory import BoardMemory
@@ -11,19 +13,23 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.capabilities import Capability
+from app.models.change_requests import ChangeRequest
+from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
+from app.models.installations import InstallationRequest
+from app.models.pack_bindings import PackBinding
+from app.models.persona_presets import PersonaPreset
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
-from app.models.prompt_evolution import (
-    OptimizationRun,
-    PromotionEvent,
-    PromptPack,
-    PromptVersion,
-    TaskEvalScore,
-)
+from app.models.onboarding_recommendations import OnboardingRecommendation
+from app.models.promotion_events import PromotionEvent
+from app.models.prompt_packs import PromptPack
+from app.models.run_telemetry import RunTelemetry
+from app.models.override_sessions import OverrideSession
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
 from app.models.tags import Tag
@@ -36,13 +42,16 @@ from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
 from app.models.task_iterations import TaskIteration
 from app.models.tasks import Task
+from app.models.tier_quotas import TierQuota
 from app.models.users import User
 
 __all__ = [
     "ActivityEvent",
+    "AgentPersonaIntegrity",
     "Agent",
     "ApprovalTaskLink",
     "Approval",
+    "BackupPolicy",
     "BoardGroupMemory",
     "BoardWebhook",
     "BoardWebhookPayload",
@@ -50,16 +59,21 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "Capability",
+    "ChangeRequest",
+    "DeterministicEval",
     "Gateway",
+    "InstallationRequest",
+    "PackBinding",
+    "PersonaPreset",
+    "PromptPack",
+    "RunTelemetry",
+    "OverrideSession",
+    "PromotionEvent",
     "GatewayInstalledSkill",
     "MarketplaceSkill",
     "SkillPack",
     "Organization",
-    "PromptPack",
-    "PromptVersion",
-    "TaskEvalScore",
-    "OptimizationRun",
-    "PromotionEvent",
     "BoardTaskCustomField",
     "TaskCustomFieldDefinition",
     "TaskCustomFieldValue",
@@ -67,10 +81,12 @@ __all__ = [
     "OrganizationBoardAccess",
     "OrganizationInvite",
     "OrganizationInviteBoardAccess",
+    "OnboardingRecommendation",
     "TaskDependency",
     "Task",
     "TaskIteration",
     "TaskFingerprint",
+    "TierQuota",
     "Tag",
     "TagAssignment",
     "User",

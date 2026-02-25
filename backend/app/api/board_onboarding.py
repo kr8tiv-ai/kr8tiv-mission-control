@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
@@ -20,6 +21,7 @@ from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db.session import get_session
+from app.models.onboarding_recommendations import OnboardingRecommendation
 from app.models.board_onboarding import BoardOnboardingSession
 from app.schemas.board_onboarding import (
     BoardOnboardingAgentComplete,
@@ -27,6 +29,8 @@ from app.schemas.board_onboarding import (
     BoardOnboardingAnswer,
     BoardOnboardingConfirm,
     BoardOnboardingLeadAgentDraft,
+    BoardOnboardingRecommendation,
+    BoardOnboardingRecommendationRead,
     BoardOnboardingRead,
     BoardOnboardingStart,
     BoardOnboardingUserProfile,
@@ -174,6 +178,120 @@ def _lead_agent_options(
     )
 
 
+def _normalize_deployment_mode(value: object) -> str:
+    if not isinstance(value, str):
+        return "team"
+    token = value.strip().lower()
+    return "individual" if token == "individual" else "team"
+
+
+def _recommendation_preset_key(*, deployment_mode: str, lead_agent: object) -> str:
+    if deployment_mode == "individual":
+        return "individual-companion"
+    if isinstance(lead_agent, dict):
+        identity_profile = lead_agent.get("identity_profile")
+        if isinstance(identity_profile, dict):
+            role = str(identity_profile.get("role", "")).strip().lower()
+            if any(keyword in role for keyword in ("marketing", "cmo", "brand")):
+                return "business-cmo"
+            if any(keyword in role for keyword in ("dev", "engineer", "code")):
+                return "builder-engineering"
+    return "team-operator"
+
+
+def _build_onboarding_recommendation(
+    draft_goal: object,
+) -> BoardOnboardingRecommendation | None:
+    if not isinstance(draft_goal, dict):
+        return None
+    deployment_mode = _normalize_deployment_mode(draft_goal.get("deployment_mode"))
+    lead_agent = draft_goal.get("lead_agent")
+    base_bundle = ["gsd_workflow", "mission_control_tasks", "notebooklm_optional"]
+    if deployment_mode == "individual":
+        base_bundle.extend(["voice", "uplay_chromium"])
+        notes = (
+            "Individual mode: no orchestrator. Voice and secure device automation are enabled by "
+            "default, with owner-approval controls."
+        )
+    else:
+        base_bundle.extend(["orchestrator", "multi_agent_coordination"])
+        notes = "Team mode: orchestrator-led execution with specialist delegation."
+    return BoardOnboardingRecommendation(
+        deployment_mode=deployment_mode,  # type: ignore[arg-type]
+        persona_preset_key=_recommendation_preset_key(
+            deployment_mode=deployment_mode,
+            lead_agent=lead_agent,
+        ),
+        ability_bundle=base_bundle,
+        voice_enabled=deployment_mode == "individual",
+        backup_options_enabled=True,
+        notebooklm_optional=True,
+        recommendation_notes=notes,
+    )
+
+
+def _as_recommendation_read(row: OnboardingRecommendation) -> BoardOnboardingRecommendationRead:
+    return BoardOnboardingRecommendationRead(
+        id=row.id,
+        board_id=row.board_id,
+        onboarding_session_id=row.onboarding_session_id,
+        deployment_mode=row.deployment_mode,  # type: ignore[arg-type]
+        persona_preset_key=row.persona_preset_key,
+        ability_bundle=list(row.ability_bundle or []),
+        voice_enabled=row.voice_enabled,
+        backup_options_enabled=row.backup_options_enabled,
+        notebooklm_optional=row.notebooklm_optional,
+        recommendation_notes=row.recommendation_notes,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+async def _upsert_onboarding_recommendation(
+    *,
+    session: AsyncSession,
+    board_id: UUID,
+    onboarding_id: UUID,
+    draft_goal: object,
+) -> OnboardingRecommendation | None:
+    recommendation = _build_onboarding_recommendation(draft_goal)
+    if recommendation is None:
+        return None
+
+    existing = (
+        await OnboardingRecommendation.objects.filter_by(board_id=board_id)
+        .order_by(col(OnboardingRecommendation.updated_at).desc())
+        .first(session)
+    )
+    now = utcnow()
+    if existing is None:
+        existing = OnboardingRecommendation(
+            board_id=board_id,
+            onboarding_session_id=onboarding_id,
+            deployment_mode=recommendation.deployment_mode,
+            persona_preset_key=recommendation.persona_preset_key,
+            ability_bundle=list(recommendation.ability_bundle),
+            voice_enabled=recommendation.voice_enabled,
+            backup_options_enabled=recommendation.backup_options_enabled,
+            notebooklm_optional=recommendation.notebooklm_optional,
+            recommendation_notes=recommendation.recommendation_notes,
+            created_at=now,
+            updated_at=now,
+        )
+    else:
+        existing.onboarding_session_id = onboarding_id
+        existing.deployment_mode = recommendation.deployment_mode
+        existing.persona_preset_key = recommendation.persona_preset_key
+        existing.ability_bundle = list(recommendation.ability_bundle)
+        existing.voice_enabled = recommendation.voice_enabled
+        existing.backup_options_enabled = recommendation.backup_options_enabled
+        existing.notebooklm_optional = recommendation.notebooklm_optional
+        existing.recommendation_notes = recommendation.recommendation_notes
+        existing.updated_at = now
+    session.add(existing)
+    return existing
+
+
 @router.get("", response_model=BoardOnboardingRead)
 async def get_onboarding(
     board: Board = BOARD_USER_READ_DEP,
@@ -316,6 +434,22 @@ async def start_onboarding(
     return onboarding
 
 
+@router.get("/recommendation", response_model=BoardOnboardingRecommendationRead)
+async def get_onboarding_recommendation(
+    board: Board = BOARD_USER_READ_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> BoardOnboardingRecommendationRead:
+    """Get the latest onboarding recommendation for a board."""
+    recommendation = (
+        await OnboardingRecommendation.objects.filter_by(board_id=board.id)
+        .order_by(col(OnboardingRecommendation.updated_at).desc())
+        .first(session)
+    )
+    if recommendation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return _as_recommendation_read(recommendation)
+
+
 @router.post("/answer", response_model=BoardOnboardingRead)
 async def answer_onboarding(
     payload: BoardOnboardingAnswer,
@@ -399,6 +533,12 @@ async def agent_onboarding_update(
     if isinstance(payload, BoardOnboardingAgentComplete):
         onboarding.draft_goal = payload_data
         onboarding.status = "completed"
+        await _upsert_onboarding_recommendation(
+            session=session,
+            board_id=board.id,
+            onboarding_id=onboarding.id,
+            draft_goal=payload_data,
+        )
         messages.append(
             {"role": "assistant", "content": payload_text, "timestamp": now},
         )

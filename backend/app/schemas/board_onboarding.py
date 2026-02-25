@@ -92,6 +92,7 @@ LeadAgentAutonomyLevel = Literal["ask_first", "balanced", "autonomous"]
 LeadAgentVerbosity = Literal["concise", "balanced", "detailed"]
 LeadAgentOutputFormat = Literal["bullets", "mixed", "narrative"]
 LeadAgentUpdateCadence = Literal["asap", "hourly", "daily", "weekly"]
+DeploymentMode = Literal["team", "individual"]
 
 
 class BoardOnboardingLeadAgentDraft(SQLModel):
@@ -147,11 +148,34 @@ class BoardOnboardingAgentComplete(BoardOnboardingConfirm):
     """Complete onboarding draft produced by the onboarding assistant."""
 
     status: Literal["complete"]
+    deployment_mode: DeploymentMode | None = None
     user_profile: BoardOnboardingUserProfile | None = None
     lead_agent: BoardOnboardingLeadAgentDraft | None = None
 
 
 BoardOnboardingAgentUpdate = BoardOnboardingAgentComplete | BoardOnboardingAgentQuestion
+
+
+class BoardOnboardingRecommendation(SQLModel):
+    """Recommendation payload derived from onboarding Q&A responses."""
+
+    deployment_mode: DeploymentMode = "team"
+    persona_preset_key: NonEmptyStr
+    ability_bundle: list[str] = Field(default_factory=list)
+    voice_enabled: bool = False
+    backup_options_enabled: bool = True
+    notebooklm_optional: bool = True
+    recommendation_notes: str | None = None
+
+
+class BoardOnboardingRecommendationRead(BoardOnboardingRecommendation):
+    """Stored onboarding recommendation record."""
+
+    id: UUID
+    board_id: UUID
+    onboarding_session_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class BoardOnboardingRead(SQLModel):

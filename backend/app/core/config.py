@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     notebooklm_runner_cmd: str = "uvx --from notebooklm-mcp-cli@latest nlm"
     notebooklm_profiles_root: str = "/var/lib/notebooklm/profiles"
     notebooklm_timeout_seconds: int = 120
+    channel_rollout_phase: str = "phase1"
+    enabled_ingress_channels: str = "telegram"
 
     # Kr8tiv distribution layer
     distribution_cli_command: str = "node kr8tiv-claw/dist/index.js"
@@ -124,6 +126,15 @@ class Settings(BaseSettings):
         """Return normalized arena-eligible agent identifiers from config."""
         values: list[str] = []
         for raw in self.arena_allowed_agents.split(","):
+            normalized = raw.strip().lower()
+            if normalized and normalized not in values:
+                values.append(normalized)
+        return tuple(values)
+
+    def ingress_channels(self) -> tuple[str, ...]:
+        """Return normalized externally enabled ingress channels."""
+        values: list[str] = []
+        for raw in self.enabled_ingress_channels.split(","):
             normalized = raw.strip().lower()
             if normalized and normalized not in values:
                 values.append(normalized)

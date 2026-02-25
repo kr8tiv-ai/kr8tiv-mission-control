@@ -9,6 +9,7 @@ from uuid import UUID
 
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.services.channel_ingress import build_ingress_task_event
 from app.services.queue import QueuedTask, enqueue_task, requeue_if_failed
 
 logger = get_logger(__name__)
@@ -94,4 +95,34 @@ def requeue_task_mode_execution(
         max_retries=settings.rq_dispatch_max_retries,
         redis_url=settings.rq_redis_url,
         delay_seconds=delay_seconds,
+    )
+
+
+def is_skill_route_eligible(skill_metadata: dict[str, Any] | None) -> bool:
+    """Return whether a skill passed ingest validation and can be routed."""
+    # Backward compatibility: skills created before ingest metadata was introduced
+    # remain installable unless they are explicitly marked as non-accepted.
+    if not isinstance(skill_metadata, dict):
+        return True
+
+    ingest_status = str(skill_metadata.get("ingest_status", "")).strip().lower()
+    if not ingest_status:
+        return True
+    return ingest_status == "accepted"
+
+
+def normalize_channel_event(
+    *,
+    channel: str,
+    message_id: str,
+    chat_id: str,
+    body: str,
+) -> dict[str, Any]:
+    """Normalize inbound channel payload into a queue-safe task event contract."""
+    return build_ingress_task_event(
+        channel=channel,
+        phase=settings.channel_rollout_phase,
+        message_id=message_id,
+        chat_id=chat_id,
+        body=body,
     )

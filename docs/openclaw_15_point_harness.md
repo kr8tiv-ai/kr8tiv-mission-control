@@ -1,73 +1,122 @@
-# OpenClaw 15-Point Harness
+# OpenClaw 15-Point Runtime Harness
 
-Use this checklist after deploys, image upgrades, credential rotation, or config changes to confirm Mission Control and OpenClaw are still aligned.
+This harness is the operational acceptance checklist for a Mission Control + multi-agent OpenClaw deployment.
 
-## Preconditions
+Use it after any restart, image update, config change, or credential rotation.
 
-- Mission Control API is reachable.
-- OpenClaw gateway URL and token are configured.
-- Templates have been synced at least once for the target board.
-- You can inspect container logs and current OpenClaw config state.
+## Scope
 
-## 15 Verification Checks
+- Mission Control stack health
+- OpenClaw gateway reachability
+- Agent model routing correctness
+- Telegram delivery correctness
+- Drift prevention (model lock + config write lock)
+- Reboot persistence of enforcement
 
-1. **Container health**
-   All Mission Control and OpenClaw containers are `Up` and healthy.
+## Pre-Reqs
 
-2. **Mission Control health endpoint**
-   `GET /api/v1/health` returns `ok`.
+- SSH access to the host running Docker
+- `kr8tiv-mission-control-backend-1` container up
+- OpenClaw bot containers up
+- `LOCAL_AUTH_TOKEN` present in backend container env
 
-3. **Gateway connectivity**
-   `GET /api/v1/gateways/status?board_id=<board_id>` reports `connected=true`.
+## 15 Checks
 
-4. **Main agent availability**
-   The gateway main agent exists (`board_id = null`) and responds.
+1. **All OpenClaw containers are healthy**
+   - Expected: `openclaw-arsenal`, `openclaw-jocasta`, `openclaw-edith`, `openclaw-ydy8-openclaw-1` are `Up (...) (healthy)` or equivalent healthy state.
 
-5. **Friday model policy lock**
-   Friday is locked to `openai-codex/gpt-5.3-codex`.
+2. **Mission Control core containers are healthy**
+   - Expected: backend, frontend, webhook-worker, db, redis are running.
 
-6. **Arsenal model policy lock**
-   Arsenal is locked to `openai-codex/gpt-5.3-codex`.
+3. **Gateway status endpoint is reachable**
+   - Endpoint: `GET /api/v1/gateways/status?board_id=<board_id>`
+   - Expected: `connected=true`.
 
-7. **Edith model policy lock**
-   Edith is locked to the configured Gemini route for your environment.
+4. **Lead lane model is codex**
+   - Session key: `agent:lead-b1000000-0000-0000-0000-000000000001:main`
+   - Expected: `modelProvider=openai-codex`, `model=gpt-5.3-codex`.
 
-8. **Jocasta model policy lock**
-   Jocasta is locked to `nvidia/moonshotai/kimi-k2-5`.
+5. **Arsenal lane model is codex**
+   - Session key: `agent:mc-c2000000-0000-0000-0000-000000000002:main`
+   - Expected: `modelProvider=openai-codex`, `model=gpt-5.3-codex`.
+
+6. **Jocasta lane model is kimi**
+   - Session key: `agent:mc-c4000000-0000-0000-0000-000000000004:main`
+   - Expected: `modelProvider=moonshotai`, `model=kimi-k2.5`.
+
+7. **Edith lane model is Gemini**
+   - Session key: `agent:mc-c3000000-0000-0000-0000-000000000003:main`
+   - Expected: Gemini 3.1 family route is active for this lane.
+   - If using `google-gemini-cli/*`: verify OAuth auth profile contains `token` + `projectId`.
+   - If OAuth is unavailable: use `google/*` model route to remain operational.
+
+8. **Per-bot config primary models are pinned**
+   - Arsenal: `openai-codex/gpt-5.3-codex`
+   - Friday: `openai-codex/gpt-5.3-codex`
+   - Jocasta: `nvidia/moonshotai/kimi-k2-5`
+   - Edith: chosen Gemini route (`google/*` or `google-gemini-cli/*`) matches your policy.
+   - If Mission Control connects with a non-local Host header, set Friday gateway `controlUi.dangerouslyDisableDeviceAuth=true` (or use full device-identity auth).
 
 9. **Locked policy enforcement**
-   `PATCH /api/v1/agents/{id}` rejects model-policy overrides for locked agents with `403`.
+   - Expected: `PATCH /api/v1/agents/{id}` rejects model-policy overrides for locked agents with `403`.
 
 10. **Template sync enforcement**
-    `POST /api/v1/gateways/{gateway_id}/templates/sync` rewrites drifted models back to policy targets.
+   - Expected: `POST /api/v1/gateways/{gateway_id}/templates/sync` rewrites drifted model routes back to policy targets.
 
-11. **OpenClaw runtime model alignment**
-    `config.get` shows `agents.list[].model` values matching locked policies.
+11. **Telegram bot tokens are present**
+   - Expected: `channels.telegram.accounts.default.botToken` exists for each bot config.
 
-12. **Config write hardening**
-    Runtime config writes are disabled for bot-controlled channels in production.
+12. **Telegram delivery test succeeds for each bot**
+   - Send one probe message per bot token to an operator chat ID.
+   - Expected: Telegram API returns `ok=true` for all probes.
 
-13. **Telegram delivery check**
-    One probe per configured bot token succeeds (`ok=true`).
+13. **Runtime config writes are disabled**
+   - Expected: `commands.config=false` in each OpenClaw config.
 
-14. **Restart persistence**
-    After restart, gateway reconnects and locked model assignments remain unchanged.
+14. **Telegram config writes are disabled**
+   - Expected: `channels.telegram.configWrites=false` and `channels.telegram.accounts.default.configWrites=false`.
 
-15. **Log sanity**
-    Last 15-20 minutes of logs show no repeated auth/routing/delivery failure loops.
+15. **Enforcer timer is active, persistent, and reboot-safe**
+   - Service: `openclaw-config-enforcer.timer`
+   - Expected: `active (waiting)`, `Persistent=true`, `OnBootSec` and `OnUnitActiveSec` configured.
 
-## Evidence Capture
+## Policy Overlay Checks (required for 2026 rollout)
 
-Capture these artifacts for each validation run:
+- **Persona integrity baseline exists**
+  - Expected: each active agent has checksum baseline row in `agent_persona_integrity`.
+- **Persona precedence is present in rendered workspace docs**
+  - Expected: `SOUL.md > USER.md > IDENTITY.md > AGENTS.md` appears in generated contract artifacts.
+- **Reasoning default is max-capacity**
+  - Expected: runtime config resolves `thinkingDefault=max` with fallback behavior `highest_or_model_default`.
+- **Supermemory plugin bootstrap is enforced**
+  - Expected bootstrap task includes `openclaw plugins install @supermemory/openclaw-supermemory`.
+- **Install governance is ask-first by default**
+  - Expected: installation requests default to `pending_owner_approval`.
+- **Tier quota controls are active**
+  - Expected: install requests over ability/storage limits are rejected with clear quota messages.
+- **Backup reminder workflow is active**
+  - Expected: unconfirmed tenants receive twice-weekly warning prompts and destination confirmation options.
+
+## Additional Runtime Validation (recommended)
+
+- Drift auto-revert works:
+  Temporarily set one pinned model to an incorrect value, wait one enforcer interval, verify the route is auto-reverted.
+- Recent logs show no critical routing/auth/delivery failures:
+  Check last 15-20 minutes of all OpenClaw bot logs for recurring `chat not found`, `token missing`, `No available auth profile`, or provider cooldown loops.
+
+## Evidence Capture Template
+
+Capture and store:
 
 - `docker ps --format '{{.Names}}|{{.Status}}|{{.Image}}'`
-- Gateway status payloads for relevant board and main agent paths
-- Locked agent policy snapshot (before and after template sync)
-- Telegram probe responses
-- Tail logs for each OpenClaw container
+- Gateway status JSON snippet for lead/c200/c300/c400
+- One Telegram probe response per bot (`ok=true`)
+- Enforcer timer/service status output
+- Drift-revert proof (before/after values)
+- Tail of recent logs for each OpenClaw container
 
-## Gemini Route Note
+## Known Pitfall: Gemini CLI vs Gemini API
 
-- `google-gemini-cli/*` requires OAuth profile auth.
-- `google/*` is API-key based.
-- Pick one route intentionally in policy docs and keep the enforcer aligned to prevent silent drift.
+- `google-gemini-cli/*` uses Cloud Code Assist OAuth and fails with plain API key (`401` / `Invalid Google Cloud Code Assist credentials`).
+- `google/*` uses API-key auth and is appropriate when only `GEMINI_API_KEY` is available.
+- Decide this route explicitly in policy docs and enforce it in your config enforcer to avoid silent drift.

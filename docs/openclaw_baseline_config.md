@@ -61,7 +61,7 @@ The config below is your provided baseline, normalized into valid JSON.
           "systemPrompt": "Session nearing compaction. Store durable memories now."
         }
       },
-      "thinkingDefault": "medium",
+      "thinkingDefault": "max",
       "maxConcurrent": 5,
       "subagents": {
         "maxConcurrent": 5
@@ -262,7 +262,9 @@ What this protects:
 
 Default reasoning intensity for turns.
 
-- Your baseline uses `medium` as a quality/speed balance.
+- Managed baseline uses `max` by default.
+- If a model does not support `max`, fall back to the highest supported tier.
+- If tiers are unavailable, keep the model's native default behavior.
 
 #### Concurrency Controls
 
@@ -466,6 +468,7 @@ mkdir -p ~/.openclaw
 3. Start the gateway:
 
 ```bash
+openclaw plugins install @supermemory/openclaw-supermemory
 openclaw gateway
 ```
 

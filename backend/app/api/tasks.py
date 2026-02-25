@@ -74,7 +74,7 @@ from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError
 from app.services.organizations import require_board_access
-from app.services.prompt_evolution import record_task_completion_telemetry
+from app.services.task_gsd_policy import validate_transition
 from app.services.task_mode_queue import QueuedTaskModeExecution, enqueue_task_mode_execution
 from app.services.tags import (
     TagState,
@@ -125,6 +125,7 @@ TASK_DEP = Depends(get_task_or_404)
 MODE_EXECUTION_TASK_MODES = {"notebook", "arena", "arena_notebook", "notebook_creation"}
 ARENA_TASK_MODES = {"arena", "arena_notebook"}
 NOTEBOOK_ENABLED_MODES = {"notebook", "arena_notebook", "notebook_creation"}
+ENGINEERING_SWARM_TASK_MODES = {"arena", "arena_notebook"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +230,59 @@ def _pending_approval_blocks_status_change_error() -> HTTPException:
     )
 
 
+def _engineering_done_gate_error(missing_checks: Sequence[str]) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "message": (
+                "Task cannot be marked done until engineering done-gate checks pass."
+            ),
+            "missing_checks": list(missing_checks),
+            "blocked_by_task_ids": [],
+        },
+    )
+
+
+def _has_doc_ref(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _validate_gsd_transition_or_raise(*, task: Task, updates: dict[str, object]) -> None:
+    source_stage = (task.gsd_stage or "spec").strip().lower()
+    target_stage = str(updates.get("gsd_stage", source_stage)).strip().lower()
+    deployment_mode = str(updates.get("deployment_mode", task.deployment_mode or "team"))
+
+    owner_approval_required = bool(
+        updates.get("owner_approval_required", task.owner_approval_required),
+    )
+    owner_approved_value = updates.get("owner_approved_at", task.owner_approved_at)
+    owner_approved = owner_approved_value is not None
+
+    spec_doc_ref = updates.get("spec_doc_ref", task.spec_doc_ref)
+    plan_doc_ref = updates.get("plan_doc_ref", task.plan_doc_ref)
+
+    result = validate_transition(
+        current_stage=source_stage,
+        target_stage=target_stage,
+        deployment_mode=deployment_mode,
+        owner_approval_required=owner_approval_required,
+        owner_approved=owner_approved,
+        has_spec=_has_doc_ref(spec_doc_ref),
+        has_plan=_has_doc_ref(plan_doc_ref),
+    )
+    if result.ok:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "message": result.reason or "GSD transition policy blocked the update.",
+            "code": "gsd_transition_blocked",
+            "fallback_stage": result.fallback_stage or source_stage,
+        },
+    )
+
+
 async def _task_has_approved_linked_approval(
     session: AsyncSession,
     *,
@@ -308,6 +362,56 @@ async def _require_review_before_done_when_enabled(
     ).first()
     if requires_review and previous_status != "review":
         raise _review_required_for_done_error()
+
+
+def _is_engineering_swarm_task(task: Task) -> bool:
+    if task.task_mode in ENGINEERING_SWARM_TASK_MODES:
+        return True
+    normalized_reason = (task.auto_reason or "").strip().lower()
+    return normalized_reason.startswith("swarm:engineering")
+
+
+def _arena_done_gate_checks(arena_config: dict[str, object] | None) -> dict[str, bool]:
+    if not isinstance(arena_config, dict):
+        return {}
+    raw = arena_config.get("done_gate_checks")
+    if not isinstance(raw, dict):
+        return {}
+    checks: dict[str, bool] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str):
+            continue
+        checks[key] = bool(value)
+    if bool(arena_config.get("ui_labeled")):
+        checks["ui_labeled"] = True
+    return checks
+
+
+async def _require_engineering_done_gate_for_done(
+    *,
+    task: Task,
+    previous_status: str,
+    target_status: str,
+    updates: dict[str, object] | None = None,
+) -> None:
+    if previous_status == "done" or target_status != "done":
+        return
+    if not _is_engineering_swarm_task(task):
+        return
+
+    arena_config = task.arena_config
+    if updates is not None and "arena_config" in updates:
+        update_value = updates.get("arena_config")
+        if isinstance(update_value, dict):
+            arena_config = cast(dict[str, object], update_value)
+
+    checks = _arena_done_gate_checks(arena_config)
+    required_keys = ("pr_created", "ci_passed", "human_reviewed")
+    missing_checks = [key for key in required_keys if not checks.get(key, False)]
+    if checks.get("ui_labeled", False) and not checks.get("ui_screenshot_present", False):
+        missing_checks.append("ui_screenshot_present")
+    if missing_checks:
+        raise _engineering_done_gate_error(missing_checks)
 
 
 async def _require_no_pending_approval_for_status_change_when_enabled(
@@ -1543,6 +1647,7 @@ async def update_task(
     updates.pop("depends_on_task_ids", None)
     updates.pop("tag_ids", None)
     updates.pop("custom_field_values", None)
+    _validate_gsd_transition_or_raise(task=task, updates=updates)
     requested_status = payload.status if "status" in payload.model_fields_set else None
     update = _TaskUpdateInput(
         task=task,
@@ -1945,6 +2050,7 @@ def _validate_lead_update_request(update: _TaskUpdateInput) -> None:
     allowed_fields = {
         "assigned_agent_id",
         "status",
+        "arena_config",
         "depends_on_task_ids",
         "tag_ids",
         "custom_field_values",
@@ -2139,6 +2245,12 @@ async def _apply_lead_task_update(
             raise _blocked_task_error(blocked_by)
 
     await _lead_apply_assignment(session, update=update)
+    if "arena_config" in update.updates:
+        raw_arena_config = update.updates["arena_config"]
+        if raw_arena_config is None or isinstance(raw_arena_config, dict):
+            update.task.arena_config = cast(dict[str, object] | None, raw_arena_config)
+        else:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
     _lead_apply_status(update)
     await _require_no_pending_approval_for_status_change_when_enabled(
         session,
@@ -2160,6 +2272,12 @@ async def _apply_lead_task_update(
         task_id=update.task.id,
         previous_status=update.previous_status,
         target_status=update.task.status,
+    )
+    await _require_engineering_done_gate_for_done(
+        task=update.task,
+        previous_status=update.previous_status,
+        target_status=update.task.status,
+        updates=update.updates,
     )
 
     if normalized_tag_ids is not None:
@@ -2488,6 +2606,12 @@ async def _finalize_updated_task(
         previous_status=update.previous_status,
         target_status=update.task.status,
     )
+    await _require_engineering_done_gate_for_done(
+        task=update.task,
+        previous_status=update.previous_status,
+        target_status=update.task.status,
+        updates=update.updates,
+    )
     update.task.updated_at = utcnow()
 
     status_raw = update.updates.get("status")
@@ -2533,11 +2657,6 @@ async def _finalize_updated_task(
         )
 
     session.add(update.task)
-    await record_task_completion_telemetry(
-        session,
-        task=update.task,
-        previous_status=update.previous_status,
-    )
     await session.commit()
     await session.refresh(update.task)
     await _record_task_comment_from_update(session, update=update)

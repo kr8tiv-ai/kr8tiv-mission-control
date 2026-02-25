@@ -28,6 +28,13 @@ class Task(TenantScoped, table=True):
     status: str = Field(default="inbox", index=True)
     priority: str = Field(default="medium", index=True)
     task_mode: str = Field(default="standard", index=True)
+    gsd_stage: str = Field(default="spec", index=True)
+    spec_doc_ref: str | None = Field(default=None, sa_column=Column(Text))
+    plan_doc_ref: str | None = Field(default=None, sa_column=Column(Text))
+    verification_ref: str | None = Field(default=None, sa_column=Column(Text))
+    deployment_mode: str = Field(default="team", index=True)
+    owner_approval_required: bool = Field(default=False)
+    owner_approved_at: datetime | None = None
     arena_config: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     notebook_profile: str = Field(default="auto", index=True)
     notebook_id: str | None = Field(default=None, sa_column=Column(Text))
