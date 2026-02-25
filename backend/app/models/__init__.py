@@ -17,6 +17,7 @@ from app.models.capabilities import Capability
 from app.models.change_requests import ChangeRequest
 from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
+from app.models.gsd_runs import GSDRun
 from app.models.installations import InstallationRequest
 from app.models.pack_bindings import PackBinding
 from app.models.persona_presets import PersonaPreset
@@ -63,6 +64,7 @@ __all__ = [
     "ChangeRequest",
     "DeterministicEval",
     "Gateway",
+    "GSDRun",
     "InstallationRequest",
     "PackBinding",
     "PersonaPreset",
