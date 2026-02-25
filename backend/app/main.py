@@ -12,6 +12,7 @@ from fastapi_pagination import add_pagination
 
 from app.api.activity import router as activity_router
 from app.api.agent import router as agent_router
+from app.api.agent_continuity import router as agent_continuity_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
 from app.api.auth import router as auth_router
@@ -580,6 +581,7 @@ api_v1.include_router(tags_router)
 api_v1.include_router(users_router)
 api_v1.include_router(distribution_router)
 api_v1.include_router(tenant_access_router)
+api_v1.include_router(agent_continuity_router)
 app.include_router(api_v1)
 
 add_pagination(app)
