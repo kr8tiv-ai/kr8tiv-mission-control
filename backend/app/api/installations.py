@@ -14,6 +14,7 @@ from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.installations import InstallationRequest
 from app.models.override_sessions import OverrideSession
+from app.models.tier_quotas import TierQuota
 from app.schemas.installations import (
     InstallationRequestCreate,
     InstallationRequestRead,
@@ -29,6 +30,78 @@ if TYPE_CHECKING:
 router = APIRouter(prefix="/installations", tags=["control-plane"])
 SESSION_DEP = Depends(get_session)
 ORG_ADMIN_DEP = Depends(require_org_admin)
+
+
+def _normalize_tier(value: object) -> str:
+    if isinstance(value, str):
+        text = value.strip().lower()
+        return text or "personal"
+    return "personal"
+
+
+def _coerce_storage_mb(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return max(value, 0)
+    if isinstance(value, float):
+        return max(int(value), 0)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return 0
+        try:
+            parsed = float(text)
+        except ValueError:
+            return 0
+        return max(int(parsed), 0)
+    return 0
+
+
+async def _ensure_quota_available(
+    *,
+    payload: InstallationRequestCreate,
+    session: AsyncSession,
+    ctx: OrganizationContext,
+) -> None:
+    requested_tier = _normalize_tier(payload.requested_payload.get("tier"))
+    quota = await TierQuota.objects.filter_by(
+        organization_id=ctx.organization.id,
+        tier=requested_tier,
+    ).first(session)
+    if quota is None:
+        return
+
+    approved_requests = (
+        await InstallationRequest.objects.filter_by(
+            organization_id=ctx.organization.id,
+            status="approved",
+        ).all(session)
+    )
+    if len(approved_requests) >= quota.max_abilities:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Install blocked: ability slots exhausted for "
+                f"tier '{requested_tier}' ({quota.max_abilities} max)."
+            ),
+        )
+
+    used_storage_mb = sum(
+        _coerce_storage_mb((row.requested_payload or {}).get("estimated_storage_mb"))
+        for row in approved_requests
+    )
+    requested_storage_mb = _coerce_storage_mb(payload.requested_payload.get("estimated_storage_mb"))
+    if used_storage_mb + requested_storage_mb > quota.max_storage_mb:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Install blocked: storage quota exceeded for "
+                f"tier '{requested_tier}' "
+                f"({used_storage_mb + requested_storage_mb}MB requested, "
+                f"{quota.max_storage_mb}MB max)."
+            ),
+        )
 
 
 def _as_installation_read(row: InstallationRequest) -> InstallationRequestRead:
@@ -72,6 +145,8 @@ async def create_installation_request(
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> InstallationRequestRead:
     """Create an installation request governed by approval policy."""
+    await _ensure_quota_available(payload=payload, session=session, ctx=ctx)
+
     now = utcnow()
     status_value = "pending_owner_approval" if payload.approval_mode == "ask_first" else "approved"
     request = InstallationRequest(
