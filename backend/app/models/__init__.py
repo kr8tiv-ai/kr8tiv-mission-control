@@ -21,6 +21,7 @@ from app.models.organization_invite_board_access import OrganizationInviteBoardA
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
+from app.models.onboarding_recommendations import OnboardingRecommendation
 from app.models.promotion_events import PromotionEvent
 from app.models.prompt_packs import PromptPack
 from app.models.run_telemetry import RunTelemetry
@@ -69,6 +70,7 @@ __all__ = [
     "OrganizationBoardAccess",
     "OrganizationInvite",
     "OrganizationInviteBoardAccess",
+    "OnboardingRecommendation",
     "TaskDependency",
     "Task",
     "TaskIteration",
