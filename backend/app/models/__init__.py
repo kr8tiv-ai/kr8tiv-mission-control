@@ -14,6 +14,7 @@ from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
 from app.models.capabilities import Capability
+from app.models.change_requests import ChangeRequest
 from app.models.deterministic_evals import DeterministicEval
 from app.models.gateways import Gateway
 from app.models.installations import InstallationRequest
@@ -59,6 +60,7 @@ __all__ = [
     "BoardGroup",
     "Board",
     "Capability",
+    "ChangeRequest",
     "DeterministicEval",
     "Gateway",
     "InstallationRequest",
