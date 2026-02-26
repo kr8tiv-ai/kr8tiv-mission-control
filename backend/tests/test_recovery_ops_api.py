@@ -106,6 +106,7 @@ async def test_update_recovery_policy_persists_limits() -> None:
                 "stale_after_seconds": 600,
                 "max_restarts_per_hour": 5,
                 "cooldown_seconds": 120,
+                "alert_dedupe_seconds": 600,
                 "alert_telegram": True,
                 "alert_whatsapp": False,
                 "alert_ui": True,
@@ -116,11 +117,13 @@ async def test_update_recovery_policy_persists_limits() -> None:
         assert body["stale_after_seconds"] == 600
         assert body["max_restarts_per_hour"] == 5
         assert body["cooldown_seconds"] == 120
+        assert body["alert_dedupe_seconds"] == 600
         assert body["alert_whatsapp"] is False
 
         fetched = await client.get("/api/v1/runtime/recovery/policy")
         assert fetched.status_code == 200
         assert fetched.json()["cooldown_seconds"] == 120
+        assert fetched.json()["alert_dedupe_seconds"] == 600
     await engine.dispose()
 
 

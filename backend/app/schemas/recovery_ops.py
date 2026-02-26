@@ -17,6 +17,7 @@ class RecoveryPolicyRead(SQLModel):
     stale_after_seconds: int
     max_restarts_per_hour: int
     cooldown_seconds: int
+    alert_dedupe_seconds: int
     alert_telegram: bool
     alert_whatsapp: bool
     alert_ui: bool
@@ -31,6 +32,7 @@ class RecoveryPolicyUpdate(SQLModel):
     stale_after_seconds: int | None = None
     max_restarts_per_hour: int | None = None
     cooldown_seconds: int | None = None
+    alert_dedupe_seconds: int | None = None
     alert_telegram: bool | None = None
     alert_whatsapp: bool | None = None
     alert_ui: bool | None = None

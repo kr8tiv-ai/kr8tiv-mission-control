@@ -14,6 +14,7 @@ def test_recovery_policy_defaults_enable_autorestart_with_cooldown() -> None:
     assert policy.stale_after_seconds == 900
     assert policy.max_restarts_per_hour == 3
     assert policy.cooldown_seconds == 300
+    assert policy.alert_dedupe_seconds == 900
     assert policy.alert_telegram is True
     assert policy.alert_whatsapp is True
     assert policy.alert_ui is True

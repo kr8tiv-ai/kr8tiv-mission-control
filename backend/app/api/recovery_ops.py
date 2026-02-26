@@ -40,6 +40,7 @@ def _as_policy_read(row: RecoveryPolicy) -> RecoveryPolicyRead:
         stale_after_seconds=row.stale_after_seconds,
         max_restarts_per_hour=row.max_restarts_per_hour,
         cooldown_seconds=row.cooldown_seconds,
+        alert_dedupe_seconds=row.alert_dedupe_seconds,
         alert_telegram=row.alert_telegram,
         alert_whatsapp=row.alert_whatsapp,
         alert_ui=row.alert_ui,
