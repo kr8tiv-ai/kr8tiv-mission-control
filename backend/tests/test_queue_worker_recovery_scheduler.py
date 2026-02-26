@@ -17,6 +17,14 @@ class _SessionContext:
         return False
 
 
+async def _ready_true() -> bool:
+    return True
+
+
+async def _ready_false() -> bool:
+    return False
+
+
 @pytest.mark.asyncio
 async def test_run_recovery_scheduler_once_executes_sweep_when_enabled(
     monkeypatch: pytest.MonkeyPatch,
@@ -42,6 +50,7 @@ async def test_run_recovery_scheduler_once_executes_sweep_when_enabled(
             )()
 
     monkeypatch.setattr(queue_worker.settings, "recovery_loop_enabled", True)
+    monkeypatch.setattr(queue_worker, "is_scheduler_migration_ready", _ready_true, raising=False)
     monkeypatch.setattr(queue_worker, "RecoveryScheduler", _SchedulerStub)
     monkeypatch.setattr(queue_worker, "async_session_maker", lambda: _SessionContext())
 
@@ -62,6 +71,25 @@ async def test_run_recovery_scheduler_once_is_noop_when_disabled(
             raise AssertionError("scheduler should not be instantiated when loop is disabled")
 
     monkeypatch.setattr(queue_worker, "RecoveryScheduler", _SchedulerStub)
+
+    executed = await queue_worker.run_recovery_scheduler_once()
+
+    assert executed is False
+
+
+@pytest.mark.asyncio
+async def test_run_recovery_scheduler_once_skips_when_migrations_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(queue_worker.settings, "recovery_loop_enabled", True)
+    monkeypatch.setattr(queue_worker, "is_scheduler_migration_ready", _ready_false, raising=False)
+
+    class _SchedulerStub:
+        def __init__(self, *, session) -> None:
+            raise AssertionError("scheduler should not run while migrations are pending")
+
+    monkeypatch.setattr(queue_worker, "RecoveryScheduler", _SchedulerStub)
+    monkeypatch.setattr(queue_worker, "async_session_maker", lambda: _SessionContext())
 
     executed = await queue_worker.run_recovery_scheduler_once()
 

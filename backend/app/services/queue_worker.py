@@ -15,6 +15,7 @@ from app.services.deterministic_eval_execution import execute_deterministic_eval
 from app.services.deterministic_eval_queue import TASK_TYPE as DETERMINISTIC_EVAL_TASK_TYPE
 from app.services.deterministic_eval_queue import requeue_deterministic_eval
 from app.services.queue import QueuedTask, dequeue_task
+from app.services.runtime.migration_gate import is_scheduler_migration_ready
 from app.services.runtime.recovery_scheduler import RecoveryScheduler
 from app.services.task_mode_execution import execute_task_mode
 from app.services.task_mode_queue import (
@@ -143,6 +144,10 @@ async def flush_queue(*, block: bool = False, block_timeout: float = 0) -> int:
 async def run_recovery_scheduler_once() -> bool:
     """Run one periodic recovery sweep when runtime setting enables it."""
     if not settings.recovery_loop_enabled:
+        return False
+
+    if not await is_scheduler_migration_ready():
+        logger.info("queue.worker.recovery_sweep_deferred_migrations_pending")
         return False
 
     async with async_session_maker() as session:
