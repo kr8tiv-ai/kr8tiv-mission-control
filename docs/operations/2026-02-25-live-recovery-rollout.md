@@ -208,3 +208,38 @@ Verification snapshot:
    - no-op behavior when `recovery_loop_enabled=false`.
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
+
+## 2026-02-26 Rollout Update (Phase 17 Scheduler + Dedupe Live)
+
+Phase 17 was merged to `main` and deployed to production with immutable images from merge commit `f8a4338f7701f61485db69e5b808a5a7f503a41f`.
+
+Verification snapshot:
+1. Main image publish workflow:
+   - Workflow: `publish-mission-control-images.yml` (`push` on `main`)
+   - Run ID: `22457484276`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22457484276`
+2. VPS rollout action:
+   - Hostinger action ID: `81054769`
+   - Action: `docker_compose_up`
+   - State: `success`
+   - Completed at: `2026-02-26T19:24:13Z`
+3. Active immutable images:
+   - Backend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:f8a4338`
+   - Webhook worker: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:f8a4338`
+   - Frontend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:f8a4338`
+4. Live endpoint checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+   - `GET /api/v1/runtime/recovery/policy` => `200` with `alert_dedupe_seconds=900`
+   - `GET /api/v1/runtime/recovery/incidents?board_id=b1000000-0000-0000-0000-000000000001&limit=5` => `200`
+   - `POST /api/v1/runtime/recovery/run?board_id=b1000000-0000-0000-0000-000000000001` => `200`
+5. Scheduler runtime evidence:
+   - Webhook worker log event observed:
+     - `queue.worker.recovery_sweep ... board_count=1 incident_count=3 ...`
+   - Confirms periodic scheduler path executed live.
+
+Startup note:
+- During first seconds of rollout, webhook worker emitted transient `UndefinedColumn` errors before backend startup migration completed.
+- The loop recovered automatically after migration and proceeded with successful sweep execution.
