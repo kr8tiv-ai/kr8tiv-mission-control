@@ -104,6 +104,31 @@ Use it after any restart, image update, config change, or credential rotation.
 - Recent logs show no critical routing/auth/delivery failures:
   Check last 15-20 minutes of all OpenClaw bot logs for recurring `chat not found`, `token missing`, `No available auth profile`, or provider cooldown loops.
 
+## Phase 16 Recovery Validation Overlay
+
+Run these checks after deploying any build that includes `recovery_ops` and `recovery_engine`:
+
+1. Recovery policy endpoint works
+   - `GET /api/v1/runtime/recovery/policy`
+   - Expected: `200` with policy payload.
+2. Incident listing endpoint works
+   - `GET /api/v1/runtime/recovery/incidents?board_id=<board_id>&limit=5`
+   - Expected: `200` with incident array payload.
+3. Manual recovery run works
+   - `POST /api/v1/runtime/recovery/run?board_id=<board_id>`
+   - Expected: `200` with summary fields:
+     - `total_incidents`
+     - `recovered`
+     - `failed`
+     - `suppressed`
+4. Recovery routes are visible in OpenAPI
+   - `/api/v1/runtime/recovery/policy`
+   - `/api/v1/runtime/recovery/incidents`
+   - `/api/v1/runtime/recovery/run`
+5. Immutable image pins reflect rollout commit
+   - `backend` and `webhook-worker` share same backend SHA tag.
+   - `frontend` has matching rollout SHA tag.
+
 ## Evidence Capture Template
 
 Capture and store:
