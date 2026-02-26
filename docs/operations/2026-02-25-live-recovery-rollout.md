@@ -209,6 +209,43 @@ Verification snapshot:
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
 
+## 2026-02-26 Rollout Update (Phase 18 Migration Gate Live)
+
+Phase 18 was merged to `main` and deployed to production with immutable images from commit `b9fa9039fdbab05b5c68cc8c6902261d5552b6de`.
+
+Verification snapshot:
+1. Main image publish workflow:
+   - Workflow: `publish-mission-control-images.yml` (`push` on `main`)
+   - Run ID: `22458967039`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22458967039`
+2. VPS rollout action:
+   - Hostinger action ID: `81059870`
+   - Action: `docker_compose_up`
+   - State: `success`
+   - Completed at: `2026-02-26T20:07:24Z`
+3. Active immutable images:
+   - Backend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:b9fa903`
+   - Webhook worker: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:b9fa903`
+   - Frontend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:b9fa903`
+4. Live endpoint checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+   - `http://76.13.106.100:48650/health` => `200`
+   - `http://76.13.106.100:48651/health` => `200`
+   - `http://76.13.106.100:48652/health` => `200`
+   - `http://76.13.106.100:48653/health` => `200`
+   - `GET /api/v1/runtime/recovery/policy` => `200`
+   - `GET /api/v1/runtime/recovery/incidents?board_id=b1000000-0000-0000-0000-000000000001&limit=5` => `200`
+   - `POST /api/v1/runtime/recovery/run?board_id=b1000000-0000-0000-0000-000000000001` => `200`
+5. Scheduler startup gate evidence:
+   - Worker log confirms migration gate readiness event:
+     - `queue.worker.recovery_gate.ready ... head_revision=a8c1d2e3f4b5`
+   - Recovery scheduler executes after gate:
+     - `queue.worker.recovery_sweep ... board_count=1 incident_count=4 ...`
+   - No transient recovery `UndefinedColumn` startup loop observed during this rollout.
+
 ## 2026-02-26 Rollout Update (Phase 17 Scheduler + Dedupe Live)
 
 Phase 17 was merged to `main` and deployed to production with immutable images from merge commit `f8a4338f7701f61485db69e5b808a5a7f503a41f`.
