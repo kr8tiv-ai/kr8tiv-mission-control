@@ -112,3 +112,17 @@ Verification snapshot:
    - `/api/v1/boards/{board_id}/agent-continuity` present
    - `/api/v1/gsd-runs` present
    - `/api/v1/gsd-runs/{run_id}` present
+
+## 2026-02-26 Rollout Update (Task 5 Verification Closeout)
+
+Phase 15 Task 5 verification was completed end-to-end from the `main` branch.
+
+Verification snapshot:
+1. Backend full-suite checks:
+   - `UV_PROJECT_ENVIRONMENT=.venv-test uv run pytest tests -q` => `401 passed, 1 xfailed, 1 warning`
+   - `UV_PROJECT_ENVIRONMENT=.venv-test uv run alembic heads` => `8c4e2b1d9f0a (head)`
+2. Frontend full-suite checks:
+   - `npm test` => `21 passed` test files, `81 passed` tests
+   - `npm run build` => success on Next.js `16.1.6`
+3. Task 5 blocker remediation:
+   - `src/components/organisms/LocalAuthLogin.test.tsx` was aligned to current UI copy (`"Enter Mission Control"`), resolving stale selector failures.
