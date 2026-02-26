@@ -26,6 +26,7 @@ class RecoveryPolicy(QueryModel, table=True):
     stale_after_seconds: int = Field(default=900)
     max_restarts_per_hour: int = Field(default=3)
     cooldown_seconds: int = Field(default=300)
+    alert_dedupe_seconds: int = Field(default=900)
     alert_telegram: bool = Field(default=True)
     alert_whatsapp: bool = Field(default=True)
     alert_ui: bool = Field(default=True)

@@ -189,3 +189,22 @@ Verification snapshot:
    - `GET /api/v1/runtime/recovery/policy` => `200`
    - `GET /api/v1/runtime/recovery/incidents?board_id=b1000000-0000-0000-0000-000000000001&limit=5` => `200`
    - `POST /api/v1/runtime/recovery/run?board_id=b1000000-0000-0000-0000-000000000001` => `200`
+
+## 2026-02-26 Phase 17 Development Verification (Pre-Rollout)
+
+Phase 17 scheduler + dedupe changes were validated in branch worktree before production deployment.
+
+Verification snapshot:
+1. Focused recovery suite:
+   - `uv run pytest tests/test_recovery_models.py tests/test_recovery_engine.py tests/test_recovery_ops_api.py tests/test_recovery_alert_routing.py tests/test_recovery_scheduler.py tests/test_queue_worker_recovery_scheduler.py -q`
+   - Result: `16 passed`
+2. Policy/API extension validated:
+   - `alert_dedupe_seconds` now present in model defaults and policy update/read API payloads.
+3. Scheduler + dedupe service validated:
+   - periodic sweep service executes board recovery and routes alerts.
+   - duplicate incidents inside dedupe window suppress alert delivery.
+4. Worker integration validated:
+   - queue worker executes scheduler tick path when `recovery_loop_enabled=true`.
+   - no-op behavior when `recovery_loop_enabled=false`.
+
+Production rollout evidence will be appended after immutable image publish + VPS deploy.
