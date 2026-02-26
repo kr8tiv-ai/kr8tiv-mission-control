@@ -75,7 +75,7 @@ export default function NewAgentPage() {
 
   const [name, setName] = useState("");
   const [boardId, setBoardId] = useState<string>("");
-  const [heartbeatEvery, setHeartbeatEvery] = useState("10m");
+  const [heartbeatEvery, setHeartbeatEvery] = useState("15m");
   const [identityProfile, setIdentityProfile] = useState<IdentityProfile>({
     ...DEFAULT_IDENTITY_PROFILE,
   });
@@ -129,7 +129,7 @@ export default function NewAgentPage() {
         name: trimmed,
         board_id: resolvedBoardId,
         heartbeat_config: {
-          every: heartbeatEvery.trim() || "10m",
+          every: heartbeatEvery.trim() || "15m",
           target: "last",
           includeReasoning: true,
         },

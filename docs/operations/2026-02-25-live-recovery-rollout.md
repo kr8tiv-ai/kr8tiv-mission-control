@@ -209,6 +209,42 @@ Verification snapshot:
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
 
+## 2026-02-26 Incident Addendum (Telegram Heartbeat Timeout + Churn)
+
+Live diagnosis against VPS `1302498` OpenClaw project logs found a repeating failure pattern:
+1. Telegram poller conflicts:
+   - `getUpdates ... 409: Conflict: terminated by other getUpdates request`
+2. Long embedded run stalls during heartbeat cycles:
+   - `embedded run timeout ... timeoutMs=600000`
+3. Model/API saturation during heartbeat-driven runs:
+   - `API rate limit reached. Please try again later.`
+4. Repeated unused-channel health restarts:
+   - `[health-monitor] [whatsapp:default] restarting (reason: stopped)` and hourly restart-cap skips.
+
+Local hardening changes prepared for rollout:
+1. Heartbeat cadence safety:
+   - Default heartbeat changed from `10m` to `15m`.
+   - Aggressive intervals (below `15m`) are clamped to the safe default during provisioning sync.
+2. Channel policy enforcement during heartbeat sync:
+   - `channels.telegram.configWrites=false` and `channels.telegram.accounts.default.configWrites=false` enforced.
+   - `whatsapp` channel is explicitly disabled when not enabled by `enabled_ingress_channels`.
+3. HEARTBEAT template simplification:
+   - Removes per-heartbeat OpenAPI fetch requirements.
+   - Reduces pre-flight to lightweight check-in path.
+   - Allows safe idle `HEARTBEAT_OK` no-op cycles instead of forced assist chatter.
+
+Verification status:
+1. Backend focused + full suite:
+   - `424 passed, 1 xfailed`
+2. Frontend suite + build:
+   - `81 passed`
+   - `next build` success
+
+Live API mitigation attempt:
+1. Attempted immediate PATCH of board agent heartbeat configs to `20m` via `/api/v1/agents/{id}`.
+2. Response: `502 Bad Gateway` for all four board agents (provisioning path currently blocked by gateway connectivity/auth posture).
+3. Required next action: deploy this hardening build, then run gateway template sync/reprovision so channel + heartbeat policies are pushed from Mission Control.
+
 ## 2026-02-26 Rollout Update (Phase 18 Migration Gate Live)
 
 Phase 18 was merged to `main` and deployed to production with immutable images from commit `b9fa9039fdbab05b5c68cc8c6902261d5552b6de`.

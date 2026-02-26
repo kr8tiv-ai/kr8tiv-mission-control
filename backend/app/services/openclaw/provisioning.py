@@ -74,6 +74,14 @@ class ProvisionOptions:
 
 _ROLE_SOUL_MAX_CHARS = 24_000
 _ROLE_SOUL_WORD_RE = re.compile(r"[a-z0-9]+")
+_HEARTBEAT_EVERY_RE = re.compile(r"^\s*(?P<count>\d+)\s*(?P<unit>[smhd])\s*$", re.IGNORECASE)
+_HEARTBEAT_MIN_SECONDS = 15 * 60
+_HEARTBEAT_UNIT_SECONDS = {
+    "s": 1,
+    "m": 60,
+    "h": 60 * 60,
+    "d": 60 * 60 * 24,
+}
 _REASONING_CAPABILITY_KEYS = (
     "thinkingModes",
     "thinking_modes",
@@ -121,28 +129,79 @@ def _heartbeat_config(agent: Agent) -> dict[str, Any]:
     merged = DEFAULT_HEARTBEAT_CONFIG.copy()
     if isinstance(agent.heartbeat_config, dict):
         merged.update(agent.heartbeat_config)
+    merged["every"] = _normalize_heartbeat_every(merged.get("every"))
+    if not isinstance(merged.get("target"), str) or not str(merged.get("target")).strip():
+        merged["target"] = DEFAULT_HEARTBEAT_CONFIG.get("target", "last")
+    if not isinstance(merged.get("includeReasoning"), bool):
+        merged["includeReasoning"] = bool(DEFAULT_HEARTBEAT_CONFIG.get("includeReasoning", True))
     return merged
+
+
+def _normalize_heartbeat_every(raw_every: object) -> str:
+    fallback = str(DEFAULT_HEARTBEAT_CONFIG.get("every", "15m"))
+    if not isinstance(raw_every, str):
+        return fallback
+    match = _HEARTBEAT_EVERY_RE.match(raw_every)
+    if match is None:
+        return fallback
+    count = int(match.group("count"))
+    unit = match.group("unit").lower()
+    if count <= 0:
+        return fallback
+    seconds = count * _HEARTBEAT_UNIT_SECONDS[unit]
+    if seconds < _HEARTBEAT_MIN_SECONDS:
+        return fallback
+    return f"{count}{unit}"
 
 
 def _channel_heartbeat_visibility_patch(config_data: dict[str, Any]) -> dict[str, Any] | None:
     channels = config_data.get("channels")
-    if not isinstance(channels, dict):
-        return {"defaults": {"heartbeat": DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY.copy()}}
-    defaults = channels.get("defaults")
-    if not isinstance(defaults, dict):
-        return {"defaults": {"heartbeat": DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY.copy()}}
-    heartbeat = defaults.get("heartbeat")
-    if not isinstance(heartbeat, dict):
-        return {"defaults": {"heartbeat": DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY.copy()}}
-    merged = dict(heartbeat)
+    channels_map = channels if isinstance(channels, dict) else {}
+    defaults = channels_map.get("defaults")
+    defaults_map = defaults if isinstance(defaults, dict) else {}
+    heartbeat = defaults_map.get("heartbeat")
+    merged = dict(heartbeat) if isinstance(heartbeat, dict) else {}
     changed = False
     for key, value in DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY.items():
-        if key not in merged:
+        if merged.get(key) != value:
             merged[key] = value
             changed = True
-    if not changed:
+    patch: dict[str, Any] = {}
+    if changed:
+        patch["defaults"] = {"heartbeat": merged}
+
+    telegram = channels_map.get("telegram")
+    telegram_map = telegram if isinstance(telegram, dict) else {}
+    telegram_patch: dict[str, Any] = {}
+    if telegram_map.get("configWrites") is not False:
+        telegram_patch["configWrites"] = False
+    telegram_accounts = telegram_map.get("accounts")
+    telegram_accounts_map = telegram_accounts if isinstance(telegram_accounts, dict) else {}
+    telegram_default = telegram_accounts_map.get("default")
+    telegram_default_map = telegram_default if isinstance(telegram_default, dict) else {}
+    if telegram_default_map.get("configWrites") is not False:
+        telegram_patch.setdefault("accounts", {}).setdefault("default", {})["configWrites"] = False
+    if telegram_patch:
+        patch["telegram"] = telegram_patch
+
+    if "whatsapp" not in set(settings.ingress_channels()):
+        whatsapp = channels_map.get("whatsapp")
+        whatsapp_map = whatsapp if isinstance(whatsapp, dict) else {}
+        whatsapp_patch: dict[str, Any] = {}
+        if whatsapp_map.get("enabled") is not False:
+            whatsapp_patch["enabled"] = False
+        whatsapp_accounts = whatsapp_map.get("accounts")
+        whatsapp_accounts_map = whatsapp_accounts if isinstance(whatsapp_accounts, dict) else {}
+        whatsapp_default = whatsapp_accounts_map.get("default")
+        whatsapp_default_map = whatsapp_default if isinstance(whatsapp_default, dict) else {}
+        if whatsapp_default_map.get("enabled") is not False:
+            whatsapp_patch.setdefault("accounts", {}).setdefault("default", {})["enabled"] = False
+        if whatsapp_patch:
+            patch["whatsapp"] = whatsapp_patch
+
+    if not patch:
         return None
-    return {"defaults": {"heartbeat": merged}}
+    return patch
 
 
 def _extract_model_reasoning_modes(config_data: dict[str, Any], model_id: str | None) -> list[str]:

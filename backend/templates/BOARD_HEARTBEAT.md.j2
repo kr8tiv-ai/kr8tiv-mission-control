@@ -82,40 +82,12 @@ Do real work with low noise while sharing useful knowledge across the board.
 If any required input is missing, stop and request a provisioning update.
 
 ## API Source of Truth
-Use OpenAPI for endpoint/payload details instead of static endpoint assumptions.
+Use OpenAPI only when needed:
+- first run after startup/restart
+- endpoint mismatch/404/validation error
+- workflow handoff where endpoint assumptions changed
 
-```bash
-curl -fsS "{{ base_url }}/openapi.json" -o /tmp/openapi.json
-```
-
-When selecting endpoints, prioritize `x-llm-intent`, `x-when-to-use`, and `x-routing-policy`
-against the current task objective before choosing a path/method.
-
-{% if is_lead %}
-Lead-focused operation filter:
-
-```bash
-jq -r '
-  .paths | to_entries[] | .key as $path
-  | .value | to_entries[]
-  | select((.value.tags // []) | index("agent-lead"))
-  | ((.value.summary // "") | gsub("\\s+"; " ")) as $summary
-  | "\(.key|ascii_upcase)\t\($path)\t\(.value.operationId // "-")\t\(.value[\"x-llm-intent\"] // "-")\t\(.value[\"x-when-to-use\"] // [] | join(\" | \"))\t\(.value[\"x-routing-policy\"] // [] | join(\" | \"))\t\($summary)"
-' /tmp/openapi.json | sort
-```
-{% else %}
-Worker-focused operation filter:
-
-```bash
-jq -r '
-  .paths | to_entries[] | .key as $path
-  | .value | to_entries[]
-  | select((.value.tags // []) | index("agent-worker"))
-  | ((.value.summary // "") | gsub("\\s+"; " ")) as $summary
-  | "\(.key|ascii_upcase)\t\($path)\t\(.value.operationId // "-")\t\(.value[\"x-llm-intent\"] // "-")\t\(.value[\"x-when-to-use\"] // [] | join(\" | \"))\t\(.value[\"x-routing-policy\"] // [] | join(\" | \"))\t\($summary)"
-' /tmp/openapi.json | sort
-```
-{% endif %}
+Do not fetch OpenAPI on every heartbeat.
 
 ## Schedule
 - Heartbeat cadence is controlled by gateway heartbeat config.
@@ -129,6 +101,7 @@ jq -r '
 - If pre-flight fails due to 5xx/network, do not write memory or task updates.
 - Do not self-edit model routes or provider auth in heartbeat loops.
 - Use approved fallback model policy only.
+- Idle heartbeats are valid: if no active work changed, return `HEARTBEAT_OK` with no extra chatter.
 
 ## Operator Doctrine
 - "I can't" is not acceptable during execution.
@@ -139,11 +112,15 @@ jq -r '
 
 ## Pre-Flight Checks (Every Heartbeat)
 1) Confirm `BASE_URL`, `AUTH_TOKEN`, and `BOARD_ID` from `TOOLS.md` match this workspace.
-2) Verify API access:
-- `GET {{ base_url }}/healthz`
-- `GET {{ base_url }}/api/v1/agent/boards`
-- `GET {{ base_url }}/api/v1/agent/boards/{{ board_id }}/tasks`
-3) If any check fails, stop and retry next heartbeat.
+2) Verify lightweight API access:
+- `POST {{ base_url }}/api/v1/agent/heartbeat`
+3) If check-in fails due to 5xx/network, stop and retry next heartbeat.
+
+## Deep Checks (Not Every Heartbeat)
+- Run broader checks (`/healthz`, board/tasks pull, OpenAPI scan) only when:
+  - starting new work
+  - recovering from failure
+  - stale local context is detected
 
 ## Shared Context Pull
 Before execution:
@@ -170,10 +147,12 @@ Before execution:
 {% else %}
 ### Board Worker Loop
 1) Check in via heartbeat endpoint.
-2) Continue one `in_progress` task; else pick one assigned `inbox` task; else run assist mode.
-3) Refresh task context and plan for the active task.
-4) Execute and post only high-signal task comment updates.
-5) Move to `review` when deliverable and evidence are ready.
+2) Continue one `in_progress` task.
+3) If no `in_progress` task exists, pick one assigned `inbox` task.
+4) If no assigned work exists, stay idle and return `HEARTBEAT_OK`.
+5) Refresh task context and plan only for the active task.
+6) Execute and post only high-signal task comment updates.
+7) Move to `review` when deliverable and evidence are ready.
 
 ### Offline Peer Recovery (Worker)
 1) If you detect a down peer, elect one recovery owner using this order: `FRIDAY -> ARSENAL -> JOCASTA -> EDITH`.
@@ -183,8 +162,9 @@ Before execution:
 
 ### Assist Mode
 If no active/assigned task:
-1) Add one concrete assist comment to an `in_progress` or `review` task.
-2) If no meaningful assist exists, ask `@lead` for work and suggest 1-3 next tasks.
+1) Prefer silence (`HEARTBEAT_OK`) over low-signal comments.
+2) If there is clear, high-value help, add one concrete assist comment.
+3) If no meaningful assist exists, ask `@lead` for work at low frequency (not every heartbeat).
 {% endif %}
 
 ## Task Comment Format
@@ -216,7 +196,7 @@ If blocked:
 ## When to Return `HEARTBEAT_OK`
 Return `HEARTBEAT_OK` only when:
 1) Pre-flight checks succeeded.
-2) This heartbeat produced a concrete outcome (task update, assist outcome, or clear lead request when idle).
+2) This heartbeat either produced a concrete outcome OR confirmed a safe idle no-op.
 3) No outage rule was violated.
 
 Otherwise, do not return `HEARTBEAT_OK`.

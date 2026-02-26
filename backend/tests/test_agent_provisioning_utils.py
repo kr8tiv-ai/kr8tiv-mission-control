@@ -717,6 +717,13 @@ def test_heartbeat_config_defaults_include_reasoning() -> None:
     agent = _AgentStub(name="Alice", heartbeat_config=None)
     heartbeat = agent_provisioning._heartbeat_config(agent)
     assert heartbeat["includeReasoning"] is True
+    assert heartbeat["every"] == "15m"
+
+
+def test_heartbeat_config_clamps_aggressive_interval() -> None:
+    agent = _AgentStub(name="Alice", heartbeat_config={"every": "5m"})
+    heartbeat = agent_provisioning._heartbeat_config(agent)
+    assert heartbeat["every"] == "15m"
 
 
 @pytest.mark.asyncio
@@ -817,6 +824,115 @@ async def test_patch_agent_heartbeats_preserves_existing_thinking_default(
     assert isinstance(raw_payload, str)
     payload = json.loads(raw_payload)
     assert payload["agents"]["defaults"]["thinkingDefault"] == "medium"
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_disables_whatsapp_when_not_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": [], "defaults": {}},
+                    "channels": {
+                        "telegram": {
+                            "configWrites": True,
+                            "accounts": {"default": {"configWrites": True}},
+                        },
+                        "whatsapp": {
+                            "enabled": True,
+                            "accounts": {"default": {"enabled": True}},
+                        },
+                    },
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    monkeypatch.setattr(agent_provisioning.settings, "enabled_ingress_channels", "telegram")
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "10m", "target": "last", "includeReasoning": True},
+                None,
+            )
+        ],
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert payload["channels"]["whatsapp"]["enabled"] is False
+    assert payload["channels"]["whatsapp"]["accounts"]["default"]["enabled"] is False
+    assert payload["channels"]["telegram"]["configWrites"] is False
+    assert payload["channels"]["telegram"]["accounts"]["default"]["configWrites"] is False
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_keeps_whatsapp_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": [], "defaults": {}},
+                    "channels": {
+                        "whatsapp": {
+                            "enabled": True,
+                            "accounts": {"default": {"enabled": True}},
+                        },
+                    },
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    monkeypatch.setattr(agent_provisioning.settings, "enabled_ingress_channels", "telegram,whatsapp")
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "10m", "target": "last", "includeReasoning": True},
+                None,
+            )
+        ],
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert payload["channels"].get("whatsapp") is None
 
 
 def test_agents_template_declares_persona_precedence() -> None:
