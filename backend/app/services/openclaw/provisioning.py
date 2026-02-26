@@ -117,6 +117,13 @@ def _is_missing_agent_error(exc: OpenClawGatewayError) -> bool:
     return "agent" in message and "not found" in message
 
 
+def _is_invalid_config_error(exc: OpenClawGatewayError) -> bool:
+    message = str(exc).lower()
+    if not message:
+        return False
+    return "invalid config" in message
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -781,10 +788,30 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         channels_patch = _channel_heartbeat_visibility_patch(config_data)
         if channels_patch is not None:
             patch["channels"] = channels_patch
-        params = {"raw": json.dumps(patch)}
-        if base_hash:
-            params["baseHash"] = base_hash
-        await openclaw_call("config.patch", params, config=self._config)
+
+        # OpenClaw runtimes differ in accepted `channels` shape. Try the full patch first,
+        # then degrade to slimmer, backward-compatible payloads if needed.
+        candidates: list[dict[str, Any]] = [patch]
+        if channels_patch is not None:
+            candidates.append({"agents": dict(patch["agents"])})
+            candidates.append({"agents": {"list": new_list}})
+
+        last_invalid_config: OpenClawGatewayError | None = None
+        for candidate in candidates:
+            params = {"raw": json.dumps(candidate)}
+            if base_hash:
+                params["baseHash"] = base_hash
+            try:
+                await openclaw_call("config.patch", params, config=self._config)
+                return
+            except OpenClawGatewayError as exc:
+                if not _is_invalid_config_error(exc):
+                    raise
+                last_invalid_config = exc
+                continue
+
+        if last_invalid_config is not None:
+            raise last_invalid_config
 
 
 async def _gateway_config_agent_list(
