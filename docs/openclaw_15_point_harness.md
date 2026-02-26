@@ -148,6 +148,21 @@ Run these checks after deploying a build that includes periodic scheduler ticks:
 5. Incident persistence remains complete
    - Expected: incidents are still persisted even when alert is deduped.
 
+## Phase 18 Migration Gate Validation Overlay
+
+Run these checks after deploying a build that includes scheduler migration readiness gating:
+
+1. Scheduler defers while migrations are pending
+   - Start worker before backend reaches Alembic head.
+   - Expected: log event `queue.worker.recovery_sweep_deferred_migrations_pending`.
+   - Expected: no scheduler query execution during pending migration window.
+2. Scheduler executes after migration head is reached
+   - Once DB revision equals Alembic head, next scheduler tick runs normally.
+   - Expected: log event `queue.worker.recovery_sweep` with board/incident metrics.
+3. Startup race noise is eliminated
+   - During rollout startup window, webhook worker should not emit repeated recovery-query schema errors.
+   - Expected: no transient `UndefinedColumn` loop noise tied to recovery scheduler startup.
+
 ## Evidence Capture Template
 
 Capture and store:

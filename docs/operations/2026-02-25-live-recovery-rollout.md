@@ -243,3 +243,24 @@ Verification snapshot:
 Startup note:
 - During first seconds of rollout, webhook worker emitted transient `UndefinedColumn` errors before backend startup migration completed.
 - The loop recovered automatically after migration and proceeded with successful sweep execution.
+
+## 2026-02-26 Phase 18 Development Verification (Pre-Rollout)
+
+Phase 18 migration-gate changes were validated in branch worktree before production deployment.
+
+Verification snapshot:
+1. Migration gate unit suite:
+   - `uv run pytest tests/test_recovery_migration_gate.py -q`
+   - Result: `3 passed`
+2. Queue worker scheduler gate integration:
+   - `uv run pytest tests/test_queue_worker_recovery_scheduler.py -q`
+   - Result: `3 passed`
+   - Confirms scheduler no-ops when migrations are pending.
+3. Focused recovery regression suite:
+   - `uv run pytest tests/test_recovery_migration_gate.py tests/test_queue_worker_recovery_scheduler.py tests/test_recovery_scheduler.py tests/test_recovery_engine.py tests/test_recovery_ops_api.py -q`
+   - Result: `15 passed`
+4. Runtime behavior change:
+   - `run_recovery_scheduler_once()` now gates scheduler execution on `is_scheduler_migration_ready()`.
+   - Worker emits `queue.worker.recovery_sweep_deferred_migrations_pending` until DB revision reaches Alembic head.
+
+Production rollout evidence will be appended after immutable image publish + VPS deploy.
