@@ -29,6 +29,8 @@ from app.models.organizations import Organization
 from app.models.onboarding_recommendations import OnboardingRecommendation
 from app.models.promotion_events import PromotionEvent
 from app.models.prompt_packs import PromptPack
+from app.models.recovery_incidents import RecoveryIncident
+from app.models.recovery_policies import RecoveryPolicy
 from app.models.run_telemetry import RunTelemetry
 from app.models.override_sessions import OverrideSession
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
@@ -69,6 +71,8 @@ __all__ = [
     "PackBinding",
     "PersonaPreset",
     "PromptPack",
+    "RecoveryIncident",
+    "RecoveryPolicy",
     "RunTelemetry",
     "OverrideSession",
     "PromotionEvent",
