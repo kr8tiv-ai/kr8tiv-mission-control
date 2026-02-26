@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
@@ -50,6 +51,16 @@ def _alembic_config() -> Config:
     alembic_cfg = Config(str(alembic_ini))
     alembic_cfg.attributes["configure_logger"] = False
     return alembic_cfg
+
+
+def get_alembic_head_revision() -> str | None:
+    """Return current repo Alembic head revision, if deterministically resolvable."""
+    script = ScriptDirectory.from_config(_alembic_config())
+    heads = sorted(script.get_heads())
+    if len(heads) != 1:
+        logger.warning("alembic.multiple_or_missing_heads", extra={"heads": heads})
+        return None
+    return heads[0]
 
 
 def run_migrations() -> None:
