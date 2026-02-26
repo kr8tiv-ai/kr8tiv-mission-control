@@ -129,6 +129,25 @@ Run these checks after deploying any build that includes `recovery_ops` and `rec
    - `backend` and `webhook-worker` share same backend SHA tag.
    - `frontend` has matching rollout SHA tag.
 
+## Phase 17 Scheduler + Dedupe Validation Overlay
+
+Run these checks after deploying a build that includes periodic scheduler ticks:
+
+1. Recovery policy includes dedupe control
+   - `GET /api/v1/runtime/recovery/policy`
+   - Expected field: `alert_dedupe_seconds` (integer).
+2. Worker scheduler loop is enabled
+   - Verify runtime config resolves:
+     - `recovery_loop_enabled=true`
+     - `recovery_loop_interval_seconds` is a positive integer.
+3. Scheduler sweep logs appear periodically
+   - Expected structured log event: `queue.worker.recovery_sweep`.
+4. Duplicate alerts are suppressed
+   - Trigger same board/agent/status/reason incident twice inside dedupe window.
+   - Expected: second event increments dedupe suppression and does not send owner alert.
+5. Incident persistence remains complete
+   - Expected: incidents are still persisted even when alert is deduped.
+
 ## Evidence Capture Template
 
 Capture and store:
