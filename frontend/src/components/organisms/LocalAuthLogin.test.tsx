@@ -36,7 +36,7 @@ describe("LocalAuthLogin", () => {
     const user = userEvent.setup();
     render(<LocalAuthLogin />);
 
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Enter Mission Control" }));
 
     expect(screen.getByText("Bearer token is required.")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe("LocalAuthLogin", () => {
     render(<LocalAuthLogin />);
 
     await user.type(screen.getByPlaceholderText("Paste token"), "x".repeat(49));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Enter Mission Control" }));
 
     expect(
       screen.getByText("Bearer token must be at least 50 characters."),
@@ -64,7 +64,7 @@ describe("LocalAuthLogin", () => {
     render(<LocalAuthLogin onAuthenticated={onAuthenticatedMock} />);
 
     await user.type(screen.getByPlaceholderText("Paste token"), "x".repeat(50));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Enter Mission Control" }));
 
     await waitFor(() =>
       expect(screen.getByText("Token is invalid.")).toBeInTheDocument(),
@@ -88,7 +88,7 @@ describe("LocalAuthLogin", () => {
 
     const token = `  ${"g".repeat(50)} `;
     await user.type(screen.getByPlaceholderText("Paste token"), token);
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Enter Mission Control" }));
 
     await waitFor(() =>
       expect(setLocalAuthTokenMock).toHaveBeenCalledWith("g".repeat(50)),
@@ -103,7 +103,7 @@ describe("LocalAuthLogin", () => {
     render(<LocalAuthLogin onAuthenticated={onAuthenticatedMock} />);
 
     await user.type(screen.getByPlaceholderText("Paste token"), "t".repeat(50));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Enter Mission Control" }));
 
     await waitFor(() =>
       expect(
