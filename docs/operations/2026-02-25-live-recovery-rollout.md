@@ -209,6 +209,26 @@ Verification snapshot:
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
 
+## 2026-02-26 Heartbeat Timeout Mitigation Update
+
+Root-cause findings from live logs:
+1. EDITH lane was still being patched with legacy locked model ID `google-gemini-cli/gemini-3.1`, which current runtime rejected (`FailoverError: Unknown model`).
+2. This surfaced as repeated embedded-run failures during heartbeat cycles and looked like heartbeat instability.
+
+Remediation implemented in backend:
+1. Locked model policy canonical IDs updated:
+   - EDITH -> `google-gemini-cli/gemini-3-pro-preview`
+   - JOCASTA -> `nvidia/moonshotai/kimi-k2.5`
+2. Legacy model aliases are now normalized automatically in model-policy parsing:
+   - `google-gemini-cli/gemini-3.1` -> `google-gemini-cli/gemini-3-pro-preview`
+   - `nvidia/moonshotai/kimi-k2-5` -> `nvidia/moonshotai/kimi-k2.5`
+3. Locked-policy reconciliation now runs during heartbeat check-ins so stale DB rows self-correct over time without manual migration.
+
+Verification:
+1. `uv run pytest backend/tests/test_agent_model_policy.py -q` -> `5 passed`
+2. `uv run pytest backend/tests/test_agent_provisioning_utils.py -q` -> `32 passed`
+3. `uv run pytest backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_arena_config.py backend/tests/test_task_mode_schema.py -q` -> `9 passed`
+
 ## 2026-02-26 Incident Addendum (Telegram Heartbeat Timeout + Churn)
 
 Live diagnosis against VPS `1302498` OpenClaw project logs found a repeating failure pattern:

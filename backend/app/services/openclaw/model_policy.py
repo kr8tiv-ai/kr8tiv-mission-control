@@ -8,6 +8,12 @@ from typing import Any
 
 _CLI_PROVIDERS = frozenset({"openai-codex", "google-gemini-cli"})
 _API_PROVIDERS = frozenset({"nvidia"})
+_MODEL_ALIASES: dict[str, str] = {
+    # Legacy id used in earlier runs; current OpenClaw runtime exposes this as pro-preview.
+    "google-gemini-cli/gemini-3.1": "google-gemini-cli/gemini-3-pro-preview",
+    # Normalize historical punctuation variant.
+    "nvidia/moonshotai/kimi-k2-5": "nvidia/moonshotai/kimi-k2.5",
+}
 
 _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "friday": {
@@ -28,15 +34,15 @@ _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     },
     "edith": {
         "provider": "google-gemini-cli",
-        "model": "google-gemini-cli/gemini-3.1",
+        "model": "google-gemini-cli/gemini-3-pro-preview",
         "transport": "cli",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to Gemini 3.1 CLI runtime.",
+        "notes": "Pinned to Gemini 3 Pro Preview CLI runtime.",
     },
     "jocasta": {
         "provider": "nvidia",
-        "model": "nvidia/moonshotai/kimi-k2-5",
+        "model": "nvidia/moonshotai/kimi-k2.5",
         "transport": "api",
         "locked": True,
         "allow_self_change": False,
@@ -83,6 +89,8 @@ def normalize_model_policy(policy: object) -> dict[str, Any] | None:
         return None
 
     model = _as_nonempty_str(policy.get("model"))
+    if model is not None:
+        model = _MODEL_ALIASES.get(model, model)
     provider = _as_nonempty_str(policy.get("provider")) or _infer_provider_from_model(model)
     if model is None:
         return None

@@ -1458,6 +1458,10 @@ class AgentLifecycleService(OpenClawDBService):
     async def sync_locked_agent_runtime_policy(self, *, agent: Agent) -> None:
         if not is_model_policy_locked(getattr(agent, "model_policy", None)):
             return
+        # Keep persisted locked policies in sync with canonical mapping so stale
+        # legacy model ids are corrected automatically during heartbeat check-ins.
+        if enforce_agent_model_policy(agent):
+            self.session.add(agent)
         gateway = await Gateway.objects.by_id(agent.gateway_id).first(self.session)
         if gateway is None or not gateway.url or not gateway.workspace_root:
             return

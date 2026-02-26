@@ -215,7 +215,7 @@ class AgentUpdate(SQLModel):
         examples=[
             {
                 "provider": "google-gemini-cli",
-                "model": "google-gemini-cli/gemini-3.1",
+                "model": "google-gemini-cli/gemini-3-pro-preview",
                 "transport": "cli",
                 "locked": True,
             },

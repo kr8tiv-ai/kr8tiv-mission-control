@@ -11,7 +11,9 @@ from fastapi import HTTPException, status
 
 from app.models.agents import Agent
 from app.services.openclaw.model_policy import (
+    enforce_agent_model_policy,
     locked_model_policy_for_name,
+    model_id_for_policy,
     normalize_model_policy,
 )
 from app.services.openclaw.provisioning_db import AgentLifecycleService
@@ -42,7 +44,56 @@ def test_locked_model_policy_lookup_for_named_agents() -> None:
     assert friday["model"] == "openai-codex/gpt-5.3-codex"
     assert arsenal["transport"] == "cli"
     assert edith["provider"] == "google-gemini-cli"
-    assert jocasta["model"] == "nvidia/moonshotai/kimi-k2-5"
+    assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert jocasta["model"] == "nvidia/moonshotai/kimi-k2.5"
+
+
+def test_normalize_model_policy_maps_legacy_aliases() -> None:
+    normalized = normalize_model_policy(
+        {
+            "provider": "google-gemini-cli",
+            "model": "google-gemini-cli/gemini-3.1",
+            "transport": "cli",
+            "locked": True,
+        },
+    )
+
+    assert normalized is not None
+    assert normalized["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert (
+        model_id_for_policy(
+            {
+                "provider": "google-gemini-cli",
+                "model": "google-gemini-cli/gemini-3.1",
+                "transport": "cli",
+            },
+        )
+        == "google-gemini-cli/gemini-3-pro-preview"
+    )
+
+
+def test_enforce_agent_model_policy_rewrites_legacy_locked_model() -> None:
+    agent = Agent(
+        id=uuid4(),
+        name="EDITH",
+        board_id=uuid4(),
+        gateway_id=uuid4(),
+        status="online",
+        model_policy={
+            "provider": "google-gemini-cli",
+            "model": "google-gemini-cli/gemini-3.1",
+            "transport": "cli",
+            "locked": True,
+            "allow_self_change": False,
+        },
+    )
+
+    changed = enforce_agent_model_policy(agent)
+
+    assert changed is True
+    normalized = normalize_model_policy(agent.model_policy)
+    assert normalized is not None
+    assert normalized["model"] == "google-gemini-cli/gemini-3-pro-preview"
 
 
 @pytest.mark.asyncio
