@@ -473,7 +473,14 @@ async def _execute_arena_mode(
         total_chars = sum(len(line) for line in summary_lines)
         if total_chars > 8000:
             # Keep header (task/description) and last 2 rounds only
-            header_lines = [line for line in summary_lines if line.startswith("Task:") or line.startswith("Description:") or line.startswith("[Supermemory")]
+            header_lines = [
+                line
+                for line in summary_lines
+                if line.startswith("Task:")
+                or line.startswith("Description:")
+                or line.startswith("Supermemory context:")
+                or line.startswith("- ")
+            ]
             recent_rounds = [line for line in summary_lines if f"[Round {round_number}]" in line or f"[Round {round_number - 1}]" in line]
             summary_lines = header_lines + ["... (earlier rounds truncated) ..."] + recent_rounds
 

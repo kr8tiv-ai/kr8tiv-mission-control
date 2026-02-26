@@ -17,6 +17,9 @@ async def test_retrieve_context_lines_uses_hybrid_search_and_dedupes() -> None:
         assert request.url.path == "/v4/search"
         payload = request.read().decode("utf-8")
         assert '"mode":"hybrid"' in payload
+        assert '"strategy":"hybrid"' in payload
+        assert '"q":"test query"' in payload
+        assert '"query":"test query"' in payload
         return httpx.Response(
             200,
             json={
@@ -88,6 +91,35 @@ async def test_retrieve_context_lines_returns_empty_without_api_key() -> None:
 
     assert lines == []
     assert called is False
+
+
+@pytest.mark.asyncio
+async def test_retrieve_context_lines_supports_hits_field_shape() -> None:
+    def _handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "hits": [
+                    {"content": "alpha"},
+                    {"content": "alpha"},
+                    {"snippet": "beta"},
+                ]
+            },
+        )
+
+    adapter = SupermemoryAdapter(
+        base_url="https://api.supermemory.ai",
+        api_key="test-key",
+        top_k=3,
+        transport=httpx.MockTransport(_handler),
+    )
+
+    lines = await adapter.retrieve_context_lines(
+        query="test query",
+        container_tag="tenant:abc",
+    )
+
+    assert lines == ["alpha", "beta"]
 
 
 def test_build_container_tag_uses_prefix_and_board_scope() -> None:

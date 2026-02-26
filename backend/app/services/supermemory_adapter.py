@@ -19,8 +19,14 @@ def build_container_tag(*, prefix: str, scope: str) -> str:
 
 
 def _extract_text_candidates(payload: dict[str, object]) -> list[str]:
-    source = payload.get("results") or payload.get("items") or payload.get("data") or []
-    if not isinstance(source, Sequence):
+    source = (
+        payload.get("results")
+        or payload.get("hits")
+        or payload.get("items")
+        or payload.get("data")
+        or []
+    )
+    if not isinstance(source, Sequence) or isinstance(source, (str, bytes, bytearray)):
         return []
     lines: list[str] = []
     for item in source:
@@ -74,8 +80,10 @@ class SupermemoryAdapter:
         score_threshold = float(threshold if threshold is not None else self.threshold)
         request_payload: dict[str, object] = {
             "query": query,
+            "q": query,
             "containerTag": container_tag,
             "mode": "hybrid",
+            "strategy": "hybrid",
             "threshold": score_threshold,
             "limit": limit,
         }
