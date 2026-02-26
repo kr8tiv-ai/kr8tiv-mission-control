@@ -162,3 +162,30 @@ Verification snapshot:
    - `/api/v1/runtime/recovery/incidents`
    - `/api/v1/runtime/recovery/run`
    - `/api/v1/boards/{board_id}/agent-continuity`
+
+## 2026-02-26 Rollout Update (Post-Merge Main Re-Pin)
+
+After PR `#3` merged to `main` at `8264dd1cef1a8edeb82c7401c5e174ffb195f66d`, runtime was re-pinned from branch tag `c4889c7` to main SHA tag `8264dd1` for GitHub/deploy parity.
+
+Verification snapshot:
+1. Main image publish workflow:
+   - Workflow: `publish-mission-control-images.yml` (`push` on `main`)
+   - Run ID: `22452397604`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22452397604`
+2. VPS rollout action:
+   - Hostinger action ID: `81039640`
+   - Action: `docker_compose_up`
+   - State: `success`
+   - Completed at: `2026-02-26T17:03:51Z`
+3. Active immutable images:
+   - Backend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:8264dd1`
+   - Webhook worker: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:8264dd1`
+   - Frontend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:8264dd1`
+4. Live endpoint checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+   - `GET /api/v1/runtime/recovery/policy` => `200`
+   - `GET /api/v1/runtime/recovery/incidents?board_id=b1000000-0000-0000-0000-000000000001&limit=5` => `200`
+   - `POST /api/v1/runtime/recovery/run?board_id=b1000000-0000-0000-0000-000000000001` => `200`
