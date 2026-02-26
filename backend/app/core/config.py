@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     rq_dispatch_max_retries: int = 3
     rq_dispatch_retry_base_seconds: float = 10.0
     rq_dispatch_retry_max_seconds: float = 120.0
+    recovery_loop_enabled: bool = True
+    recovery_loop_interval_seconds: int = 180
 
     # Task mode orchestration
     arena_allowed_agents: str = "friday,arsenal,edith,jocasta"

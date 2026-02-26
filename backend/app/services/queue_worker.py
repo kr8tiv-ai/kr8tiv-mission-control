@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import random
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.core.config import settings
+from app.db.session import async_session_maker
 from app.core.logging import get_logger
 from app.services.deterministic_eval_execution import execute_deterministic_eval
 from app.services.deterministic_eval_queue import TASK_TYPE as DETERMINISTIC_EVAL_TASK_TYPE
 from app.services.deterministic_eval_queue import requeue_deterministic_eval
 from app.services.queue import QueuedTask, dequeue_task
+from app.services.runtime.recovery_scheduler import RecoveryScheduler
 from app.services.task_mode_execution import execute_task_mode
 from app.services.task_mode_queue import (
     TASK_TYPE as TASK_MODE_TASK_TYPE,
@@ -137,12 +140,40 @@ async def flush_queue(*, block: bool = False, block_timeout: float = 0) -> int:
     return processed
 
 
+async def run_recovery_scheduler_once() -> bool:
+    """Run one periodic recovery sweep when runtime setting enables it."""
+    if not settings.recovery_loop_enabled:
+        return False
+
+    async with async_session_maker() as session:
+        result = await RecoveryScheduler(session=session).run_once()
+    logger.info(
+        "queue.worker.recovery_sweep",
+        extra={
+            "board_count": result.board_count,
+            "incident_count": result.incident_count,
+            "alerts_sent": result.alerts_sent,
+            "alerts_suppressed_dedupe": result.alerts_suppressed_dedupe,
+            "alerts_skipped_status": result.alerts_skipped_status,
+        },
+    )
+    return True
+
+
 async def _run_worker_loop() -> None:
+    next_recovery_due_at = time.monotonic()
     while True:
         try:
+            now = time.monotonic()
+            if settings.recovery_loop_enabled and now >= next_recovery_due_at:
+                await run_recovery_scheduler_once()
+                next_recovery_due_at = time.monotonic() + max(
+                    int(settings.recovery_loop_interval_seconds),
+                    1,
+                )
             await flush_queue(
                 block=True,
-                block_timeout=0,
+                block_timeout=1,
             )
         except Exception:
             logger.exception(
