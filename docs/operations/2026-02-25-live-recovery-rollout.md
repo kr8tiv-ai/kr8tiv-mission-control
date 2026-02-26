@@ -223,7 +223,8 @@ Live diagnosis against VPS `1302498` OpenClaw project logs found a repeating fai
 
 Local hardening changes prepared for rollout:
 1. Heartbeat cadence safety:
-   - Default heartbeat changed from `10m` to `15m`.
+   - Default heartbeat changed from `15m` to `20m`.
+   - `includeReasoning` default changed to `false` for lightweight liveness checks.
    - Aggressive intervals (below `15m`) are clamped to the safe default during provisioning sync.
 2. Channel policy enforcement during heartbeat sync:
    - `channels.telegram.configWrites=false` and `channels.telegram.accounts.default.configWrites=false` enforced.

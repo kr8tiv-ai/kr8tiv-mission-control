@@ -12,9 +12,9 @@ _GATEWAY_AGENT_PREFIX = f"agent:{_GATEWAY_OPENCLAW_AGENT_PREFIX}"
 _GATEWAY_AGENT_SUFFIX = ":main"
 
 DEFAULT_HEARTBEAT_CONFIG: dict[str, Any] = {
-    "every": "15m",
+    "every": "20m",
     "target": "last",
-    "includeReasoning": True,
+    "includeReasoning": False,
 }
 
 OFFLINE_AFTER = timedelta(minutes=10)

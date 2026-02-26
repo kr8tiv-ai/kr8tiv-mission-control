@@ -713,17 +713,17 @@ async def test_delete_agent_lifecycle_raises_on_non_missing_agent_error(monkeypa
         )
 
 
-def test_heartbeat_config_defaults_include_reasoning() -> None:
+def test_heartbeat_config_defaults_to_lightweight_policy() -> None:
     agent = _AgentStub(name="Alice", heartbeat_config=None)
     heartbeat = agent_provisioning._heartbeat_config(agent)
-    assert heartbeat["includeReasoning"] is True
-    assert heartbeat["every"] == "15m"
+    assert heartbeat["includeReasoning"] is False
+    assert heartbeat["every"] == "20m"
 
 
 def test_heartbeat_config_clamps_aggressive_interval() -> None:
     agent = _AgentStub(name="Alice", heartbeat_config={"every": "5m"})
     heartbeat = agent_provisioning._heartbeat_config(agent)
-    assert heartbeat["every"] == "15m"
+    assert heartbeat["every"] == "20m"
 
 
 @pytest.mark.asyncio
