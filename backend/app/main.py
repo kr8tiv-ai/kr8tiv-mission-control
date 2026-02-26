@@ -35,6 +35,7 @@ from app.api.organizations import router as organizations_router
 from app.api.packs import router as packs_router
 from app.api.persona_presets import router as persona_presets_router
 from app.api.runtime import router as runtime_router
+from app.api.recovery_ops import router as recovery_ops_router
 from app.api.runtime_ops import router as runtime_ops_router
 from app.api.skills_marketplace import router as skills_marketplace_router
 from app.api.souls_directory import router as souls_directory_router
@@ -561,6 +562,7 @@ api_v1.include_router(metrics_router)
 api_v1.include_router(organizations_router)
 api_v1.include_router(runtime_router)
 api_v1.include_router(runtime_ops_router)
+api_v1.include_router(recovery_ops_router)
 api_v1.include_router(packs_router)
 api_v1.include_router(persona_presets_router)
 api_v1.include_router(souls_directory_router)

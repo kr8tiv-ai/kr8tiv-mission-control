@@ -22,6 +22,7 @@ from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_cal
 
 ContinuityState = Literal["alive", "stale", "unreachable"]
 RuntimeSessionKeysFetcher = Callable[[Gateway], Awaitable[set[str]]]
+RECOVERY_CONTINUITIES: frozenset[ContinuityState] = frozenset({"stale", "unreachable"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +96,11 @@ def _is_stale(*, heartbeat_age_seconds: int | None) -> bool:
     if heartbeat_age_seconds is None:
         return True
     return heartbeat_age_seconds > int(OFFLINE_AFTER.total_seconds())
+
+
+def continuity_requires_recovery(continuity: ContinuityState) -> bool:
+    """Return true when continuity status should trigger automated recovery logic."""
+    return continuity in RECOVERY_CONTINUITIES
 
 
 class AgentContinuityService(OpenClawDBService):

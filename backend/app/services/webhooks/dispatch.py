@@ -16,6 +16,7 @@ from app.models.agents import Agent
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.services.channel_ingress import is_owner_alert_channel_enabled
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.queue import QueuedTask
 from app.services.webhooks.queue import (
@@ -231,6 +232,14 @@ async def flush_webhook_delivery_queue(*, block: bool = False, block_timeout: fl
                     "board_id": str(item.board_id),
                     "attempt": item.attempts,
                     "error": str(exc),
+                    "owner_alert_telegram_enabled": is_owner_alert_channel_enabled(
+                        channel="telegram",
+                        phase=settings.channel_rollout_phase,
+                    ),
+                    "owner_alert_whatsapp_enabled": is_owner_alert_channel_enabled(
+                        channel="whatsapp",
+                        phase=settings.channel_rollout_phase,
+                    ),
                 },
             )
             delay = _compute_webhook_retry_delay(item.attempts)

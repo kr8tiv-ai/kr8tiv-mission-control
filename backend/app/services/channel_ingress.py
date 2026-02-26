@@ -17,6 +17,14 @@ def is_channel_enabled(*, channel: str, phase: str) -> bool:
     return False
 
 
+def is_owner_alert_channel_enabled(*, channel: str, phase: str) -> bool:
+    """Gate owner-facing alert channels by rollout phase."""
+    normalized_channel = (channel or "").strip().lower()
+    if normalized_channel == "ui":
+        return True
+    return is_channel_enabled(channel=normalized_channel, phase=phase)
+
+
 def build_ingress_task_event(
     *,
     channel: str,

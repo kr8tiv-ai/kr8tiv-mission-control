@@ -126,3 +126,39 @@ Verification snapshot:
    - `npm run build` => success on Next.js `16.1.6`
 3. Task 5 blocker remediation:
    - `src/components/organisms/LocalAuthLogin.test.tsx` was aligned to current UI copy (`"Enter Mission Control"`), resolving stale selector failures.
+
+## 2026-02-26 Rollout Update (Phase 16 Agent Uptime Autorecovery)
+
+Phase 16 runtime was published and rolled to production with immutable SHA tags from commit `c4889c7`.
+
+Verification snapshot:
+1. Image publish workflow:
+   - Workflow: `publish-mission-control-images.yml` (`workflow_dispatch`)
+   - Run ID: `22452058574`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22452058574`
+2. VPS rollout action:
+   - Hostinger action ID: `81038315`
+   - Action: `docker_compose_up`
+   - State: `success`
+   - Completed at: `2026-02-26T16:55:03Z`
+3. Immutable runtime images now active:
+   - Backend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:c4889c7`
+   - Webhook worker: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:c4889c7`
+   - Frontend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:c4889c7`
+4. Public availability checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+5. Recovery API live checks:
+   - `GET /api/v1/runtime/recovery/policy` => `200`
+   - `GET /api/v1/runtime/recovery/incidents?board_id=b1000000-0000-0000-0000-000000000001&limit=5` => `200`
+   - `POST /api/v1/runtime/recovery/run?board_id=b1000000-0000-0000-0000-000000000001` => `200`
+6. Recovery run evidence:
+   - Result summary: `total_incidents=2`, `recovered=2`, `failed=0`, `suppressed=0`
+   - Incident reasons: `heartbeat_stale` with action `session_resync`
+7. OpenAPI route presence confirmed:
+   - `/api/v1/runtime/recovery/policy`
+   - `/api/v1/runtime/recovery/incidents`
+   - `/api/v1/runtime/recovery/run`
+   - `/api/v1/boards/{board_id}/agent-continuity`
