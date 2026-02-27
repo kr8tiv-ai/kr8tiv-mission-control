@@ -13,6 +13,7 @@ from app.schemas.common import NonEmptyStr
 GSDRunStage = Literal["planning", "implementation", "rollout", "validation", "hardening"]
 GSDRunStatus = Literal["queued", "in_progress", "blocked", "completed"]
 OwnerApprovalStatus = Literal["not_required", "pending", "approved", "rejected"]
+GSDMetricsValue = int | float
 
 
 def _normalize_optional_text(value: str | None) -> str | None:
@@ -35,6 +36,16 @@ def _normalize_links(values: list[str]) -> list[str]:
     return ordered
 
 
+def _normalize_metrics(values: dict[str, GSDMetricsValue]) -> dict[str, GSDMetricsValue]:
+    normalized: dict[str, GSDMetricsValue] = {}
+    for raw_key, value in values.items():
+        key = raw_key.strip()
+        if not key:
+            continue
+        normalized[key] = value
+    return normalized
+
+
 class GSDRunCreate(BaseModel):
     """Payload for creating a GSD run telemetry record."""
 
@@ -48,6 +59,7 @@ class GSDRunCreate(BaseModel):
     owner_approval_status: OwnerApprovalStatus | None = None
     owner_approval_note: str | None = None
     rollout_evidence_links: list[NonEmptyStr] = Field(default_factory=list)
+    metrics_snapshot: dict[str, GSDMetricsValue] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def normalize(self) -> Self:
@@ -55,6 +67,7 @@ class GSDRunCreate(BaseModel):
         self.run_name = _normalize_optional_text(self.run_name)
         self.owner_approval_note = _normalize_optional_text(self.owner_approval_note)
         self.rollout_evidence_links = _normalize_links(self.rollout_evidence_links)
+        self.metrics_snapshot = _normalize_metrics(self.metrics_snapshot)
         return self
 
 
@@ -67,6 +80,7 @@ class GSDRunUpdate(BaseModel):
     owner_approval_status: OwnerApprovalStatus | None = None
     owner_approval_note: str | None = None
     rollout_evidence_links: list[NonEmptyStr] | None = None
+    metrics_snapshot: dict[str, GSDMetricsValue] | None = None
     run_name: str | None = None
     iteration_number: int | None = Field(default=None, ge=1)
 
@@ -77,6 +91,8 @@ class GSDRunUpdate(BaseModel):
         self.run_name = _normalize_optional_text(self.run_name)
         if self.rollout_evidence_links is not None:
             self.rollout_evidence_links = _normalize_links(self.rollout_evidence_links)
+        if self.metrics_snapshot is not None:
+            self.metrics_snapshot = _normalize_metrics(self.metrics_snapshot)
         return self
 
 
@@ -97,7 +113,7 @@ class GSDRunRead(BaseModel):
     owner_approval_note: str | None = None
     owner_approved_at: datetime | None = None
     rollout_evidence_links: list[str]
+    metrics_snapshot: dict[str, GSDMetricsValue]
     completed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-

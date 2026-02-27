@@ -79,6 +79,7 @@ async def test_gsd_run_tracks_stage_progress_owner_approval_and_rollout_evidence
                 "status": "in_progress",
                 "owner_approval_required": True,
                 "owner_approval_status": "pending",
+                "metrics_snapshot": {"incidents_total": 0, "incidents_recovered": 0},
             },
         )
         assert created.status_code == 200
@@ -94,6 +95,15 @@ async def test_gsd_run_tracks_stage_progress_owner_approval_and_rollout_evidence
                     "https://example.com/release/phase15",
                     "https://example.com/healthchecks/phase15",
                 ]
+                payload["metrics_snapshot"] = {
+                    "incidents_total": 4,
+                    "incidents_recovered": 4,
+                    "incidents_failed": 0,
+                    "incidents_suppressed": 0,
+                    "retry_count": 1,
+                    "latency_p95_ms": 920,
+                    "tool_failure_rate": 0.02,
+                }
             if stage == "validation":
                 payload["owner_approval_status"] = "approved"
                 payload["owner_approval_note"] = "Verified with owner on call."
@@ -110,6 +120,8 @@ async def test_gsd_run_tracks_stage_progress_owner_approval_and_rollout_evidence
         assert body["owner_approval_status"] == "approved"
         assert body["owner_approval_required"] is True
         assert len(body["rollout_evidence_links"]) == 2
+        assert body["metrics_snapshot"]["incidents_total"] == 4
+        assert body["metrics_snapshot"]["incidents_recovered"] == 4
         assert body["completed_at"] is not None
 
 
@@ -158,4 +170,3 @@ async def test_gsd_run_list_is_scoped_to_current_organization() -> None:
         assert names == {"a", "b"}
 
     await engine.dispose()
-

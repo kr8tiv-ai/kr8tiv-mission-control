@@ -58,6 +58,7 @@ def _as_read(row: GSDRun) -> GSDRunRead:
         owner_approval_note=row.owner_approval_note,
         owner_approved_at=row.owner_approved_at,
         rollout_evidence_links=list(row.rollout_evidence_links),
+        metrics_snapshot=dict(row.metrics_snapshot),
         completed_at=row.completed_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -141,6 +142,7 @@ async def create_gsd_run(
         owner_approval_note=payload.owner_approval_note,
         owner_approved_at=(now if approval_status == "approved" else None),
         rollout_evidence_links=list(payload.rollout_evidence_links),
+        metrics_snapshot=dict(payload.metrics_snapshot),
         completed_at=(now if payload.status == "completed" else None),
         created_at=now,
         updated_at=now,
@@ -201,10 +203,11 @@ async def update_gsd_run(
 
     if payload.rollout_evidence_links is not None:
         row.rollout_evidence_links = list(payload.rollout_evidence_links)
+    if payload.metrics_snapshot is not None:
+        row.metrics_snapshot = dict(payload.metrics_snapshot)
 
     row.updated_at = now
     session.add(row)
     await session.commit()
     await session.refresh(row)
     return _as_read(row)
-

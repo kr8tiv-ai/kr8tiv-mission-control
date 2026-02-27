@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Column
@@ -38,8 +39,11 @@ class GSDRun(TenantScoped, table=True):
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
+    metrics_snapshot: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
 
     completed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow, index=True)
     updated_at: datetime = Field(default_factory=utcnow, index=True)
-

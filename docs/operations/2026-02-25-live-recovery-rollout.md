@@ -466,3 +466,19 @@ Production rollout evidence will be appended after immutable image publish + VPS
 4. Verification:
    - `uv run pytest backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py -q` => `16 passed`
    - `uv run pytest backend/tests/test_tasks_api_rows.py -q` => `5 passed`
+
+## 2026-02-27 GSD Spec Continuation (Phase 22 Telemetry Metrics Batch)
+
+1. Added `metrics_snapshot` support to GSD run telemetry:
+   - Model: `backend/app/models/gsd_runs.py`
+   - Schemas: `backend/app/schemas/gsd_runs.py`
+   - API persistence/readback: `backend/app/api/gsd_runs.py`
+2. Added migration for persisted environments:
+   - `backend/migrations/versions/c1f8e4a6b9d2_add_gsd_run_metrics_snapshot.py`
+3. Extended API tests:
+   - `backend/tests/test_gsd_runs_api.py` now verifies create/update/read with metrics payload.
+4. Verification:
+   - `uv run pytest backend/tests/test_gsd_runs_api.py -q` => `2 passed`
+   - Combined targeted regression:
+     - `uv run pytest backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py backend/tests/test_tasks_api_rows.py backend/tests/test_gsd_runs_api.py -q`
+     - Result: `23 passed`
