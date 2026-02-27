@@ -121,6 +121,7 @@ Task-mode endpoints:
 - `GET /api/v1/runtime/notebook/gate-summary?board_id=<uuid>`
 - `GET /api/v1/gsd-runs/{run_id}/summary`
 - `POST /api/v1/runtime/verification/execute`
+- `GET /api/v1/runtime/ops/control-plane-status?board_id=<uuid>&profile=auto`
 
 ## Phase 23-25 Control-Plane Additions
 
@@ -128,6 +129,23 @@ Task-mode endpoints:
 2. Board operators can fetch notebook gate rollups through `gate-summary` for quick triage.
 3. GSD telemetry now exposes previous-iteration deltas for continuity metrics.
 4. Runtime verification harness can optionally attach evidence and block a GSD run when required checks fail.
+
+## Operator Command Surface
+
+Unified runtime status can be fetched via API or CLI:
+
+```bash
+# API
+curl -H "Authorization: Bearer <LOCAL_AUTH_TOKEN>" \
+  "http://localhost:8100/api/v1/runtime/ops/control-plane-status?board_id=<board_id>&profile=auto"
+
+# CLI
+python -m app.cli.control_plane_status \
+  --base-url "http://localhost:8100" \
+  --token "<LOCAL_AUTH_TOKEN>" \
+  --board-id "<board_id>" \
+  --profile auto
+```
 
 ## Worker Runtime
 

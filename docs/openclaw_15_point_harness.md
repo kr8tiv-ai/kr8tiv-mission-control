@@ -182,6 +182,9 @@ Run these checks after deploying a build that includes notebook gate summaries, 
 5. Required check failure blocks GSD run
    - Trigger at least one required check failure.
    - Expected: target `gsd_runs.status` transitions to `blocked` and metrics snapshot includes `verification_required_failed`.
+6. Unified control-plane status endpoint is live
+   - `GET /api/v1/runtime/ops/control-plane-status?board_id=<board_id>&profile=auto`
+   - Expected: response includes `arena`, `notebook`, `verification`, and `gsd` sections in one payload.
 
 ## Evidence Capture Template
 
