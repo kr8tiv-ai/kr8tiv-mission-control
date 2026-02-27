@@ -19,6 +19,7 @@ Use it after any restart, image update, config change, or credential rotation.
 - `kr8tiv-mission-control-backend-1` container up
 - OpenClaw bot containers up
 - `LOCAL_AUTH_TOKEN` present in backend container env
+- Gateway runtime upgraded to at least `v2026.2.26` (security baseline)
 
 ## 15 Checks
 
@@ -30,7 +31,7 @@ Use it after any restart, image update, config change, or credential rotation.
 
 3. **Gateway status endpoint is reachable**
    - Endpoint: `GET /api/v1/gateways/status?board_id=<board_id>`
-   - Expected: `connected=true`.
+   - Expected: `connected=true` and gateway runtime compatibility check passes (`GATEWAY_MIN_VERSION >= 2026.2.26`).
 
 4. **Lead lane model is codex**
    - Session key: `agent:lead-b1000000-0000-0000-0000-000000000001:main`

@@ -37,6 +37,18 @@ def test_evaluate_gateway_version_detects_old_runtime() -> None:
     assert "Minimum supported version is 2026.1.30" in (result.message or "")
 
 
+def test_evaluate_gateway_version_uses_configured_default_minimum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gateway_compat.settings, "gateway_min_version", "2026.2.26", raising=False)
+
+    result = gateway_compat.evaluate_gateway_version(current_version="2026.2.25")
+
+    assert result.compatible is False
+    assert result.minimum_version == "2026.2.26"
+    assert "Minimum supported version is 2026.2.26" in (result.message or "")
+
+
 @pytest.mark.asyncio
 async def test_check_gateway_runtime_compatibility_prefers_schema_version(
     monkeypatch: pytest.MonkeyPatch,

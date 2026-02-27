@@ -37,7 +37,7 @@ class GatewayVersionCheckResult:
 
 def _normalized_minimum_version() -> str:
     raw = (settings.gateway_min_version or "").strip()
-    return raw or "2026.1.30"
+    return raw or "2026.2.26"
 
 
 def _parse_version_parts(value: str) -> tuple[int, ...] | None:

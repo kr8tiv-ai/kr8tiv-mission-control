@@ -50,6 +50,12 @@ Verification:
 uvx --from notebooklm-mcp-cli@latest nlm notebook list --profile personal
 ```
 
+## OpenClaw Security Baseline
+
+- Mission Control should enforce `GATEWAY_MIN_VERSION=2026.2.26` or newer.
+- This baseline aligns with upstream OpenClaw security fixes shipped in `v2026.2.26`.
+- If a gateway reports older runtime metadata, Mission Control should treat it as incompatible and block control-plane operations until upgraded.
+
 ## Arena Execution Model
 
 Arena execution is worker-driven and persists each reviewer iteration.

@@ -92,8 +92,8 @@ class Settings(BaseSettings):
     supermemory_timeout_seconds: int = 8
     supermemory_container_tag_prefix: str = "tenant"
 
-    # OpenClaw gateway runtime compatibility
-    gateway_min_version: str = "2026.02.9"
+    # OpenClaw gateway runtime compatibility (security baseline)
+    gateway_min_version: str = "2026.2.26"
 
     # Prompt evolution gate guardrails
     prompt_eval_enabled: bool = True
