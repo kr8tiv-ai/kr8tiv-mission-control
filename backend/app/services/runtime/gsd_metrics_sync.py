@@ -6,6 +6,7 @@ from uuid import UUID
 
 from app.core.time import utcnow
 from app.models.gsd_runs import GSDRun
+from app.services.runtime.gsd_metrics_aggregator import aggregate_continuity_metrics
 
 
 async def sync_recovery_summary_to_gsd_run(
@@ -26,14 +27,12 @@ async def sync_recovery_summary_to_gsd_run(
     if row.board_id is not None and row.board_id != board_id:
         return None
 
-    snapshot = dict(row.metrics_snapshot or {})
-    snapshot.update(
-        {
-            "incidents_total": int(total_incidents),
-            "incidents_recovered": int(recovered),
-            "incidents_failed": int(failed),
-            "incidents_suppressed": int(suppressed),
-        }
+    snapshot = aggregate_continuity_metrics(
+        existing=row.metrics_snapshot,
+        total_incidents=total_incidents,
+        recovered=recovered,
+        failed=failed,
+        suppressed=suppressed,
     )
     row.metrics_snapshot = snapshot
     row.updated_at = utcnow()
@@ -41,4 +40,3 @@ async def sync_recovery_summary_to_gsd_run(
     await session.commit()
     await session.refresh(row)
     return row
-
