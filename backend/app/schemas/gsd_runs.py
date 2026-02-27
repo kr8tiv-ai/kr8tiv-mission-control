@@ -117,3 +117,11 @@ class GSDRunRead(BaseModel):
     completed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class GSDRunSummaryRead(BaseModel):
+    """Summary payload for a run with previous-iteration deltas."""
+
+    run: GSDRunRead
+    previous: GSDRunRead | None = None
+    deltas: dict[str, float] = Field(default_factory=dict)

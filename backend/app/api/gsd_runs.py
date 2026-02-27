@@ -13,7 +13,13 @@ from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.boards import Board
 from app.models.gsd_runs import GSDRun
-from app.schemas.gsd_runs import GSDRunCreate, GSDRunRead, GSDRunUpdate, OwnerApprovalStatus
+from app.schemas.gsd_runs import (
+    GSDRunCreate,
+    GSDRunRead,
+    GSDRunSummaryRead,
+    GSDRunUpdate,
+    OwnerApprovalStatus,
+)
 from app.services.organizations import OrganizationContext
 
 if TYPE_CHECKING:
@@ -65,6 +71,24 @@ def _as_read(row: GSDRun) -> GSDRunRead:
     )
 
 
+def _is_numeric_metric(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _compute_metric_deltas(
+    *,
+    current: dict[str, object],
+    previous: dict[str, object],
+) -> dict[str, float]:
+    deltas: dict[str, float] = {}
+    for key, current_value in current.items():
+        previous_value = previous.get(key)
+        if not _is_numeric_metric(current_value) or not _is_numeric_metric(previous_value):
+            continue
+        deltas[key] = float(current_value) - float(previous_value)
+    return deltas
+
+
 async def _require_row(
     *,
     run_id: UUID,
@@ -88,6 +112,27 @@ async def _validate_board_scope(
     board = await Board.objects.by_id(board_id).first(session)
     if board is None or board.organization_id != ctx.organization.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+
+
+async def _find_previous_iteration_row(
+    *,
+    current_row: GSDRun,
+    session: AsyncSession,
+    ctx: OrganizationContext,
+) -> GSDRun | None:
+    statement = (
+        select(GSDRun)
+        .where(col(GSDRun.organization_id) == ctx.organization.id)
+        .where(col(GSDRun.run_name) == current_row.run_name)
+        .where(col(GSDRun.iteration_number) < current_row.iteration_number)
+        .order_by(col(GSDRun.iteration_number).desc(), col(GSDRun.created_at).desc())
+        .limit(1)
+    )
+    if current_row.board_id is None:
+        statement = statement.where(col(GSDRun.board_id).is_(None))
+    else:
+        statement = statement.where(col(GSDRun.board_id) == current_row.board_id)
+    return (await session.exec(statement)).first()
 
 
 @router.get("", response_model=list[GSDRunRead])
@@ -162,6 +207,24 @@ async def get_gsd_run(
     """Fetch a single GSD run telemetry record by id."""
     row = await _require_row(run_id=run_id, session=session, ctx=ctx)
     return _as_read(row)
+
+
+@router.get("/{run_id}/summary", response_model=GSDRunSummaryRead)
+async def get_gsd_run_summary(
+    run_id: UUID,
+    session: AsyncSession = SESSION_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GSDRunSummaryRead:
+    """Fetch run details and previous-iteration metric deltas for the same run name."""
+    row = await _require_row(run_id=run_id, session=session, ctx=ctx)
+    previous_row = await _find_previous_iteration_row(current_row=row, session=session, ctx=ctx)
+    run_read = _as_read(row)
+    previous_read = _as_read(previous_row) if previous_row is not None else None
+    deltas = _compute_metric_deltas(
+        current=run_read.metrics_snapshot,
+        previous=(previous_read.metrics_snapshot if previous_read is not None else {}),
+    )
+    return GSDRunSummaryRead(run=run_read, previous=previous_read, deltas=deltas)
 
 
 @router.patch("/{run_id}", response_model=GSDRunRead)

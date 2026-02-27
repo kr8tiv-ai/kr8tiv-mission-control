@@ -170,3 +170,77 @@ async def test_gsd_run_list_is_scoped_to_current_organization() -> None:
         assert names == {"a", "b"}
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_gsd_run_summary_includes_previous_iteration_deltas() -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    await _create_schema(engine)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    org = Organization(id=uuid4(), name="KR8TIV")
+    board = Board(id=uuid4(), organization_id=org.id, name="MC", slug="mc")
+
+    async with session_maker() as session:
+        session.add(org)
+        session.add(board)
+        await session.commit()
+
+    app = _build_test_app()
+
+    async def _override_get_session() -> AsyncSession:
+        async with session_maker() as session:
+            yield session
+
+    async def _override_require_org_admin() -> OrganizationContext:
+        return _org_context(org)
+
+    app.dependency_overrides[get_session] = _override_get_session
+    app.dependency_overrides[require_org_admin] = _override_require_org_admin
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        previous = await client.post(
+            "/api/v1/gsd-runs",
+            json={
+                "board_id": str(board.id),
+                "run_name": "phase24-continuity",
+                "iteration_number": 1,
+                "stage": "validation",
+                "status": "completed",
+                "metrics_snapshot": {
+                    "incidents_total": 5,
+                    "incidents_failed": 1,
+                    "latency_p95_ms": 1000,
+                },
+            },
+        )
+        assert previous.status_code == 200
+        previous_id = previous.json()["id"]
+
+        current = await client.post(
+            "/api/v1/gsd-runs",
+            json={
+                "board_id": str(board.id),
+                "run_name": "phase24-continuity",
+                "iteration_number": 2,
+                "stage": "validation",
+                "status": "completed",
+                "metrics_snapshot": {
+                    "incidents_total": 4,
+                    "incidents_failed": 0,
+                    "latency_p95_ms": 900,
+                },
+            },
+        )
+        assert current.status_code == 200
+        current_id = current.json()["id"]
+
+        summary = await client.get(f"/api/v1/gsd-runs/{current_id}/summary")
+        assert summary.status_code == 200
+        body = summary.json()
+        assert body["run"]["id"] == current_id
+        assert body["previous"]["id"] == previous_id
+        assert body["deltas"]["incidents_total"] == -1.0
+        assert body["deltas"]["incidents_failed"] == -1.0
+        assert body["deltas"]["latency_p95_ms"] == -100.0
+
+    await engine.dispose()
