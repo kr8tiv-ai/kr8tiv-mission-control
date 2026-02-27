@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from sqlmodel import col, select
 
 from app.core.time import utcnow
+from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.recovery_incidents import RecoveryIncident
 from app.models.recovery_policies import RecoveryPolicy
@@ -38,10 +39,12 @@ class RecoveryEngine(OpenClawDBService):
         *,
         continuity_snapshot_fetcher: ContinuitySnapshotFetcher | None = None,
         recovery_action: RecoveryAction | None = None,
+        force_heartbeat_resync: bool = False,
     ) -> None:
         super().__init__(session)
         self._continuity_snapshot_fetcher = continuity_snapshot_fetcher
         self._recovery_action = recovery_action
+        self._force_heartbeat_resync = force_heartbeat_resync
 
     async def _board_or_404(self, *, board_id: UUID) -> Board:
         board = await Board.objects.by_id(board_id).first(self.session)
@@ -61,6 +64,15 @@ class RecoveryEngine(OpenClawDBService):
         return await AgentContinuityService(self.session).snapshot_for_board(board_id=board_id)
 
     async def _recover_agent(self, *, board_id: UUID, agent_id: UUID, continuity_reason: str) -> tuple[bool, str]:
+        if self._force_heartbeat_resync and continuity_reason in {"heartbeat_missing", "heartbeat_stale"}:
+            agent = await Agent.objects.by_id(agent_id).first(self.session)
+            if agent is not None and agent.board_id == board_id:
+                now = utcnow()
+                agent.status = "online"
+                agent.last_seen_at = now
+                agent.updated_at = now
+                self.session.add(agent)
+                return True, "forced_heartbeat_resync"
         if self._recovery_action is not None:
             return await self._recovery_action(
                 board_id=board_id,
@@ -98,7 +110,12 @@ class RecoveryEngine(OpenClawDBService):
         rows = (await self.session.exec(statement)).all()
         return sum(1 for row in rows if row.status in _ATTEMPT_STATUSES)
 
-    async def evaluate_board(self, *, board_id: UUID) -> list[RecoveryIncident]:
+    async def evaluate_board(
+        self,
+        *,
+        board_id: UUID,
+        bypass_cooldown: bool = False,
+    ) -> list[RecoveryIncident]:
         """Run continuity-based recovery evaluation and persist incident outcomes."""
         board = await self._board_or_404(board_id=board_id)
         policy = await self._ensure_policy(organization_id=board.organization_id)
@@ -114,7 +131,7 @@ class RecoveryEngine(OpenClawDBService):
                 continue
 
             latest = await self._latest_incident(agent_id=item.agent_id)
-            if latest is not None:
+            if latest is not None and not bypass_cooldown:
                 cooldown_seconds = int((now - latest.detected_at).total_seconds())
                 if cooldown_seconds < max(policy.cooldown_seconds, 0):
                     incident = RecoveryIncident(

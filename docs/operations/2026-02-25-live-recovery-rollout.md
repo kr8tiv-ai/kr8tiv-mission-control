@@ -209,6 +209,24 @@ Verification snapshot:
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
 
+## 2026-02-27 Phase 19 Development Verification (Forced Heartbeat Resync)
+
+Phase 19 manual recovery hardening was validated in local worktree before rollout.
+
+Verification snapshot:
+1. New force-run behavior tests:
+   - `uv run pytest backend/tests/test_recovery_engine.py backend/tests/test_recovery_ops_api.py -q`
+   - Result: `8 passed`
+2. Recovery regression suite:
+   - `uv run pytest backend/tests/test_recovery_models.py backend/tests/test_recovery_engine.py backend/tests/test_recovery_ops_api.py backend/tests/test_recovery_alert_routing.py backend/tests/test_recovery_scheduler.py backend/tests/test_queue_worker_recovery_scheduler.py -q`
+   - Result: `19 passed`
+3. Runtime behavior changes:
+   - `POST /api/v1/runtime/recovery/run` now accepts `force=true`.
+   - `force=true` bypasses cooldown suppression for that run.
+   - `force=true` enables forced heartbeat resync for `heartbeat_stale` and `heartbeat_missing`, immediately marking matching board agents `online` with refreshed `last_seen_at`.
+
+Production rollout evidence will be appended after immutable image publish + VPS deploy.
+
 ## 2026-02-26 Heartbeat Timeout Mitigation Update
 
 Root-cause findings from live logs:

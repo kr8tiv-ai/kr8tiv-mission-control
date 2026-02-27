@@ -133,6 +133,7 @@ async def list_recovery_incidents(
 @router.post("/run", response_model=RecoveryRunRead)
 async def run_recovery_now(
     board_id: UUID,
+    force: bool = Query(default=False, description="Bypass cooldown and force immediate heartbeat resync."),
     session=SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> RecoveryRunRead:
@@ -141,7 +142,13 @@ async def run_recovery_now(
     if board is None or board.organization_id != ctx.organization.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
 
-    incidents = await RecoveryEngine(session=session).evaluate_board(board_id=board.id)
+    incidents = await RecoveryEngine(
+        session=session,
+        force_heartbeat_resync=force,
+    ).evaluate_board(
+        board_id=board.id,
+        bypass_cooldown=force,
+    )
     counts = {"recovered": 0, "failed": 0, "suppressed": 0}
     for incident in incidents:
         if incident.status in counts:
