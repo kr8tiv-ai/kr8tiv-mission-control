@@ -871,3 +871,24 @@ Current status snapshot:
 2. Behavior:
    - `workflow_dispatch` with `gate_only=true` skips build/push and runs rollout gate only.
    - Enables fast validation of probe/rollback configuration before expensive release runs.
+
+## 2026-02-27 GSD Spec Continuation (Phase 32 Gate-Ops Validation Loop)
+
+1. Operator automation test verification:
+   - `uv run pytest backend/tests/test_rollout_gate_ops.py -q`
+   - Result: `7 passed`
+2. Gate secret rotation + gate-only dispatch executed via operator script:
+   - Command:
+     - `uv run python scripts/ci/rollout_gate_ops.py --health-urls "http://76.13.106.100:8100/health,http://76.13.106.100:8100/readyz,http://76.13.106.100:3100,http://76.13.106.100:48650/health,http://76.13.106.100:48651/health,http://76.13.106.100:48652/health,http://76.13.106.100:48653/health" --dispatch-gate-only`
+   - Script result:
+     - `health_secret_updated=true`
+     - `health_urls_count=7`
+     - `rollback_updated=false`
+     - `dispatch_run_id=22476038198`
+3. GitHub Actions gate-only run verification:
+   - Workflow: `Publish Mission Control Images`
+   - Run ID: `22476038198`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22476038198`
+4. Operational note:
+   - Local operator environment required `PyNaCl` for GitHub secret encryption path (`pip install pynacl`) before running secret updates.
