@@ -51,6 +51,9 @@ Production deploys must be reproducible and restart-safe. Mission Control runtim
 6. Skip policy:
    - `push` on `main`: `skipped` is treated as failure (`--fail-on-skipped` enforced).
    - `workflow_dispatch`: operator may set `allow_skipped_gate=true` for non-prod/debug runs.
+7. Main preflight:
+   - `publish-mission-control-images.yml` now fails early on `main` when `RUNTIME_HEALTH_URLS` is unset.
+   - This prevents wasted image build/push cycles on non-validated rollout attempts.
 
 ## Rollback
 

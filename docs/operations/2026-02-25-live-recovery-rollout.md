@@ -824,3 +824,12 @@ Current status snapshot:
 4. Verification:
    - `UV_PROJECT_ENVIRONMENT=.venv-test uv run pytest tests/test_rollout_health_gate.py tests/test_verification_harness.py tests/test_verification_harness_api.py tests/test_runtime_control_plane_status_api.py -q`
    - Result: `15 passed`
+
+## 2026-02-27 GSD Spec Continuation (Phase 30 Main Preflight Loop)
+
+1. Added fail-fast preflight in publish workflow:
+   - `.github/workflows/publish-mission-control-images.yml`
+   - `push` on `main` now exits before build/push when `RUNTIME_HEALTH_URLS` is unset.
+2. Purpose:
+   - save build/push compute when rollout validation inputs are missing.
+   - keep strict runtime-gated release policy deterministic.
