@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { TaskBoard } from "./TaskBoard";
@@ -66,5 +66,55 @@ describe("TaskBoard", () => {
       />,
     );
     expect(screen.getByText(/missing spec/i)).toBeInTheDocument();
+  });
+
+  it("shows notebook gate badges and filters notebook blocked/retryable tasks", () => {
+    render(
+      <TaskBoard
+        tasks={[
+          {
+            id: "t-blocked",
+            title: "Notebook blocked task",
+            status: "inbox",
+            priority: "medium",
+            task_mode: "notebook",
+            notebook_gate_state: "misconfig",
+            notebook_gate_reason: "invalid_profile",
+          },
+          {
+            id: "t-retry",
+            title: "Notebook retry task",
+            status: "inbox",
+            priority: "medium",
+            task_mode: "notebook",
+            notebook_gate_state: "retryable",
+            notebook_gate_reason: "auth_expired",
+          },
+          {
+            id: "t-standard",
+            title: "Standard task",
+            status: "inbox",
+            priority: "low",
+            task_mode: "standard",
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText(/notebook blocked - invalid_profile/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/notebook retryable - auth_expired/i),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /blocked - 1/i }));
+    expect(screen.getByText("Notebook blocked task")).toBeInTheDocument();
+    expect(screen.queryByText("Notebook retry task")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /retryable - 1/i }));
+    expect(screen.getByText("Notebook retry task")).toBeInTheDocument();
+    expect(screen.queryByText("Notebook blocked task")).not.toBeInTheDocument();
+    expect(screen.queryByText("Standard task")).not.toBeInTheDocument();
   });
 });

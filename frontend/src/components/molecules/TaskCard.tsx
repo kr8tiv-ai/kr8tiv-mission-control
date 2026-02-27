@@ -13,6 +13,8 @@ interface TaskCardProps {
   missingSpec?: boolean;
   missingPlan?: boolean;
   verifyFailed?: boolean;
+  notebookGateState?: "ready" | "retryable" | "misconfig" | "hard_fail";
+  notebookGateReason?: string;
   assignee?: string;
   due?: string;
   isOverdue?: boolean;
@@ -36,6 +38,8 @@ export function TaskCard({
   missingSpec = false,
   missingPlan = false,
   verifyFailed = false,
+  notebookGateState,
+  notebookGateReason,
   assignee,
   due,
   isOverdue = false,
@@ -79,6 +83,14 @@ export function TaskCard({
   const normalizedMode = (deploymentMode ?? "").trim().toLowerCase();
   const modeLabel = normalizedMode === "individual" ? "Individual" : "Team";
   const showModePill = normalizedMode === "individual" || normalizedMode === "team";
+  const normalizedNotebookGateState = (notebookGateState ?? "").trim().toLowerCase();
+  const hasNotebookBlockedState =
+    normalizedNotebookGateState === "misconfig" ||
+    normalizedNotebookGateState === "hard_fail";
+  const hasNotebookRetryableState =
+    normalizedNotebookGateState === "retryable";
+  const hasNotebookReadyState = normalizedNotebookGateState === "ready";
+  const notebookReason = (notebookGateReason ?? "").trim();
 
   return (
     <div
@@ -143,6 +155,26 @@ export function TaskCard({
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
               Verify failed
+            </div>
+          ) : null}
+          {hasNotebookBlockedState ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              Notebook blocked
+              {notebookReason ? ` - ${notebookReason}` : ""}
+            </div>
+          ) : null}
+          {hasNotebookRetryableState ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Notebook retryable
+              {notebookReason ? ` - ${notebookReason}` : ""}
+            </div>
+          ) : null}
+          {hasNotebookReadyState ? (
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Notebook ready
             </div>
           ) : null}
           {isBlocked ? (

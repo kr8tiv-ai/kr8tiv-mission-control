@@ -15,6 +15,13 @@ import { cn } from "@/lib/utils";
 
 type TaskStatus = "inbox" | "in_progress" | "review" | "done";
 type GSDStage = "spec" | "plan" | "execute" | "verify" | "done";
+type NotebookGateState = "ready" | "retryable" | "misconfig" | "hard_fail";
+type TaskMode =
+  | "standard"
+  | "notebook"
+  | "arena"
+  | "arena_notebook"
+  | "notebook_creation";
 
 type Task = {
   id: string;
@@ -22,6 +29,7 @@ type Task = {
   status: TaskStatus;
   priority: string;
   gsd_stage?: GSDStage | null;
+  task_mode?: TaskMode | null;
   deployment_mode?: "team" | "individual" | null;
   spec_doc_ref?: string | null;
   plan_doc_ref?: string | null;
@@ -35,6 +43,8 @@ type Task = {
   depends_on_task_ids?: string[];
   blocked_by_task_ids?: string[];
   is_blocked?: boolean;
+  notebook_gate_state?: NotebookGateState | null;
+  notebook_gate_reason?: string | null;
 };
 
 type TaskBoardProps = {
@@ -51,6 +61,7 @@ type ReviewBucket =
   | "blocked"
   | "verify_failed";
 type GSDFilter = "all" | GSDStage;
+type NotebookGateFilter = "all" | "blocked" | "retryable";
 
 const columns: Array<{
   title: string;
@@ -120,6 +131,27 @@ const resolveDueState = (
   };
 };
 
+const NOTEBOOK_TASK_MODES: TaskMode[] = [
+  "notebook",
+  "arena_notebook",
+  "notebook_creation",
+];
+
+const isNotebookEnabledTask = (task: Task): boolean => {
+  const mode = (task.task_mode ?? "").trim() as TaskMode;
+  return NOTEBOOK_TASK_MODES.includes(mode);
+};
+
+const isNotebookBlockedTask = (task: Task): boolean =>
+  isNotebookEnabledTask(task) &&
+  ["misconfig", "hard_fail"].includes(
+    (task.notebook_gate_state ?? "").trim().toLowerCase(),
+  );
+
+const isNotebookRetryableTask = (task: Task): boolean =>
+  isNotebookEnabledTask(task) &&
+  (task.notebook_gate_state ?? "").trim().toLowerCase() === "retryable";
+
 type CardPosition = { left: number; top: number };
 
 const KANBAN_MOVE_ANIMATION_MS = 240;
@@ -152,6 +184,8 @@ export const TaskBoard = memo(function TaskBoard({
   const [activeColumn, setActiveColumn] = useState<TaskStatus | null>(null);
   const [reviewBucket, setReviewBucket] = useState<ReviewBucket>("all");
   const [gsdFilter, setGsdFilter] = useState<GSDFilter>("all");
+  const [notebookGateFilter, setNotebookGateFilter] =
+    useState<NotebookGateFilter>("all");
 
   const setCardRef = useCallback(
     (taskId: string) => (node: HTMLDivElement | null) => {
@@ -298,6 +332,32 @@ export const TaskBoard = memo(function TaskBoard({
     };
   }, [draggingId, measurePositions, tasks]);
 
+  const gsdVisibleTasks = useMemo(
+    () =>
+      gsdFilter === "all"
+        ? tasks
+        : tasks.filter((task) => (task.gsd_stage ?? "spec") === gsdFilter),
+    [gsdFilter, tasks],
+  );
+
+  const notebookGateCounts = useMemo(
+    () =>
+      gsdVisibleTasks.reduce(
+        (acc, task) => {
+          acc.all += 1;
+          if (isNotebookBlockedTask(task)) acc.blocked += 1;
+          if (isNotebookRetryableTask(task)) acc.retryable += 1;
+          return acc;
+        },
+        {
+          all: 0,
+          blocked: 0,
+          retryable: 0,
+        },
+      ),
+    [gsdVisibleTasks],
+  );
+
   const grouped = useMemo(() => {
     const buckets: Record<TaskStatus, Task[]> = {
       inbox: [],
@@ -308,16 +368,18 @@ export const TaskBoard = memo(function TaskBoard({
     for (const column of columns) {
       buckets[column.status] = [];
     }
-    const visibleTasks =
-      gsdFilter === "all"
-        ? tasks
-        : tasks.filter((task) => (task.gsd_stage ?? "spec") === gsdFilter);
+    const visibleTasks = gsdVisibleTasks.filter((task) => {
+      if (notebookGateFilter === "blocked") return isNotebookBlockedTask(task);
+      if (notebookGateFilter === "retryable")
+        return isNotebookRetryableTask(task);
+      return true;
+    });
     visibleTasks.forEach((task) => {
       const bucket = buckets[task.status] ?? buckets.inbox;
       bucket.push(task);
     });
     return buckets;
-  }, [gsdFilter, tasks]);
+  }, [gsdVisibleTasks, notebookGateFilter]);
 
   // Keep drag/drop state and payload handling centralized for column move interactions.
   const handleDragStart =
@@ -408,6 +470,45 @@ export const TaskBoard = memo(function TaskBoard({
               </button>
             ),
           )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          <span className="mr-1 text-slate-600">Notebook gate</span>
+          {(
+            [
+              {
+                key: "all",
+                label: "All",
+                count: notebookGateCounts.all,
+              },
+              {
+                key: "blocked",
+                label: "Blocked",
+                count: notebookGateCounts.blocked,
+              },
+              {
+                key: "retryable",
+                label: "Retryable",
+                count: notebookGateCounts.retryable,
+              },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() =>
+                setNotebookGateFilter(option.key as NotebookGateFilter)
+              }
+              className={cn(
+                "rounded-full border px-2.5 py-1 transition",
+                notebookGateFilter === option.key
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
+              )}
+              aria-pressed={notebookGateFilter === option.key}
+            >
+              {option.label} - {option.count}
+            </button>
+          ))}
         </div>
       </div>
       {columns.map((column) => {
@@ -570,6 +671,8 @@ export const TaskBoard = memo(function TaskBoard({
                           (task.gsd_stage ?? "spec") === "verify" &&
                           !(task.verification_ref ?? "").trim()
                         }
+                        notebookGateState={task.notebook_gate_state ?? undefined}
+                        notebookGateReason={task.notebook_gate_reason ?? undefined}
                         assignee={task.assignee ?? undefined}
                         due={dueState.due}
                         isOverdue={dueState.isOverdue}
