@@ -9,7 +9,8 @@ from typing import Any
 from app.core.config import settings
 from app.services.openclaw.gateway_rpc import GatewayConfig, OpenClawGatewayError, openclaw_call
 
-_VERSION_PATTERN = re.compile(r"(?i)v?(?P<version>\d+(?:\.\d+)+)")
+_VERSION_PATTERN = re.compile(r"(?i)v?(?P<version>\d+(?:\.\d+)*)")
+_COMPACT_DATE_PATTERN = re.compile(r"^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})$")
 _PRIMARY_VERSION_PATHS: tuple[tuple[str, ...], ...] = (
     ("version",),
     ("gatewayVersion",),
@@ -45,7 +46,16 @@ def _parse_version_parts(value: str) -> tuple[int, ...] | None:
     if match is None:
         return None
     numeric = match.group("version")
-    return tuple(int(part) for part in numeric.split("."))
+    parts = numeric.split(".")
+    if len(parts) == 1:
+        compact_match = _COMPACT_DATE_PATTERN.fullmatch(parts[0])
+        if compact_match is not None:
+            year = int(compact_match.group("year"))
+            month = int(compact_match.group("month"))
+            day = int(compact_match.group("day"))
+            if 1 <= month <= 12 and 1 <= day <= 31:
+                return (year, month, day)
+    return tuple(int(part) for part in parts)
 
 
 def _compare_versions(left: tuple[int, ...], right: tuple[int, ...]) -> int:

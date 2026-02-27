@@ -26,6 +26,26 @@ def test_extract_gateway_version_prefers_primary_path() -> None:
     assert gateway_compat.extract_gateway_version(payload) == "2026.2.1"
 
 
+def test_evaluate_gateway_version_handles_compact_stable_tag() -> None:
+    result = gateway_compat.evaluate_gateway_version(
+        current_version="stable-20260220",
+        minimum_version="2026.2.26",
+    )
+
+    assert result.compatible is False
+    assert "Minimum supported version is 2026.2.26" in (result.message or "")
+
+
+def test_evaluate_gateway_version_accepts_newer_compact_stable_tag() -> None:
+    result = gateway_compat.evaluate_gateway_version(
+        current_version="stable-20260227",
+        minimum_version="2026.2.26",
+    )
+
+    assert result.compatible is True
+    assert result.current_version == "stable-20260227"
+
+
 def test_evaluate_gateway_version_detects_old_runtime() -> None:
     result = gateway_compat.evaluate_gateway_version(
         current_version="2025.12.1",
