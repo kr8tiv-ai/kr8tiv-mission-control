@@ -98,7 +98,7 @@ async def test_continuity_snapshot_identifies_alive_stale_and_unreachable_agents
         gateway=gateway,
         name="stale-agent",
         session_key="session-stale",
-        minutes_ago=25,
+        minutes_ago=50,
     )
     unreachable = _make_agent(
         board=board,
@@ -158,7 +158,7 @@ async def test_agent_continuity_api_returns_board_scoped_snapshot(
         gateway=gateway,
         name="stale-api-agent",
         session_key="session-stale-api",
-        minutes_ago=22,
+        minutes_ago=50,
     )
 
     async with session_maker() as session:
@@ -200,4 +200,44 @@ async def test_agent_continuity_api_returns_board_scoped_snapshot(
     assert body["counts"]["alive"] == 1
     assert body["counts"]["stale"] == 1
     assert body["counts"]["unreachable"] == 0
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_continuity_snapshot_does_not_mark_default_heartbeat_as_stale_too_early() -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    await _create_schema(engine)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    org, gateway, board = _seed_board_rows()
+    recently_seen = _make_agent(
+        board=board,
+        gateway=gateway,
+        name="healthy-agent",
+        session_key="session-healthy",
+        minutes_ago=25,
+    )
+
+    async with session_maker() as session:
+        session.add(org)
+        session.add(gateway)
+        session.add(board)
+        session.add(recently_seen)
+        await session.commit()
+
+    async def _fetch_runtime_sessions(_gateway: Gateway) -> set[str]:
+        return {"session-healthy"}
+
+    async with session_maker() as session:
+        service = AgentContinuityService(
+            session=session,
+            runtime_session_keys_fetcher=_fetch_runtime_sessions,
+        )
+        report = await service.snapshot_for_board(board_id=board.id)
+
+    assert report.counts["alive"] == 1
+    assert report.counts["stale"] == 0
+    item = report.agents[0]
+    assert item.agent_name == "healthy-agent"
+    assert item.continuity == "alive"
     await engine.dispose()

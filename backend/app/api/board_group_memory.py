@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -70,6 +71,12 @@ IS_CHAT_QUERY = Query(default=None)
 SINCE_QUERY = Query(default=None)
 _RUNTIME_TYPE_REFERENCES = (UUID,)
 AGENT_BOARD_ROLE_TAGS = cast("list[str | Enum]", ["agent-lead", "agent-worker"])
+_SENSITIVE_KV_RE = re.compile(
+    r"(?im)\b(auth[_-]?token|api[_-]?key|private[_ -]?key|secret|seed(?:[_ -]?phrase)?|mnemonic)\b\s*[:=]\s*\S+",
+)
+_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9\-._~+/]+=*")
+_HEX_KEY_RE = re.compile(r"\b[0-9a-fA-F]{64}\b")
+_BASE58_SECRET_RE = re.compile(r"\b[1-9A-HJ-NP-Za-km-z]{80,128}\b")
 
 
 def _agent_group_memory_openapi_hints(
@@ -212,6 +219,7 @@ def _group_chat_targets(
     actor: ActorContext,
     is_broadcast: bool,
     mentions: set[str],
+    is_chat: bool,
 ) -> dict[str, Agent]:
     targets: dict[str, Agent] = {}
     for agent in agents:
@@ -219,12 +227,49 @@ def _group_chat_targets(
             continue
         if actor.actor_type == "agent" and actor.agent and agent.id == actor.agent.id:
             continue
-        if is_broadcast or agent.is_board_lead:
+        if is_broadcast or is_chat:
+            targets[str(agent.id)] = agent
+            continue
+        if agent.is_board_lead:
             targets[str(agent.id)] = agent
             continue
         if mentions and matches_agent_mention(agent, mentions):
             targets[str(agent.id)] = agent
     return targets
+
+
+def _sanitize_group_snippet(content: str) -> str:
+    sanitized = _SENSITIVE_KV_RE.sub(lambda m: f"{m.group(1)}=[REDACTED]", content)
+    sanitized = _BEARER_RE.sub("Bearer [REDACTED]", sanitized)
+    sanitized = _HEX_KEY_RE.sub("[REDACTED]", sanitized)
+    sanitized = _BASE58_SECRET_RE.sub("[REDACTED]", sanitized)
+    return sanitized
+
+
+def _delegator_name(agents: list[Agent]) -> str | None:
+    for agent in agents:
+        name = (agent.name or "").strip()
+        if not name:
+            continue
+        if agent.is_board_lead and name.lower() == "friday":
+            return name
+    for agent in agents:
+        name = (agent.name or "").strip()
+        if agent.is_board_lead and name:
+            return name
+    return None
+
+
+def _coordination_directive(delegator_name: str | None) -> str:
+    if delegator_name:
+        return (
+            f"Coordination: {delegator_name} is delegating. "
+            "If you are not explicitly assigned, acknowledge and avoid duplicate execution."
+        )
+    return (
+        "Coordination: board lead delegates. "
+        "If not explicitly assigned, acknowledge and avoid duplicate execution."
+    )
 
 
 def _group_actor_name(actor: ActorContext) -> str:
@@ -254,6 +299,7 @@ class _NotifyGroupContext:
     actor_name: str
     snippet: str
     base_url: str
+    delegator_name: str | None
 
 
 async def _notify_group_target(
@@ -279,6 +325,8 @@ async def _notify_group_target(
         f"Group: {context.group.name}\n"
         f"From: {context.actor_name}\n\n"
         f"{context.snippet}\n\n"
+        f"{_coordination_directive(context.delegator_name)}\n"
+        "Security: never post tokens, private keys, seed phrases, or credentials.\n\n"
         "Reply via group chat (shared across linked boards):\n"
         f"POST {context.base_url}/api/v1/boards/{board.id}/group-memory\n"
         'Body: {"content":"...","tags":["chat"]}'
@@ -320,6 +368,7 @@ async def _notify_group_memory_targets(
         actor=actor,
         is_broadcast=is_broadcast,
         mentions=mentions,
+        is_chat=memory.is_chat,
     )
 
     if not targets:
@@ -327,7 +376,7 @@ async def _notify_group_memory_targets(
 
     actor_name = _group_actor_name(actor)
 
-    snippet = memory.content.strip()
+    snippet = _sanitize_group_snippet(memory.content.strip())
     if len(snippet) > MAX_SNIPPET_LENGTH:
         snippet = f"{snippet[: MAX_SNIPPET_LENGTH - 3]}..."
 
@@ -343,6 +392,7 @@ async def _notify_group_memory_targets(
         actor_name=actor_name,
         snippet=snippet,
         base_url=base_url,
+        delegator_name=_delegator_name(agents),
     )
     for agent in targets.values():
         await _notify_group_target(context, agent)

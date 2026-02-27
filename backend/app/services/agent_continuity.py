@@ -15,7 +15,7 @@ from app.core.time import utcnow
 from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.gateways import Gateway
-from app.services.openclaw.constants import OFFLINE_AFTER
+from app.services.openclaw.constants import stale_after_for_heartbeat_config
 from app.services.openclaw.db_service import OpenClawDBService
 from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_call
@@ -92,10 +92,10 @@ def _heartbeat_age_seconds(
     return max(int(delta.total_seconds()), 0)
 
 
-def _is_stale(*, heartbeat_age_seconds: int | None) -> bool:
+def _is_stale(*, heartbeat_age_seconds: int | None, stale_after_seconds: int) -> bool:
     if heartbeat_age_seconds is None:
         return True
-    return heartbeat_age_seconds > int(OFFLINE_AFTER.total_seconds())
+    return heartbeat_age_seconds > stale_after_seconds
 
 
 def continuity_requires_recovery(continuity: ContinuityState) -> bool:
@@ -164,7 +164,13 @@ class AgentContinuityService(OpenClawDBService):
         for agent in agents:
             session_id = (agent.openclaw_session_id or "").strip() or None
             heartbeat_age = _heartbeat_age_seconds(now=now, last_seen_at=agent.last_seen_at)
-            stale = _is_stale(heartbeat_age_seconds=heartbeat_age)
+            stale_after_seconds = int(
+                stale_after_for_heartbeat_config(agent.heartbeat_config).total_seconds(),
+            )
+            stale = _is_stale(
+                heartbeat_age_seconds=heartbeat_age,
+                stale_after_seconds=stale_after_seconds,
+            )
 
             runtime_reachable = True
             continuity_reason = "healthy"

@@ -17,7 +17,54 @@ DEFAULT_HEARTBEAT_CONFIG: dict[str, Any] = {
     "includeReasoning": False,
 }
 
-OFFLINE_AFTER = timedelta(minutes=10)
+_HEARTBEAT_STALE_MULTIPLIER = 2
+_HEARTBEAT_STALE_GRACE_SECONDS = 5 * 60
+_MIN_OFFLINE_AFTER = timedelta(minutes=15)
+_HEARTBEAT_EVERY_RE = re.compile(r"^\s*(?P<count>[1-9]\d*)\s*(?P<unit>[smhdw])\s*$", re.IGNORECASE)
+_HEARTBEAT_UNIT_SECONDS = {
+    "s": 1,
+    "m": 60,
+    "h": 60 * 60,
+    "d": 60 * 60 * 24,
+    "w": 60 * 60 * 24 * 7,
+}
+
+
+def _parse_heartbeat_every_to_seconds(value: str) -> int:
+    match = _HEARTBEAT_EVERY_RE.match(value)
+    if match is None:
+        msg = "invalid heartbeat schedule format"
+        raise ValueError(msg)
+    count = int(match.group("count"))
+    unit = match.group("unit").lower()
+    return count * int(_HEARTBEAT_UNIT_SECONDS[unit])
+
+
+def heartbeat_interval_seconds(heartbeat_config: object | None) -> int:
+    """Return parsed heartbeat cadence seconds with a safe fallback."""
+    fallback = _parse_heartbeat_every_to_seconds(str(DEFAULT_HEARTBEAT_CONFIG.get("every", "20m")))
+    if not isinstance(heartbeat_config, dict):
+        return fallback
+    raw_every = heartbeat_config.get("every")
+    if not isinstance(raw_every, str):
+        return fallback
+    try:
+        return _parse_heartbeat_every_to_seconds(raw_every)
+    except ValueError:
+        return fallback
+
+
+def stale_after_for_heartbeat_config(heartbeat_config: object | None) -> timedelta:
+    """Derive stale/offline threshold from heartbeat cadence with jitter margin."""
+    interval = heartbeat_interval_seconds(heartbeat_config)
+    stale_after_seconds = interval * _HEARTBEAT_STALE_MULTIPLIER + _HEARTBEAT_STALE_GRACE_SECONDS
+    stale_after = timedelta(seconds=stale_after_seconds)
+    if stale_after < _MIN_OFFLINE_AFTER:
+        return _MIN_OFFLINE_AFTER
+    return stale_after
+
+
+OFFLINE_AFTER = stale_after_for_heartbeat_config(DEFAULT_HEARTBEAT_CONFIG)
 AGENT_SESSION_PREFIX = "agent"
 
 DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY: dict[str, bool] = {

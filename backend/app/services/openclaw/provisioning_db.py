@@ -49,7 +49,7 @@ from app.services.activity_log import record_activity
 from app.services.openclaw.constants import (
     _TOOLS_KV_RE,
     DEFAULT_HEARTBEAT_CONFIG,
-    OFFLINE_AFTER,
+    stale_after_for_heartbeat_config,
 )
 from app.services.openclaw.db_agent_state import (
     mark_provision_complete,
@@ -851,7 +851,7 @@ class AgentLifecycleService(OpenClawDBService):
             return agent
         if agent.last_seen_at is None:
             agent.status = "provisioning"
-        elif now - agent.last_seen_at > OFFLINE_AFTER:
+        elif now - agent.last_seen_at > stale_after_for_heartbeat_config(agent.heartbeat_config):
             agent.status = "offline"
         return agent
 
