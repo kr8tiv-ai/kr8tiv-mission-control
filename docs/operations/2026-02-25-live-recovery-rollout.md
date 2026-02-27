@@ -892,3 +892,33 @@ Current status snapshot:
    - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22476038198`
 4. Operational note:
    - Local operator environment required `PyNaCl` for GitHub secret encryption path (`pip install pynacl`) before running secret updates.
+
+## 2026-02-27 GSD Spec Continuation (Phase 33 Rollback Incident Hook + Failure Drill)
+
+1. Rollback hook implementation shipped:
+   - Added script: `scripts/ci/rollback_incident_hook.py`
+   - Behavior: creates labeled incident issue (`incident`, `rollout-gate`) when rollback hook is executed.
+2. Workflow wiring hardening:
+   - Updated `.github/workflows/publish-mission-control-images.yml`:
+     - added `issues: write` permission
+     - exported `GITHUB_TOKEN` into rollout gate step env so rollback hook can call GitHub Issues API
+3. Gate-ops reliability hardening:
+   - Updated `scripts/ci/rollout_gate_ops.py` with API retry/backoff for transient network failures.
+4. Test verification:
+   - `uv run pytest backend/tests/test_rollout_gate_ops.py backend/tests/test_rollout_health_gate.py backend/tests/test_rollback_incident_hook.py -q`
+   - Result: `15 passed`
+5. Live forced-failure drill:
+   - Temporarily set `RUNTIME_HEALTH_URLS=http://127.0.0.1:9`
+   - Gate-only dispatch run:
+     - Run ID: `22485113885`
+     - Conclusion: `failure`
+     - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22485113885`
+   - Rollback hook output effect:
+     - Incident issue created: `#7`
+     - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/issues/7`
+6. Recovery validation:
+   - Restored production health probes (7 URLs)
+   - Gate-only dispatch run:
+     - Run ID: `22485224289`
+     - Conclusion: `success`
+     - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22485224289`
