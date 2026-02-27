@@ -693,3 +693,25 @@ Current status snapshot:
 5. Mitigation shipped in this batch:
    - Verification harness now emits `external_health_probe` checks from `VERIFICATION_EXTERNAL_HEALTH_URLS`.
    - This creates a deterministic gate signal for rollout success/failure even when host shell is unavailable.
+
+## 2026-02-27 Rollout Update (Phase 26 External Probe Build `2e909c5`)
+
+1. Deployment target + image publish confirmation:
+   - Commit: `2e909c5c6e08274f712381c3fa0555d50379eed0`
+   - Workflow: `Publish Mission Control Images`
+   - Run ID: `22472490317`
+   - Conclusion: `success`
+2. Hostinger rollout actions on VPS `1302498`:
+   - `docker_compose_update` action `81102536` => `success`
+   - `docker_compose_start` action `81102537` => `success`
+3. Live endpoint verification after rollout:
+   - `http://76.13.106.100:8100/health` => timeout
+   - `http://76.13.106.100:8100/readyz` => timeout
+   - `http://76.13.106.100:3100` => timeout
+   - `http://76.13.106.100:48650/health` => timeout
+   - `http://76.13.106.100:48651/health` => timeout
+   - `http://76.13.106.100:48652/health` => timeout
+   - `http://76.13.106.100:48653/health` => timeout
+4. Current status:
+   - Rollout automation path is functioning (publish/update/start successful).
+   - Runtime remains unreachable due to unresolved host/container control-plane failure.
