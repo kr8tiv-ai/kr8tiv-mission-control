@@ -870,14 +870,14 @@ def _updated_agent_list(
     for agent_id, (workspace_path, heartbeat, model_id) in entry_by_id.items():
         if agent_id in updated_ids:
             continue
-        new_entry: dict[str, Any] = {
+        new_agent_entry: dict[str, Any] = {
             "id": agent_id,
             "workspace": workspace_path,
             "heartbeat": heartbeat,
         }
         if model_id:
-            new_entry["model"] = model_id
-        new_list.append(new_entry)
+            new_agent_entry["model"] = model_id
+        new_list.append(new_agent_entry)
 
     return new_list
 

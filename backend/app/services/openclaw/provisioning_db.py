@@ -1291,7 +1291,7 @@ class AgentLifecycleService(OpenClawDBService):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="Board gateway_id is required",
-            )
+                )
             agent.gateway_id = board.gateway_id
         enforce_agent_model_policy(agent)
         agent.updated_at = utcnow()

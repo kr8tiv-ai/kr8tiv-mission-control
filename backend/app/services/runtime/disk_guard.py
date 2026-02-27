@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Literal, Protocol
+from typing import Callable, Literal, Protocol, cast
 
 from app.core.time import utcnow
 
@@ -109,7 +109,7 @@ class DiskGuardService:
         self._path = path
         self._warning_threshold_pct = float(warning_threshold_pct)
         self._critical_threshold_pct = float(critical_threshold_pct)
-        self._usage_reader = usage_reader or shutil.disk_usage
+        self._usage_reader: DiskUsageReader = usage_reader or cast(DiskUsageReader, shutil.disk_usage)
 
     def read_status(self) -> DiskGuardStatus:
         """Read current filesystem usage and classify pressure severity."""
@@ -133,4 +133,3 @@ class DiskGuardService:
             warning_threshold_pct=self._warning_threshold_pct,
             critical_threshold_pct=self._critical_threshold_pct,
         )
-

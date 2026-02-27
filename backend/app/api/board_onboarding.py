@@ -217,7 +217,7 @@ def _build_onboarding_recommendation(
         base_bundle.extend(["orchestrator", "multi_agent_coordination"])
         notes = "Team mode: orchestrator-led execution with specialist delegation."
     return BoardOnboardingRecommendation(
-        deployment_mode=deployment_mode,  # type: ignore[arg-type]
+        deployment_mode=deployment_mode,
         persona_preset_key=_recommendation_preset_key(
             deployment_mode=deployment_mode,
             lead_agent=lead_agent,
@@ -235,7 +235,7 @@ def _as_recommendation_read(row: OnboardingRecommendation) -> BoardOnboardingRec
         id=row.id,
         board_id=row.board_id,
         onboarding_session_id=row.onboarding_session_id,
-        deployment_mode=row.deployment_mode,  # type: ignore[arg-type]
+        deployment_mode=row.deployment_mode,
         persona_preset_key=row.persona_preset_key,
         ability_bundle=list(row.ability_bundle or []),
         voice_enabled=row.voice_enabled,

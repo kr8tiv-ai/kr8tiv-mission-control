@@ -10,6 +10,7 @@ import shutil
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 from app.core.config import BACKEND_ROOT, settings
 from app.schemas.distribution import (
@@ -116,7 +117,9 @@ class DistributionService:
     def _read_distribution_metadata(self, artifact_dir: Path) -> dict[str, object]:
         path = self._distribution_meta_path(artifact_dir)
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return cast(dict[str, object], payload)
         created_at = datetime.fromtimestamp(artifact_dir.stat().st_mtime, tz=UTC).isoformat()
         return {"include_watchdog": False, "created_at": created_at}
 

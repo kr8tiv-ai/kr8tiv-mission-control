@@ -43,6 +43,16 @@ def _build_payload_preview(payload_value: object) -> str:
         return str(payload_value)
 
 
+def _coerce_payload_headers(payload: BoardWebhookPayload) -> dict[str, str] | None:
+    raw_headers = getattr(payload, "headers", None)
+    if not isinstance(raw_headers, dict):
+        return None
+    normalized: dict[str, str] = {}
+    for key, value in raw_headers.items():
+        normalized[str(key)] = str(value)
+    return normalized
+
+
 def _webhook_message(
     *,
     board: Board,
@@ -52,7 +62,7 @@ def _webhook_message(
     preview = _build_payload_preview(payload.payload)
     policy = evaluate_ingress_policy(
         payload=payload.payload,
-        headers=payload.headers,
+        headers=_coerce_payload_headers(payload),
         owner_user_id=settings.telegram_owner_user_id,
         bot_username=settings.telegram_bot_username,
         bot_user_id=settings.telegram_bot_user_id,

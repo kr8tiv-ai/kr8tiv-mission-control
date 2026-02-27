@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 import inspect
-from typing import Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -23,6 +23,9 @@ from app.services.agent_continuity import (
 )
 from app.services.openclaw.db_service import OpenClawDBService
 
+if TYPE_CHECKING:
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
 ContinuitySnapshotFetcher = Callable[..., Awaitable[AgentContinuityReport]]
 RecoveryAction = Callable[..., Awaitable[tuple[bool, str]]]
 
@@ -35,7 +38,7 @@ class RecoveryEngine(OpenClawDBService):
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         *,
         continuity_snapshot_fetcher: ContinuitySnapshotFetcher | None = None,
         recovery_action: RecoveryAction | None = None,
@@ -99,7 +102,7 @@ class RecoveryEngine(OpenClawDBService):
         )
         return (await self.session.exec(statement)).first()
 
-    async def _attempt_count_last_hour(self, *, agent_id: UUID, now) -> int:
+    async def _attempt_count_last_hour(self, *, agent_id: UUID, now: datetime) -> int:
         window_start = now - timedelta(hours=1)
         statement = (
             select(RecoveryIncident)

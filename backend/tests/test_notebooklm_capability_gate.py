@@ -87,4 +87,3 @@ async def test_gate_classifies_misconfig_for_missing_profile_files(
 
     assert result.state == "misconfig"
     assert result.reason == "profile_missing"
-

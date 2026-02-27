@@ -19,4 +19,3 @@ def test_heartbeat_template_requires_probe_before_idle_ok() -> None:
     assert "POST {{ base_url }}/api/v1/agent/heartbeat" in template
     assert "Return `HEARTBEAT_OK` only when:" in template
     assert "stay idle and return `HEARTBEAT_OK`" not in template
-

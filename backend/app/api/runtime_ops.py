@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
@@ -151,7 +152,7 @@ def _build_arena_status() -> RuntimeArenaStatusRead:
     )
 
 
-def _as_notebook_counts(states: list[str | None]) -> tuple[int, dict[str, int]]:
+def _as_notebook_counts(states: Sequence[str | None]) -> tuple[int, dict[str, int]]:
     counts = {key: 0 for key in _NOTEBOOK_STATE_KEYS}
     for state in states:
         normalized = str(state or "").strip().lower()

@@ -75,4 +75,3 @@ async def board_agent_continuity(
             for item in report.agents
         ],
     )
-

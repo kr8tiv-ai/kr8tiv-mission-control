@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+from uuid import UUID
 
 from sqlmodel import col, select
 
@@ -13,16 +14,24 @@ from app.models.boards import Board
 from app.models.recovery_incidents import RecoveryIncident
 from app.models.recovery_policies import RecoveryPolicy
 from app.services.openclaw.db_service import OpenClawDBService
-from app.services.runtime.recovery_alerts import RecoveryAlertService
+from app.services.runtime.recovery_alerts import RecoveryAlertResult, RecoveryAlertService
 from app.services.runtime.recovery_engine import RecoveryEngine
+
+if TYPE_CHECKING:
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 class RecoveryEngineProtocol(Protocol):
-    async def evaluate_board(self, *, board_id) -> list[RecoveryIncident]: ...
+    async def evaluate_board(self, *, board_id: UUID) -> list[RecoveryIncident]: ...
 
 
 class RecoveryAlertProtocol(Protocol):
-    async def route_incident_alert(self, *, incident: RecoveryIncident, policy: RecoveryPolicy): ...
+    async def route_incident_alert(
+        self,
+        *,
+        incident: RecoveryIncident,
+        policy: RecoveryPolicy,
+    ) -> RecoveryAlertResult: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,16 +48,16 @@ class RecoveryScheduler(OpenClawDBService):
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         *,
-        recovery_engine_factory: Callable[[object], RecoveryEngineProtocol] | None = None,
+        recovery_engine_factory: Callable[[AsyncSession], RecoveryEngineProtocol] | None = None,
         alert_service: RecoveryAlertProtocol | None = None,
     ) -> None:
         super().__init__(session)
         self._recovery_engine_factory = recovery_engine_factory or (lambda session: RecoveryEngine(session=session))
         self._alert_service = alert_service or RecoveryAlertService()
 
-    async def _ensure_policy(self, *, organization_id) -> RecoveryPolicy:
+    async def _ensure_policy(self, *, organization_id: UUID) -> RecoveryPolicy:
         policy = await RecoveryPolicy.objects.filter_by(organization_id=organization_id).first(self.session)
         if policy is not None:
             return policy
@@ -84,7 +93,7 @@ class RecoveryScheduler(OpenClawDBService):
         alerts_suppressed_dedupe = 0
         alerts_skipped_status = 0
 
-        policy_cache: dict = {}
+        policy_cache: dict[UUID, RecoveryPolicy] = {}
         for board in boards:
             engine = self._recovery_engine_factory(self.session)
             incidents = await engine.evaluate_board(board_id=board.id)

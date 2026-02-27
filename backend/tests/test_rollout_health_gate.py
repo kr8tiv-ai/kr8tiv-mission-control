@@ -5,8 +5,6 @@ import importlib.util
 from pathlib import Path
 import sys
 
-import pytest
-
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "ci" / "rollout_health_gate.py"
 

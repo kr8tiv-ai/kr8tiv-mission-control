@@ -33,7 +33,7 @@ def _as_confirmation_read(policy: BackupPolicy) -> BackupConfirmationRead:
         organization_id=policy.organization_id,
         owner_user_id=policy.owner_user_id,
         status=policy.status,
-        destination_type=policy.destination_type,  # type: ignore[arg-type]
+        destination_type=policy.destination_type,
         destination_label=policy.destination_label,
         last_confirmed_at=policy.last_confirmed_at,
         next_prompt_at=policy.next_prompt_at,
@@ -98,7 +98,7 @@ async def get_backup_reminder(
         reminder_due=reminder.reminder_due,
         cadence_per_week=reminder.cadence_per_week,
         warning=reminder.warning,
-        recommended_destinations=DESTINATIONS,  # type: ignore[arg-type]
+        recommended_destinations=DESTINATIONS,
         next_prompt_at=policy.next_prompt_at,
     )
 

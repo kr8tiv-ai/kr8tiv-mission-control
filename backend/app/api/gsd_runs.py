@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypeGuard
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -57,10 +58,10 @@ def _as_read(row: GSDRun) -> GSDRunRead:
         created_by_user_id=row.created_by_user_id,
         run_name=row.run_name,
         iteration_number=row.iteration_number,
-        stage=row.stage,  # type: ignore[arg-type]
-        status=row.status,  # type: ignore[arg-type]
+        stage=row.stage,
+        status=row.status,
         owner_approval_required=row.owner_approval_required,
-        owner_approval_status=row.owner_approval_status,  # type: ignore[arg-type]
+        owner_approval_status=row.owner_approval_status,
         owner_approval_note=row.owner_approval_note,
         owner_approved_at=row.owner_approved_at,
         rollout_evidence_links=list(row.rollout_evidence_links),
@@ -71,14 +72,14 @@ def _as_read(row: GSDRun) -> GSDRunRead:
     )
 
 
-def _is_numeric_metric(value: object) -> bool:
+def _is_numeric_metric(value: object) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _compute_metric_deltas(
     *,
-    current: dict[str, object],
-    previous: dict[str, object],
+    current: Mapping[str, object],
+    previous: Mapping[str, object],
 ) -> dict[str, float]:
     deltas: dict[str, float] = {}
     for key, current_value in current.items():

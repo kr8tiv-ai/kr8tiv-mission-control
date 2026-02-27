@@ -248,8 +248,6 @@ async def _run_agent_turn(
     max_rounds: int,
     is_reviewer: bool,
 ) -> tuple[str, str]:
-    import asyncio
-
     board_agent = await _find_board_agent(ctx.board.id, agent_id)
     if board_agent is None:
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing board agent")

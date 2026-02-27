@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 import httpx
 
@@ -49,7 +48,7 @@ class SupermemoryAdapter:
         top_k: int | None = None,
         threshold: float | None = None,
         timeout_seconds: int | None = None,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = (base_url or settings.supermemory_base_url).rstrip("/")
         self.api_key = (api_key if api_key is not None else settings.supermemory_api_key).strip()

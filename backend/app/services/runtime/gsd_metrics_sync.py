@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from app.core.time import utcnow
 from app.models.gsd_runs import GSDRun
 from app.services.runtime.gsd_metrics_aggregator import aggregate_continuity_metrics
 
+if TYPE_CHECKING:
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
 
 async def sync_recovery_summary_to_gsd_run(
     *,
-    session,
+    session: AsyncSession,
     organization_id: UUID,
     board_id: UUID,
     gsd_run_id: UUID,

@@ -27,7 +27,7 @@ def _as_read(capability: Capability) -> CapabilityRead:
     return CapabilityRead(
         id=capability.id,
         organization_id=capability.organization_id,
-        capability_type=capability.capability_type,  # type: ignore[arg-type]
+        capability_type=capability.capability_type,
         key=capability.key,
         name=capability.name,
         description=capability.description,

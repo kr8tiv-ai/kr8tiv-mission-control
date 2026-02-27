@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,7 +24,7 @@ from app.services.organizations import OrganizationContext
 from app.services.runtime.recovery_engine import RecoveryEngine
 from app.services.runtime.gsd_metrics_sync import sync_recovery_summary_to_gsd_run
 
-if False:  # pragma: no cover
+if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 router = APIRouter(prefix="/runtime/recovery", tags=["control-plane"])
@@ -70,7 +71,7 @@ def _as_incident_read(row: RecoveryIncident) -> RecoveryIncidentRead:
 
 async def _ensure_policy(
     *,
-    session,
+    session: AsyncSession,
     organization_id: UUID,
 ) -> RecoveryPolicy:
     row = await RecoveryPolicy.objects.filter_by(organization_id=organization_id).first(session)
@@ -85,7 +86,7 @@ async def _ensure_policy(
 
 @router.get("/policy", response_model=RecoveryPolicyRead)
 async def get_recovery_policy(
-    session=SESSION_DEP,
+    session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> RecoveryPolicyRead:
     """Return organization recovery policy defaults/settings."""
@@ -96,7 +97,7 @@ async def get_recovery_policy(
 @router.put("/policy", response_model=RecoveryPolicyRead)
 async def update_recovery_policy(
     payload: RecoveryPolicyUpdate,
-    session=SESSION_DEP,
+    session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> RecoveryPolicyRead:
     """Update organization recovery policy settings."""
@@ -115,7 +116,7 @@ async def update_recovery_policy(
 async def list_recovery_incidents(
     board_id: UUID | None = BOARD_ID_QUERY,
     limit: int = LIMIT_QUERY,
-    session=SESSION_DEP,
+    session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> list[RecoveryIncidentRead]:
     """List recent recovery incidents for the organization, optionally board-scoped."""
@@ -139,7 +140,7 @@ async def run_recovery_now(
         description="Optional GSD run id to receive recovery summary metrics.",
     ),
     force: bool = Query(default=False, description="Bypass cooldown and force immediate heartbeat resync."),
-    session=SESSION_DEP,
+    session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> RecoveryRunRead:
     """Execute a one-shot continuity recovery evaluation for the given board."""

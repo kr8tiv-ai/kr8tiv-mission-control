@@ -39,8 +39,8 @@ def _as_read(row: ChangeRequest) -> ChangeRequestRead:
         title=row.title,
         description=row.description,
         category=row.category,
-        priority=row.priority,  # type: ignore[arg-type]
-        status=row.status,  # type: ignore[arg-type]
+        priority=row.priority,
+        status=row.status,
         resolution_note=row.resolution_note,
         reviewed_by_user_id=row.reviewed_by_user_id,
         reviewed_at=row.reviewed_at,

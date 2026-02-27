@@ -46,10 +46,10 @@ def choose_agent(
     if fallback_order:
         by_id = {str(item.get("id")): item for item in candidates if item.get("id") is not None}
         for fallback_id in fallback_order:
-            candidate = by_id.get(fallback_id)
-            if candidate is None:
+            fallback_candidate = by_id.get(fallback_id)
+            if fallback_candidate is None:
                 continue
-            if candidate.get("capable", False):
+            if fallback_candidate.get("capable", False):
                 return fallback_id
 
     return None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import cast
 from urllib import parse, request
 
 
@@ -40,7 +41,11 @@ def fetch_control_plane_status(
     req = request.Request(url, headers=headers, method="GET")
     with request.urlopen(req, timeout=timeout_seconds) as response:  # noqa: S310
         payload = response.read().decode("utf-8")
-    return json.loads(payload)
+    decoded = json.loads(payload)
+    if not isinstance(decoded, dict):
+        msg = "control-plane-status payload is not a JSON object"
+        raise ValueError(msg)
+    return cast(dict[str, object], decoded)
 
 
 def _build_parser() -> argparse.ArgumentParser:

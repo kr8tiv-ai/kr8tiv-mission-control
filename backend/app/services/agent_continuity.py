@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -19,6 +19,9 @@ from app.services.openclaw.constants import stale_after_for_heartbeat_config
 from app.services.openclaw.db_service import OpenClawDBService
 from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_call
+
+if TYPE_CHECKING:
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
 ContinuityState = Literal["alive", "stale", "unreachable"]
 RuntimeSessionKeysFetcher = Callable[[Gateway], Awaitable[set[str]]]
@@ -108,7 +111,7 @@ class AgentContinuityService(OpenClawDBService):
 
     def __init__(
         self,
-        session,
+        session: AsyncSession,
         *,
         runtime_session_keys_fetcher: RuntimeSessionKeysFetcher | None = None,
     ) -> None:

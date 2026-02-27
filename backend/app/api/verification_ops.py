@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -12,9 +13,9 @@ from app.db.session import get_session
 from app.models.gsd_runs import GSDRun
 from app.schemas.verification_ops import VerificationCheckRead, VerificationExecuteRead
 from app.services.organizations import OrganizationContext
-from app.services.runtime.verification_harness import run_verification_harness
+from app.services.runtime.verification_harness import VerificationHarnessResult, run_verification_harness
 
-if False:  # pragma: no cover
+if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 router = APIRouter(prefix="/runtime/verification", tags=["control-plane"])
@@ -41,7 +42,7 @@ async def _sync_verification_to_gsd_run(
     session: AsyncSession,
     organization_id: UUID,
     gsd_run_id: UUID,
-    result,
+    result: VerificationHarnessResult,
 ) -> str:
     row = await GSDRun.objects.by_id(gsd_run_id).first(session)
     if row is None or row.organization_id != organization_id:
