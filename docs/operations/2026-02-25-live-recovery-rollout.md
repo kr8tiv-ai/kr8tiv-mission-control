@@ -582,6 +582,49 @@ Current status snapshot:
      - `docker compose -f /docker/openclaw-mission-control/compose.yml up -d`
    - Then rerun live checks on `8100/readyz`, `3100`, and `48650-48653`.
 
+## 2026-02-27 Recovery Completion (Tailscale Reauth + Recovery-Mode Disk Remediation)
+
+1. Access restoration:
+   - Tailscale was reauthenticated from local operator node.
+   - Hostinger API used directly (`https://developers.hostinger.com/api/vps/v1/...`) after MCP transport failure.
+2. Root-cause confirmation:
+   - VPS entered recovery mode (`ct_recovery`) and mounted original root disk at `/mnt/sdb1`.
+   - Disk state confirmed:
+     - before: `/dev/sdb1` at `100%` used
+     - after cleanup: `/dev/sdb1` at `68%` used (`~63 GB` free)
+3. Safe cleanup executed:
+   - Preserved live docker volumes and control-plane repos.
+   - Removed oversized dated backup tarballs under `/backups` with retention on latest set (`20260226/20260227`):
+     - deleted older `openclaw-ydy8-*`, `openclaw-arsenal-*`, `openclaw-edith-*`, `openclaw-jocasta-*` archives (20260223-20260225).
+4. SSH survivability hardening:
+   - During recovery-mode mount, appended known admin keys to mounted root authorized keys:
+     - `jarvis-vps`
+     - `codex-ops-20260227`
+   - Exited recovery mode (`ct_recovery_stop`) and returned VM to `running`.
+5. Runtime redeploy from host shell:
+   - Connected over SSH with rotated root password.
+   - Updated `/docker/openclaw-mission-control/compose.yml` immutable tags to `ff2c0e6`:
+     - backend/webhook: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:ff2c0e6`
+     - frontend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:ff2c0e6`
+   - Executed:
+     - `docker compose --env-file .env -f compose.yml pull`
+     - `docker compose --env-file .env -f compose.yml up -d --remove-orphans`
+6. Live verification (post-recovery):
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+   - `http://76.13.106.100:48650/health` => `200`
+   - `http://76.13.106.100:48651/health` => `200`
+   - `http://76.13.106.100:48652/health` => `200`
+   - `http://76.13.106.100:48653/health` => `200`
+   - API checks with local auth token:
+     - `GET /api/v1/runtime/recovery/policy` => `200`
+     - `GET /api/v1/runtime/notebook/gate` => `200`
+     - `GET /api/v1/gsd-runs` => `200`
+7. Security posture check:
+   - Public Postgres exposure remains closed:
+     - `76.13.106.100:5432` => closed.
+
 ## 2026-02-27 GSD Spec Continuation (Phase 23-25 Local Verification + Evidence Pack)
 
 1. Backend targeted regression (phase23-25 scope):
