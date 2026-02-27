@@ -24,6 +24,7 @@ TaskMode = Literal[
 ]
 DeploymentMode = Literal["team", "individual"]
 NotebookProfile = Literal["enterprise", "personal", "auto"]
+NotebookGateState = Literal["ready", "retryable", "misconfig", "hard_fail"]
 TaskIterationVerdict = Literal["APPROVED", "REVISE", "ERROR"]
 STATUS_REQUIRED_ERROR = "status is required"
 # Keep these symbols as runtime globals so Pydantic can resolve
@@ -209,6 +210,9 @@ class TaskRead(TaskBase):
     in_progress_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    notebook_gate_state: NotebookGateState | None = None
+    notebook_gate_reason: str | None = None
+    notebook_gate_checked_at: datetime | None = None
     blocked_by_task_ids: list[UUID] = Field(default_factory=list)
     is_blocked: bool = False
     tags: list[TagRef] = Field(default_factory=list)

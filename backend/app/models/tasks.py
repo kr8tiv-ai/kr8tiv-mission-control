@@ -39,6 +39,9 @@ class Task(TenantScoped, table=True):
     notebook_profile: str = Field(default="auto", index=True)
     notebook_id: str | None = Field(default=None, sa_column=Column(Text))
     notebook_share_url: str | None = Field(default=None, sa_column=Column(Text))
+    notebook_gate_state: str | None = Field(default=None, index=True)
+    notebook_gate_reason: str | None = Field(default=None, sa_column=Column(Text))
+    notebook_gate_checked_at: datetime | None = None
     due_at: datetime | None = None
     in_progress_at: datetime | None = None
     previous_in_progress_at: datetime | None = None
