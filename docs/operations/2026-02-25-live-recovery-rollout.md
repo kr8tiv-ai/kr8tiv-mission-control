@@ -625,6 +625,32 @@ Current status snapshot:
    - Public Postgres exposure remains closed:
      - `76.13.106.100:5432` => closed.
 
+## 2026-02-27 Security Hardening (Redis Public Port Closure)
+
+1. Runtime hardening action:
+   - Removed host-published Redis port from live Mission Control compose on VPS:
+     - before: `6379:6379` published
+     - after: internal-only container port `6379/tcp` (no host binding)
+2. Stack redeploy:
+   - Executed on host:
+     - `docker compose --env-file .env -f /docker/openclaw-mission-control/compose.yml up -d --remove-orphans`
+   - Verified service state remained healthy for backend/frontend/webhook/db.
+3. Live verification:
+   - Application + agent health endpoints:
+     - `http://76.13.106.100:8100/health` => `200`
+     - `http://76.13.106.100:8100/readyz` => `200`
+     - `http://76.13.106.100:3100` => `200`
+     - `http://76.13.106.100:48650/health` => `200`
+     - `http://76.13.106.100:48651/health` => `200`
+     - `http://76.13.106.100:48652/health` => `200`
+     - `http://76.13.106.100:48653/health` => `200`
+   - Public TCP exposure checks:
+     - `76.13.106.100:5432` => closed
+     - `76.13.106.100:6379` => closed
+4. Repo parity:
+   - Removed Redis host port mapping from tracked compose file:
+     - `compose.yml` (`redis` service no longer exposes `6379` publicly).
+
 ## 2026-02-27 GSD Spec Continuation (Phase 23-25 Local Verification + Evidence Pack)
 
 1. Backend targeted regression (phase23-25 scope):
