@@ -21,6 +21,7 @@ from app.schemas.recovery_ops import (
 )
 from app.services.organizations import OrganizationContext
 from app.services.runtime.recovery_engine import RecoveryEngine
+from app.services.runtime.gsd_metrics_sync import sync_recovery_summary_to_gsd_run
 
 if False:  # pragma: no cover
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -133,6 +134,10 @@ async def list_recovery_incidents(
 @router.post("/run", response_model=RecoveryRunRead)
 async def run_recovery_now(
     board_id: UUID,
+    gsd_run_id: UUID | None = Query(
+        default=None,
+        description="Optional GSD run id to receive recovery summary metrics.",
+    ),
     force: bool = Query(default=False, description="Bypass cooldown and force immediate heartbeat resync."),
     session=SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
@@ -153,6 +158,21 @@ async def run_recovery_now(
     for incident in incidents:
         if incident.status in counts:
             counts[incident.status] += 1
+
+    if gsd_run_id is not None:
+        synced = await sync_recovery_summary_to_gsd_run(
+            session=session,
+            organization_id=ctx.organization.id,
+            board_id=board.id,
+            gsd_run_id=gsd_run_id,
+            total_incidents=len(incidents),
+            recovered=counts["recovered"],
+            failed=counts["failed"],
+            suppressed=counts["suppressed"],
+        )
+        if synced is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="GSD run not found")
+
     return RecoveryRunRead(
         board_id=board.id,
         generated_at=utcnow(),

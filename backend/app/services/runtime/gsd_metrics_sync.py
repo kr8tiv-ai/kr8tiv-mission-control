@@ -1,0 +1,44 @@
+"""Sync runtime recovery summaries into GSD run telemetry rows."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from app.core.time import utcnow
+from app.models.gsd_runs import GSDRun
+
+
+async def sync_recovery_summary_to_gsd_run(
+    *,
+    session,
+    organization_id: UUID,
+    board_id: UUID,
+    gsd_run_id: UUID,
+    total_incidents: int,
+    recovered: int,
+    failed: int,
+    suppressed: int,
+) -> GSDRun | None:
+    """Persist recovery counters in a target GSD run metrics snapshot."""
+    row = await GSDRun.objects.by_id(gsd_run_id).first(session)
+    if row is None or row.organization_id != organization_id:
+        return None
+    if row.board_id is not None and row.board_id != board_id:
+        return None
+
+    snapshot = dict(row.metrics_snapshot or {})
+    snapshot.update(
+        {
+            "incidents_total": int(total_incidents),
+            "incidents_recovered": int(recovered),
+            "incidents_failed": int(failed),
+            "incidents_suppressed": int(suppressed),
+        }
+    )
+    row.metrics_snapshot = snapshot
+    row.updated_at = utcnow()
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+

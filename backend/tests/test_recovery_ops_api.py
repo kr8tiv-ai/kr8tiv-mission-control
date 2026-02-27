@@ -18,6 +18,7 @@ from app.db.session import get_session
 from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.gateways import Gateway
+from app.models.gsd_runs import GSDRun
 from app.models.organizations import Organization
 from app.models.recovery_incidents import RecoveryIncident
 from app.services.organizations import OrganizationContext
@@ -292,4 +293,123 @@ async def test_run_recovery_now_force_bypasses_cooldown(
     assert response.status_code == 200
     assert seen["bypass_cooldown"] is True
     assert response.json()["recovered"] == 1
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_run_recovery_now_syncs_metrics_into_gsd_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    await _create_schema(engine)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    org = Organization(id=uuid4(), name="KR8TIV")
+    gateway = Gateway(
+        id=uuid4(),
+        organization_id=org.id,
+        name="main-gateway",
+        url="http://gateway.internal",
+        token=None,
+        workspace_root="/srv/openclaw",
+    )
+    board = Board(id=uuid4(), organization_id=org.id, name="MC", slug="mc", gateway_id=gateway.id)
+    agent = Agent(
+        id=uuid4(),
+        board_id=board.id,
+        gateway_id=gateway.id,
+        name="arsenal",
+        status="offline",
+        openclaw_session_id="agent:arsenal:main",
+        last_seen_at=utcnow() - timedelta(minutes=20),
+    )
+    gsd_run = GSDRun(
+        id=uuid4(),
+        organization_id=org.id,
+        board_id=board.id,
+        run_name="phase22-sync",
+        stage="hardening",
+        status="in_progress",
+        owner_approval_required=False,
+        owner_approval_status="not_required",
+        rollout_evidence_links=[],
+        metrics_snapshot={},
+    )
+
+    async with session_maker() as session:
+        session.add(org)
+        session.add(gateway)
+        session.add(board)
+        session.add(agent)
+        session.add(gsd_run)
+        await session.commit()
+
+    app = _build_test_app()
+
+    async def _override_get_session() -> AsyncSession:
+        async with session_maker() as session:
+            yield session
+
+    async def _override_require_org_admin() -> OrganizationContext:
+        return _org_context(org)
+
+    async def _fake_evaluate_board(
+        self: RecoveryEngine,
+        *,
+        board_id,
+        bypass_cooldown: bool = False,
+    ):  # type: ignore[override]
+        assert board_id == board.id
+        assert bypass_cooldown is False
+        now = utcnow()
+        return [
+            RecoveryIncident(
+                organization_id=org.id,
+                board_id=board.id,
+                agent_id=agent.id,
+                status="recovered",
+                reason="heartbeat_stale",
+                action="session_resync",
+                attempts=1,
+                detected_at=now,
+                recovered_at=now,
+                created_at=now,
+                updated_at=now,
+            ),
+            RecoveryIncident(
+                organization_id=org.id,
+                board_id=board.id,
+                agent_id=agent.id,
+                status="suppressed",
+                reason="cooldown_active",
+                action=None,
+                attempts=1,
+                detected_at=now,
+                created_at=now,
+                updated_at=now,
+            ),
+        ]
+
+    app.dependency_overrides[get_session] = _override_get_session
+    app.dependency_overrides[require_org_admin] = _override_require_org_admin
+    monkeypatch.setattr(RecoveryEngine, "evaluate_board", _fake_evaluate_board)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        response = await client.post(
+            f"/api/v1/runtime/recovery/run?board_id={board.id}&gsd_run_id={gsd_run.id}"
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_incidents"] == 2
+    assert body["recovered"] == 1
+    assert body["suppressed"] == 1
+
+    async with session_maker() as session:
+        refreshed = await GSDRun.objects.by_id(gsd_run.id).first(session)
+        assert refreshed is not None
+        assert refreshed.metrics_snapshot["incidents_total"] == 2
+        assert refreshed.metrics_snapshot["incidents_recovered"] == 1
+        assert refreshed.metrics_snapshot["incidents_failed"] == 0
+        assert refreshed.metrics_snapshot["incidents_suppressed"] == 1
+
     await engine.dispose()

@@ -482,3 +482,20 @@ Production rollout evidence will be appended after immutable image publish + VPS
    - Combined targeted regression:
      - `uv run pytest backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py backend/tests/test_tasks_api_rows.py backend/tests/test_gsd_runs_api.py -q`
      - Result: `23 passed`
+
+## 2026-02-27 GSD Spec Continuation (Recovery -> GSD Metrics Sync)
+
+1. Added runtime sync service:
+   - `backend/app/services/runtime/gsd_metrics_sync.py`
+   - Purpose: persist recovery run summary counters into `gsd_runs.metrics_snapshot`.
+2. Extended recovery run API:
+   - `POST /api/v1/runtime/recovery/run` now accepts optional `gsd_run_id`.
+   - When provided and valid, run summary (`total`, `recovered`, `failed`, `suppressed`) is written into the target GSD run.
+   - Invalid/out-of-scope `gsd_run_id` returns `404`.
+3. Test coverage:
+   - Added/extended `backend/tests/test_recovery_ops_api.py` with metrics sync assertion.
+4. Verification:
+   - `uv run pytest backend/tests/test_recovery_ops_api.py -q` => `5 passed`
+   - Combined targeted regression:
+     - `uv run pytest backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py backend/tests/test_tasks_api_rows.py backend/tests/test_gsd_runs_api.py backend/tests/test_recovery_ops_api.py -q`
+     - Result: `28 passed`
