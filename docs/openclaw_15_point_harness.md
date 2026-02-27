@@ -222,6 +222,9 @@ Run these checks after enabling CI rollout gating in image publish workflow:
      - Expected: rollback attempt metadata present in evidence payload.
    - If rollback command missing:
      - Expected: gate still fails with explicit rollback-missing signal.
+5. Main branch strictness
+   - For `push` on `main`, skipped gate status is treated as failure.
+   - For `workflow_dispatch`, `allow_skipped_gate=true` may be used for non-prod/debug validation only.
 
 ## Evidence Capture Template
 

@@ -215,6 +215,15 @@ def to_env_lines(payload: dict[str, Any]) -> list[str]:
     return lines
 
 
+def compute_exit_code(status: str, *, fail_on_skipped: bool) -> int:
+    """Map gate status to process exit code."""
+    if status == "failed":
+        return 1
+    if status == "skipped" and fail_on_skipped:
+        return 1
+    return 0
+
+
 def _write_text(path: str, content: str) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -237,6 +246,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--evidence-file", default="", help="Optional JSON evidence output path")
     parser.add_argument("--env-file", default="", help="Optional env-style output path")
+    parser.add_argument(
+        "--fail-on-skipped",
+        action="store_true",
+        help="Treat skipped gate status as failure",
+    )
     return parser
 
 
@@ -261,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.env_file:
         _write_text(args.env_file, "\n".join(to_env_lines(payload)) + "\n")
 
-    return 0 if payload["status"] in {"passed", "skipped"} else 1
+    return compute_exit_code(str(payload["status"]), fail_on_skipped=bool(args.fail_on_skipped))
 
 
 if __name__ == "__main__":

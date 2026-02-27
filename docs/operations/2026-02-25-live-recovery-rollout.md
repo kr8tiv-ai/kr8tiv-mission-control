@@ -796,3 +796,17 @@ Current status snapshot:
 3. Current semantics now enforced in pipeline:
    - publish remains successful only when gate status is `passed` or `skipped`
    - `failed` status now fails workflow and can trigger rollback command if configured
+
+## 2026-02-27 GSD Spec Continuation (Phase 28 Main-Branch Strict Gate Policy)
+
+1. Gate strictness update shipped:
+   - `scripts/ci/rollout_health_gate.py` now supports `--fail-on-skipped`.
+   - `skipped` can now be treated as hard failure by policy.
+2. Publish workflow policy update:
+   - `push` on `main`: `--fail-on-skipped` enforced.
+   - `workflow_dispatch`: optional input `allow_skipped_gate=true` for non-prod/debug runs.
+3. Test verification:
+   - `UV_PROJECT_ENVIRONMENT=.venv-test uv run pytest tests/test_rollout_health_gate.py -q`
+   - Result: `6 passed`
+4. Effect:
+   - Main branch can no longer silently pass rollout gate with missing runtime probe configuration.

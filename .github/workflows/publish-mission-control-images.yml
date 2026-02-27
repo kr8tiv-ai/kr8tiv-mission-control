@@ -9,6 +9,15 @@ on:
       - "frontend/**"
       - ".github/workflows/publish-mission-control-images.yml"
   workflow_dispatch:
+    inputs:
+      allow_skipped_gate:
+        description: "Allow rollout gate status=skipped (non-prod/debug only)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -63,7 +72,16 @@ jobs:
         env:
           RUNTIME_HEALTH_URLS: ${{ secrets.RUNTIME_HEALTH_URLS }}
           RUNTIME_ROLLBACK_COMMAND: ${{ secrets.RUNTIME_ROLLBACK_COMMAND }}
+          ALLOW_SKIPPED_GATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.allow_skipped_gate == 'true' }}
         run: |
+          if [ "${ALLOW_SKIPPED_GATE}" = "true" ]; then
+            FAIL_ON_SKIPPED=""
+            echo "allow_skipped_gate=true -> skipped status will not fail this run."
+          else
+            FAIL_ON_SKIPPED="--fail-on-skipped"
+            echo "allow_skipped_gate=false -> skipped status will fail this run."
+          fi
+
           python scripts/ci/rollout_health_gate.py \
             --urls "${RUNTIME_HEALTH_URLS:-}" \
             --attempts 8 \
@@ -72,6 +90,7 @@ jobs:
             --rollback-on-fail \
             --rollback-command "${RUNTIME_ROLLBACK_COMMAND:-}" \
             --rollback-timeout-seconds 240 \
+            ${FAIL_ON_SKIPPED} \
             --evidence-file artifacts/rollout/health-gate.json \
             --env-file artifacts/rollout/health-gate.env
 

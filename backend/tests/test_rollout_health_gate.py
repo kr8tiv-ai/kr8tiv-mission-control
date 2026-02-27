@@ -128,3 +128,12 @@ def test_to_env_lines_exposes_gate_summary() -> None:
     assert "ROLLOUT_GATE_ROLLBACK_ATTEMPTED=true" in env_lines
     assert "ROLLOUT_GATE_ROLLBACK_SUCCEEDED=false" in env_lines
     assert "ROLLOUT_GATE_ROLLBACK_EXIT_CODE=2" in env_lines
+
+
+def test_compute_exit_code_respects_fail_on_skipped_policy() -> None:
+    module = _load_module()
+
+    assert module.compute_exit_code("passed", fail_on_skipped=True) == 0
+    assert module.compute_exit_code("failed", fail_on_skipped=False) == 1
+    assert module.compute_exit_code("skipped", fail_on_skipped=False) == 0
+    assert module.compute_exit_code("skipped", fail_on_skipped=True) == 1

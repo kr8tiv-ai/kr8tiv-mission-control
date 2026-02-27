@@ -48,6 +48,9 @@ Production deploys must be reproducible and restart-safe. Mission Control runtim
    - Evidence artifacts:
      - `artifacts/rollout/health-gate.json`
      - `artifacts/rollout/health-gate.env`
+6. Skip policy:
+   - `push` on `main`: `skipped` is treated as failure (`--fail-on-skipped` enforced).
+   - `workflow_dispatch`: operator may set `allow_skipped_gate=true` for non-prod/debug runs.
 
 ## Rollback
 
@@ -60,4 +63,4 @@ Production deploys must be reproducible and restart-safe. Mission Control runtim
 5. Rollout gate semantics:
    - `passed`: rollout healthy
    - `failed`: rollout unhealthy (and rollback attempted if configured)
-   - `skipped`: gate intentionally bypassed due missing URL configuration
+   - `skipped`: gate intentionally bypassed due missing URL configuration (not allowed on `main`)
