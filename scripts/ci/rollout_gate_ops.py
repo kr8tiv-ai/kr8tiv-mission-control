@@ -140,15 +140,30 @@ class GitHubActionsApi:
     def _request(self, method: str, url: str, payload: dict[str, Any] | None = None) -> Any:
         body = None if payload is None else json.dumps(payload).encode("utf-8")
         req = request.Request(url, data=body, headers=self._headers, method=method)
-        try:
-            with request.urlopen(req, timeout=30) as response:  # noqa: S310
-                raw = response.read().decode("utf-8").strip()
-                if not raw:
-                    return None
-                return json.loads(raw)
-        except error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"GitHub API error {exc.code}: {detail}") from exc
+        last_exc: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                with request.urlopen(req, timeout=30) as response:  # noqa: S310
+                    raw = response.read().decode("utf-8").strip()
+                    if not raw:
+                        return None
+                    return json.loads(raw)
+            except error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                if exc.code in {502, 503, 504} and attempt < 4:
+                    last_exc = RuntimeError(f"GitHub API transient error {exc.code}: {detail}")
+                    time.sleep(float(attempt * 2))
+                    continue
+                raise RuntimeError(f"GitHub API error {exc.code}: {detail}") from exc
+            except (error.URLError, TimeoutError) as exc:
+                last_exc = exc
+                if attempt < 4:
+                    time.sleep(float(attempt * 2))
+                    continue
+                raise RuntimeError(f"GitHub API network error: {exc}") from exc
+        if last_exc is not None:  # pragma: no cover - defensive completion path
+            raise RuntimeError(f"GitHub API request failed after retries: {last_exc}")
+        raise RuntimeError("GitHub API request failed without explicit exception.")
 
     def set_secret(self, name: str, value: str) -> None:
         key_url = f"{self._base}/actions/secrets/public-key"

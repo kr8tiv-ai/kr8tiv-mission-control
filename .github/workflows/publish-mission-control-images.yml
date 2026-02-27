@@ -30,6 +30,7 @@ on:
 permissions:
   contents: read
   packages: write
+  issues: write
 
 jobs:
   publish:
@@ -96,6 +97,7 @@ jobs:
         env:
           RUNTIME_HEALTH_URLS: ${{ secrets.RUNTIME_HEALTH_URLS }}
           RUNTIME_ROLLBACK_COMMAND: ${{ secrets.RUNTIME_ROLLBACK_COMMAND }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ALLOW_SKIPPED_GATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.allow_skipped_gate == 'true' }}
         run: |
           if [ "${ALLOW_SKIPPED_GATE}" = "true" ]; then

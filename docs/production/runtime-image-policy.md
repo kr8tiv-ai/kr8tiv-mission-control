@@ -78,9 +78,11 @@ python scripts/ci/rollout_gate_ops.py \
   --repo kr8tiv-mission-control \
   --health-urls "http://76.13.106.100:8100/readyz,http://76.13.106.100:8100/healthz,http://76.13.106.100:3100" \
   --update-rollback \
-  --rollback-command "echo '[rollout-gate] rollback hook invoked; run manual rollback runbook'" \
+  --rollback-command "python scripts/ci/rollback_incident_hook.py --owner kr8tiv-ai --repo kr8tiv-mission-control --gate-status failed --status-reason probe_failures --probe-urls \"\${RUNTIME_HEALTH_URLS:-}\"" \
   --dispatch-gate-only
 ```
+
+`rollback_incident_hook.py` creates a labeled incident issue (`incident`, `rollout-gate`) referencing the failing workflow run and probe set. This provides deterministic operator escalation when runtime rollback automation is unavailable.
 
 ## Rollback
 
