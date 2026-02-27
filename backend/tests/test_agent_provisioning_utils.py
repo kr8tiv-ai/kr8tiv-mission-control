@@ -878,7 +878,7 @@ async def test_patch_agent_heartbeats_disables_whatsapp_when_not_enabled(
     raw_payload = patch_params.get("raw")
     assert isinstance(raw_payload, str)
     payload = json.loads(raw_payload)
-    assert payload["channels"]["whatsapp"]["enabled"] is False
+    assert "enabled" not in payload["channels"]["whatsapp"]
     assert payload["channels"]["whatsapp"]["accounts"]["default"]["enabled"] is False
     assert payload["channels"]["telegram"]["configWrites"] is False
     assert payload["channels"]["telegram"]["accounts"]["default"]["configWrites"] is False

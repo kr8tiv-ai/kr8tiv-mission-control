@@ -414,3 +414,32 @@ Verification snapshot:
    - Worker emits `queue.worker.recovery_sweep_deferred_migrations_pending` until DB revision reaches Alembic head.
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
+
+## 2026-02-27 Runtime Hardening Update (WhatsApp Schema Compatibility + NotebookLM Planning Queries)
+
+1. Channel patch compatibility fix:
+   - Updated heartbeat provisioning patch logic to stop emitting unsupported top-level key:
+     - removed `channels.whatsapp.enabled` patch writes
+     - retained account-level disable patch:
+       - `channels.whatsapp.accounts.default.enabled=false`
+   - Rationale:
+     - Some OpenClaw runtimes reject `channels.whatsapp.enabled` as an unknown key, which can invalidate patch attempts and re-introduce channel restart noise.
+2. Test-first validation:
+   - Updated `test_patch_agent_heartbeats_disables_whatsapp_when_not_enabled` to require account-level only disable.
+   - Verification run:
+     - `uv run pytest backend/tests/test_agent_provisioning_utils.py::test_patch_agent_heartbeats_disables_whatsapp_when_not_enabled -q` => `1 passed`
+     - `uv run pytest backend/tests/test_agent_provisioning_utils.py -k "patch_agent_heartbeats" -q` => `5 passed`
+3. NotebookLM phase-planning query sweep:
+   - Notebook queried: `c276018f-768b-4c7b-a8a8-cd96110d990b`
+   - Query artifact:
+     - `docs/operations/2026-02-27-notebooklm-phase20-qna.md`
+   - Topics queried:
+     - reliability failure patterns
+     - heartbeat/Telegram stabilization priorities
+     - persona anti-drift controls
+     - notebook capability-gate checks
+     - rollout verification checklist
+     - GSD telemetry metrics
+4. GSD planning outputs produced from query synthesis:
+   - `docs/plans/2026-02-27-phase20-22-heartbeat-capability-gate-design.md`
+   - `docs/plans/2026-02-27-phase20-22-heartbeat-capability-gate-implementation.md`

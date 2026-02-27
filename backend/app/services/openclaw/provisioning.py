@@ -195,8 +195,6 @@ def _channel_heartbeat_visibility_patch(config_data: dict[str, Any]) -> dict[str
         whatsapp = channels_map.get("whatsapp")
         whatsapp_map = whatsapp if isinstance(whatsapp, dict) else {}
         whatsapp_patch: dict[str, Any] = {}
-        if whatsapp_map.get("enabled") is not False:
-            whatsapp_patch["enabled"] = False
         whatsapp_accounts = whatsapp_map.get("accounts")
         whatsapp_accounts_map = whatsapp_accounts if isinstance(whatsapp_accounts, dict) else {}
         whatsapp_default = whatsapp_accounts_map.get("default")
