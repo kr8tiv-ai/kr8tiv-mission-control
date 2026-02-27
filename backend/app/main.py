@@ -46,6 +46,7 @@ from app.api.tasks import router as tasks_router
 from app.api.tenant_access import router as tenant_access_router
 from app.api.tier_quotas import router as tier_quotas_router
 from app.api.users import router as users_router
+from app.api.verification_ops import router as verification_ops_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
 from app.core.logging import configure_logging, get_logger
@@ -565,6 +566,7 @@ api_v1.include_router(runtime_router)
 api_v1.include_router(runtime_ops_router)
 api_v1.include_router(notebook_ops_router)
 api_v1.include_router(recovery_ops_router)
+api_v1.include_router(verification_ops_router)
 api_v1.include_router(packs_router)
 api_v1.include_router(persona_presets_router)
 api_v1.include_router(souls_directory_router)
