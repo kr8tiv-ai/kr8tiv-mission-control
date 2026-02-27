@@ -549,3 +549,35 @@ Current status snapshot:
    - Result: `30 passed, 1 warning`
 4. Rollout note:
    - This removes the migration-graph blocker; remaining live rollout risk is host disk pressure (`no space left on device`) and is handled in runtime ops.
+
+## 2026-02-27 Live Rollout Attempt (Post-Hotfix) - Blocked by Host Runtime Access
+
+1. Code + image readiness:
+   - Hotfix commit pushed to `main`: `ff2c0e6` (`fix: merge alembic heads for phase22 rollout`)
+   - GHCR tag availability verified:
+     - `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:ff2c0e6` => available
+     - `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:ff2c0e6` => available
+2. Hostinger rollout actions executed:
+   - Replaced `kr8tiv-mission-control` project with immutable `ff2c0e6` tags.
+   - Executed temporary maintenance project (`ops-docker-prune`) intended to run Docker prune operations.
+   - Restarted VPS twice to recover Docker control plane.
+3. Current blocker state:
+   - Hostinger Docker project inspection endpoints are failing:
+     - `VPS_getProjectListV1` => `[VPS:0] Could not get project list`
+     - `VPS_getProjectLogsV1` / `VPS_getProjectContentsV1` => unavailable
+   - Public service checks are timing out:
+     - `http://76.13.106.100:8100/health` => timeout
+     - `http://76.13.106.100:8100/readyz` => timeout
+     - `http://76.13.106.100:3100` => timeout
+     - OpenClaw ports `48650-48653` currently also timing out after reboot cycle.
+4. Access attempts and result:
+   - SSH via existing attached key (`jarvis-vps`) and newly attached temp key both failed auth.
+   - Root password rotation API succeeded, but password-based SSH auth is not accepted (likely disabled by host policy/sshd config).
+5. Required manual unblock to proceed:
+   - Provide one working shell path (Hostinger web terminal or valid SSH user/key), then run:
+     - `docker system df`
+     - `docker image prune -af`
+     - `docker builder prune -af`
+     - `docker container prune -f`
+     - `docker compose -f /docker/openclaw-mission-control/compose.yml up -d`
+   - Then rerun live checks on `8100/readyz`, `3100`, and `48650-48653`.
