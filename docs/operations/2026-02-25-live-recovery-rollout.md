@@ -833,3 +833,7 @@ Current status snapshot:
 2. Purpose:
    - save build/push compute when rollout validation inputs are missing.
    - keep strict runtime-gated release policy deterministic.
+3. Live verification:
+   - Workflow run `22474293410` failed fast at step `Rollout gate preflight (main strict)`.
+   - Build/push steps were skipped as expected.
+   - Confirms policy is active and preventing non-validated main publishes.
