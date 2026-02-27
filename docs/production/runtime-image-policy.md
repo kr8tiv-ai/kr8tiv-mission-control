@@ -58,6 +58,30 @@ Production deploys must be reproducible and restart-safe. Mission Control runtim
    - `workflow_dispatch` input `gate_only=true` runs rollout validation without image build/push.
    - Use this mode to validate `RUNTIME_HEALTH_URLS` and rollback wiring quickly.
 
+## Operator Automation
+
+Use the operator helper to rotate gate secrets and optionally run a `gate_only` validation dispatch:
+
+```bash
+python scripts/ci/rollout_gate_ops.py \
+  --owner kr8tiv-ai \
+  --repo kr8tiv-mission-control \
+  --health-urls "http://76.13.106.100:8100/readyz,http://76.13.106.100:8100/healthz,http://76.13.106.100:3100" \
+  --dispatch-gate-only
+```
+
+To update rollback command and validate dispatch in one command:
+
+```bash
+python scripts/ci/rollout_gate_ops.py \
+  --owner kr8tiv-ai \
+  --repo kr8tiv-mission-control \
+  --health-urls "http://76.13.106.100:8100/readyz,http://76.13.106.100:8100/healthz,http://76.13.106.100:3100" \
+  --update-rollback \
+  --rollback-command "echo '[rollout-gate] rollback hook invoked; run manual rollback runbook'" \
+  --dispatch-gate-only
+```
+
 ## Rollback
 
 1. Keep previous known-good backend + frontend tags.
