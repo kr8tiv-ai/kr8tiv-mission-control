@@ -179,15 +179,15 @@ async def test_agent_continuity_api_returns_board_scoped_snapshot(
         assert UUID(board_id) == board.id
         return board
 
-    async def _fake_fetch_runtime_sessions(self: AgentContinuityService, gateway_row: Gateway) -> set[str]:
+    async def _fake_fetch_runtime_sessions(self: AgentContinuityService, gateway_row: Gateway) -> dict[str, object]:
         assert gateway_row.id == gateway.id
-        return {"session-alive-api", "session-stale-api"}
+        return {"session-alive-api": None, "session-stale-api": None}
 
     app.dependency_overrides[get_session] = _override_get_session
     app.dependency_overrides[get_board_for_actor_read] = _override_board_access
     monkeypatch.setattr(
         AgentContinuityService,
-        "fetch_runtime_session_keys",
+        "fetch_runtime_sessions",
         _fake_fetch_runtime_sessions,
     )
 
@@ -240,4 +240,46 @@ async def test_continuity_snapshot_does_not_mark_default_heartbeat_as_stale_too_
     item = report.agents[0]
     assert item.agent_name == "healthy-agent"
     assert item.continuity == "alive"
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_continuity_snapshot_uses_recent_runtime_activity_as_liveness_signal() -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    await _create_schema(engine)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    org, gateway, board = _seed_board_rows()
+    stale_heartbeat = _make_agent(
+        board=board,
+        gateway=gateway,
+        name="runtime-fresh-agent",
+        session_key="session-runtime-fresh",
+        minutes_ago=55,
+    )
+
+    async with session_maker() as session:
+        session.add(org)
+        session.add(gateway)
+        session.add(board)
+        session.add(stale_heartbeat)
+        await session.commit()
+
+    async def _fetch_runtime_sessions(_gateway: Gateway) -> dict[str, object]:
+        # Simulate gateway activity within the stale threshold window.
+        return {"session-runtime-fresh": utcnow()}
+
+    async with session_maker() as session:
+        service = AgentContinuityService(
+            session=session,
+            runtime_session_keys_fetcher=_fetch_runtime_sessions,
+        )
+        report = await service.snapshot_for_board(board_id=board.id)
+
+    assert report.counts["alive"] == 1
+    assert report.counts["stale"] == 0
+    item = report.agents[0]
+    assert item.agent_name == "runtime-fresh-agent"
+    assert item.continuity == "alive"
+    assert item.continuity_reason == "runtime_activity_recent"
     await engine.dispose()

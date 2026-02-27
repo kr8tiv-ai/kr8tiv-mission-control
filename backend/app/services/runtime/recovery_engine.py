@@ -67,7 +67,9 @@ class RecoveryEngine(OpenClawDBService):
         return await AgentContinuityService(self.session).snapshot_for_board(board_id=board_id)
 
     async def _recover_agent(self, *, board_id: UUID, agent_id: UUID, continuity_reason: str) -> tuple[bool, str]:
-        if self._force_heartbeat_resync and continuity_reason in {"heartbeat_missing", "heartbeat_stale"}:
+        if continuity_reason in {"heartbeat_missing", "heartbeat_stale"} and (
+            self._force_heartbeat_resync or self._recovery_action is None
+        ):
             agent = await Agent.objects.by_id(agent_id).first(self.session)
             if agent is not None and agent.board_id == board_id:
                 now = utcnow()
@@ -75,7 +77,9 @@ class RecoveryEngine(OpenClawDBService):
                 agent.last_seen_at = now
                 agent.updated_at = now
                 self.session.add(agent)
-                return True, "forced_heartbeat_resync"
+                if self._force_heartbeat_resync:
+                    return True, "forced_heartbeat_resync"
+                return True, "heartbeat_resync"
         if self._recovery_action is not None:
             return await self._recovery_action(
                 board_id=board_id,

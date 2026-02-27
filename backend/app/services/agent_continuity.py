@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 ContinuityState = Literal["alive", "stale", "unreachable"]
 RuntimeSessionKeysFetcher = Callable[[Gateway], Awaitable[set[str]]]
 RECOVERY_CONTINUITIES: frozenset[ContinuityState] = frozenset({"stale", "unreachable"})
+RuntimeSessionSnapshot = dict[str, datetime | None]
+RuntimeSessionSnapshotFetcher = Callable[[Gateway], Awaitable[set[str] | RuntimeSessionSnapshot]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,19 +71,60 @@ def _as_object_list(value: object) -> list[object]:
     return []
 
 
-def _extract_session_keys(payload: object) -> set[str]:
+def _coerce_runtime_updated_at(raw: object) -> datetime | None:
+    if isinstance(raw, (int, float)):
+        value = float(raw)
+        # Gateway emits epoch milliseconds for updatedAt.
+        if value > 1_000_000_000_000:
+            value /= 1000.0
+        if value <= 0:
+            return None
+        return datetime.fromtimestamp(value, tz=UTC).replace(tzinfo=None)
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        normalized = text.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+        return parsed
+    return None
+
+
+def _extract_runtime_sessions(payload: object) -> RuntimeSessionSnapshot:
     if isinstance(payload, dict):
         raw_items = _as_object_list(payload.get("sessions"))
     else:
         raw_items = _as_object_list(payload)
-    keys: set[str] = set()
+    sessions: RuntimeSessionSnapshot = {}
     for raw in raw_items:
         if not isinstance(raw, dict):
             continue
         key = raw.get("key")
         if isinstance(key, str) and key.strip():
-            keys.add(key.strip())
-    return keys
+            sessions[key.strip()] = _coerce_runtime_updated_at(raw.get("updatedAt"))
+    return sessions
+
+
+def _normalize_runtime_sessions(
+    value: set[str] | RuntimeSessionSnapshot,
+) -> RuntimeSessionSnapshot:
+    if isinstance(value, dict):
+        normalized: RuntimeSessionSnapshot = {}
+        for raw_key, raw_updated in value.items():
+            key = str(raw_key).strip()
+            if not key:
+                continue
+            if isinstance(raw_updated, datetime):
+                normalized[key] = raw_updated
+            else:
+                normalized[key] = _coerce_runtime_updated_at(raw_updated)
+        return normalized
+    return {str(key).strip(): None for key in value if str(key).strip()}
 
 
 def _heartbeat_age_seconds(
@@ -101,6 +144,18 @@ def _is_stale(*, heartbeat_age_seconds: int | None, stale_after_seconds: int) ->
     return heartbeat_age_seconds > stale_after_seconds
 
 
+def _runtime_activity_is_recent(
+    *,
+    now: datetime,
+    runtime_updated_at: datetime | None,
+    stale_after_seconds: int,
+) -> bool:
+    if runtime_updated_at is None:
+        return False
+    runtime_age_seconds = max(int((now - runtime_updated_at).total_seconds()), 0)
+    return runtime_age_seconds <= stale_after_seconds
+
+
 def continuity_requires_recovery(continuity: ContinuityState) -> bool:
     """Return true when continuity status should trigger automated recovery logic."""
     return continuity in RECOVERY_CONTINUITIES
@@ -113,17 +168,21 @@ class AgentContinuityService(OpenClawDBService):
         self,
         session: AsyncSession,
         *,
-        runtime_session_keys_fetcher: RuntimeSessionKeysFetcher | None = None,
+        runtime_session_keys_fetcher: RuntimeSessionSnapshotFetcher | None = None,
     ) -> None:
         super().__init__(session)
         self._runtime_session_keys_fetcher = runtime_session_keys_fetcher
 
+    async def fetch_runtime_sessions(self, gateway: Gateway) -> RuntimeSessionSnapshot:
+        """Fetch runtime sessions keyed by session key with optional update timestamps."""
+        if self._runtime_session_keys_fetcher is not None:
+            return _normalize_runtime_sessions(await self._runtime_session_keys_fetcher(gateway))
+        payload = await openclaw_call("sessions.list", config=gateway_client_config(gateway))
+        return _extract_runtime_sessions(payload)
+
     async def fetch_runtime_session_keys(self, gateway: Gateway) -> set[str]:
         """Fetch currently reachable session keys from the gateway runtime."""
-        if self._runtime_session_keys_fetcher is not None:
-            return await self._runtime_session_keys_fetcher(gateway)
-        payload = await openclaw_call("sessions.list", config=gateway_client_config(gateway))
-        return _extract_session_keys(payload)
+        return set((await self.fetch_runtime_sessions(gateway)).keys())
 
     async def _board_or_404(self, *, board_id: UUID) -> Board:
         board = await Board.objects.by_id(board_id).first(self.session)
@@ -149,14 +208,14 @@ class AgentContinuityService(OpenClawDBService):
         )
         agents = list(await self.session.exec(statement))
 
-        runtime_session_keys: set[str] = set()
+        runtime_sessions: RuntimeSessionSnapshot = {}
         runtime_error: str | None = None
         gateway = await self._board_gateway(board=board)
         if gateway is None:
             runtime_error = "Board gateway is not configured."
         else:
             try:
-                runtime_session_keys = await self.fetch_runtime_session_keys(gateway)
+                runtime_sessions = await self.fetch_runtime_sessions(gateway)
             except (HTTPException, OpenClawGatewayError, OSError, RuntimeError, ValueError) as exc:
                 runtime_error = str(exc)
 
@@ -177,16 +236,26 @@ class AgentContinuityService(OpenClawDBService):
 
             runtime_reachable = True
             continuity_reason = "healthy"
+            runtime_session_updated_at: datetime | None = None
             if runtime_error:
                 runtime_reachable = False
                 continuity_reason = "runtime_unavailable"
             elif session_id is None:
                 runtime_reachable = False
                 continuity_reason = "runtime_session_missing"
-            elif session_id not in runtime_session_keys:
+            elif session_id not in runtime_sessions:
                 runtime_reachable = False
                 continuity_reason = "runtime_session_unreachable"
-            elif stale:
+            else:
+                runtime_session_updated_at = runtime_sessions.get(session_id)
+            if runtime_reachable and stale and _runtime_activity_is_recent(
+                now=now,
+                runtime_updated_at=runtime_session_updated_at,
+                stale_after_seconds=stale_after_seconds,
+            ):
+                stale = False
+                continuity_reason = "runtime_activity_recent"
+            elif runtime_reachable and stale:
                 continuity_reason = (
                     "heartbeat_missing"
                     if heartbeat_age is None

@@ -266,3 +266,38 @@ async def test_recovery_engine_force_bypasses_cooldown_and_resyncs_heartbeat() -
         assert persisted_agent.last_seen_at is not None
         assert (utcnow() - persisted_agent.last_seen_at).total_seconds() < 10
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_recovery_engine_default_stale_recovery_updates_agent_liveness() -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    await _create_schema(engine)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    org, gateway, board = _seed_board_rows()
+    agent = _make_agent(board=board, gateway=gateway, name="default-resync", session_key="agent:default:main")
+    report = _report_for(agent, continuity="stale", reason="heartbeat_stale")
+
+    async with session_maker() as session:
+        session.add(org)
+        session.add(gateway)
+        session.add(board)
+        session.add(agent)
+        session.add(RecoveryPolicy(organization_id=org.id))
+        await session.commit()
+
+        engine_service = RecoveryEngine(
+            session=session,
+            continuity_snapshot_fetcher=lambda *, board_id: report,
+        )
+        incidents = await engine_service.evaluate_board(board_id=board.id)
+
+        assert len(incidents) == 1
+        assert incidents[0].status == "recovered"
+        assert incidents[0].action == "heartbeat_resync"
+
+        persisted_agent = await Agent.objects.by_id(agent.id).first(session)
+        assert persisted_agent is not None
+        assert persisted_agent.status == "online"
+        assert persisted_agent.last_seen_at is not None
+        assert (utcnow() - persisted_agent.last_seen_at).total_seconds() < 10
+    await engine.dispose()
