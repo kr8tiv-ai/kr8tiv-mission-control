@@ -823,7 +823,74 @@ async def test_patch_agent_heartbeats_preserves_existing_thinking_default(
     raw_payload = patch_params.get("raw")
     assert isinstance(raw_payload, str)
     payload = json.loads(raw_payload)
-    assert payload["agents"]["defaults"]["thinkingDefault"] == "medium"
+    assert payload["agents"].get("defaults") is None
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_skips_patch_when_no_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    heartbeat = {"every": "20m", "target": "last", "includeReasoning": False}
+    existing_agent = {
+        "id": "board-agent-a",
+        "workspace": "/tmp/workspace-board-agent-a",
+        "heartbeat": heartbeat,
+    }
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {
+                        "list": [existing_agent],
+                        "defaults": {"thinkingDefault": "medium"},
+                    },
+                    "channels": {
+                        "defaults": {"heartbeat": agent_provisioning.DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY},
+                        "telegram": {
+                            "configWrites": False,
+                            "accounts": {"default": {"configWrites": False}},
+                        },
+                        "whatsapp": {
+                            "accounts": {"default": {"enabled": False}},
+                        },
+                    },
+                    "gateway": {
+                        "controlUi": {
+                            "allowInsecureAuth": True,
+                            "dangerouslyDisableDeviceAuth": True,
+                            "allowedOrigins": agent_provisioning._desired_control_ui_allowed_origins(),
+                        },
+                    },
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    monkeypatch.setattr(agent_provisioning.settings, "enabled_ingress_channels", "telegram")
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                heartbeat,
+                None,
+            )
+        ],
+    )
+
+    assert [method for method, _params in calls].count("config.patch") == 0
 
 
 @pytest.mark.asyncio

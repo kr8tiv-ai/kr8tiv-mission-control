@@ -306,7 +306,7 @@ def _thinking_default_patch(
 
     current = defaults.get("thinkingDefault")
     if isinstance(current, str) and current.strip():
-        return {"thinkingDefault": current.strip()}
+        return None
 
     preferred_models: list[str] = []
     primary_model = defaults.get("model")
@@ -840,24 +840,30 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         base_hash, raw_list, config_data = await _gateway_config_agent_list(self._config)
         entry_by_id = _heartbeat_entry_map(entries)
         new_list = _updated_agent_list(raw_list, entry_by_id)
+        list_changed = new_list != raw_list
 
-        patch: dict[str, Any] = {"agents": {"list": new_list}}
+        patch: dict[str, Any] = {}
+        if list_changed:
+            patch["agents"] = {"list": new_list}
         thinking_patch = _thinking_default_patch(config_data, entries)
         if thinking_patch is not None:
-            patch["agents"]["defaults"] = thinking_patch
+            patch.setdefault("agents", {})["defaults"] = thinking_patch
         channels_patch = _channel_heartbeat_visibility_patch(config_data)
         if channels_patch is not None:
             patch["channels"] = channels_patch
         control_ui_patch = _control_ui_access_patch(config_data)
         if control_ui_patch is not None:
             patch["gateway"] = control_ui_patch
+        if not patch:
+            return
 
         # OpenClaw runtimes differ in accepted `channels/gateway` shape. Try the full patch first,
         # then degrade to slimmer, backward-compatible payloads if needed.
         candidates: list[dict[str, Any]] = [patch]
-        if channels_patch is not None or control_ui_patch is not None:
+        if (channels_patch is not None or control_ui_patch is not None) and "agents" in patch:
             candidates.append({"agents": dict(patch["agents"])})
-            candidates.append({"agents": {"list": new_list}})
+            if "list" in patch["agents"]:
+                candidates.append({"agents": {"list": new_list}})
 
         last_invalid_config: OpenClawGatewayError | None = None
         for candidate in candidates:
