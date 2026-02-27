@@ -186,6 +186,23 @@ Run these checks after deploying a build that includes notebook gate summaries, 
    - `GET /api/v1/runtime/ops/control-plane-status?board_id=<board_id>&profile=auto`
    - Expected: response includes `arena`, `notebook`, `verification`, and `gsd` sections in one payload.
 
+## Phase 26 External Probe Gate Overlay
+
+Run these checks after deploying a build that includes optional external verification probes:
+
+1. External probe is surfaced in verification matrix
+   - `POST /api/v1/runtime/verification/execute`
+   - Expected: one check with `name=external_health_probe` is present.
+2. Unconfigured mode is non-blocking
+   - Keep `VERIFICATION_EXTERNAL_HEALTH_URLS` unset.
+   - Expected: `external_health_probe.required=false` and `detail=skipped:unconfigured`.
+3. Configured mode is blocking on failures
+   - Set `VERIFICATION_EXTERNAL_HEALTH_URLS` to rollout target URLs.
+   - Expected: any probe timeout/non-2xx response marks `external_health_probe.required=true`, `passed=false`, and increments `required_failed`.
+4. Configured mode passes cleanly
+   - Ensure all configured probe URLs are healthy.
+   - Expected: `external_health_probe.required=true`, `passed=true`, `detail=ok:<count>`.
+
 ## Evidence Capture Template
 
 Capture and store:

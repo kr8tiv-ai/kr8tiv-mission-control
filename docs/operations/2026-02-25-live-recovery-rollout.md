@@ -661,3 +661,35 @@ Current status snapshot:
    - Required-check failure path sets target GSD run `status=blocked`.
 7. Immutable image tags and Hostinger deployment IDs:
    - Pending for this batch (development verification only; no GHCR publish and no VPS rollout action executed).
+
+## 2026-02-27 Rollout Update (Control-Plane Status Endpoint Build `1fdbe61`)
+
+1. Deployment target + image publish confirmation:
+   - Commit: `1fdbe61712ee2b39157263e83971f0cc9403ad3c`
+   - Workflow: `Publish Mission Control Images`
+   - Run ID: `22471642278`
+   - Conclusion: `success`
+2. Hostinger rollout actions executed on VPS `1302498`:
+   - `docker_compose_update` action `81098683` => `success`
+   - `docker_compose_start` action `81098684` => `success`
+   - `ct_restart` action `81098959` => `success`
+   - `docker_compose_start` action `81099049` => `success`
+3. Current blocker state remains unresolved:
+   - Hostinger project inspection endpoints unavailable:
+     - `VPS_getProjectListV1` => `[VPS:0] Could not get project list`
+     - `VPS_getProjectContainersV1` => unavailable
+     - `VPS_getProjectLogsV1` => unavailable
+   - Public runtime checks currently timing out:
+     - `http://76.13.106.100:8100/health`
+     - `http://76.13.106.100:8100/readyz`
+     - `http://76.13.106.100:3100`
+     - `http://76.13.106.100:48650/health`
+     - `http://76.13.106.100:48651/health`
+     - `http://76.13.106.100:48652/health`
+     - `http://76.13.106.100:48653/health`
+4. Access status:
+   - SSH using attached keys (`codex-ops-20260227`, `jarvis-vps`) still returns `Permission denied (publickey,password)`.
+   - Platform actions can mutate Docker project lifecycle, but deep runtime diagnosis remains blocked until host shell access is restored.
+5. Mitigation shipped in this batch:
+   - Verification harness now emits `external_health_probe` checks from `VERIFICATION_EXTERNAL_HEALTH_URLS`.
+   - This creates a deterministic gate signal for rollout success/failure even when host shell is unavailable.

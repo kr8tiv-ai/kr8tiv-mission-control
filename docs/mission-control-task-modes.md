@@ -129,6 +129,10 @@ Task-mode endpoints:
 2. Board operators can fetch notebook gate rollups through `gate-summary` for quick triage.
 3. GSD telemetry now exposes previous-iteration deltas for continuity metrics.
 4. Runtime verification harness can optionally attach evidence and block a GSD run when required checks fail.
+5. Runtime verification harness now supports optional external URL probes:
+   - Configure `VERIFICATION_EXTERNAL_HEALTH_URLS` with comma-separated URLs.
+   - If configured, `external_health_probe` is required for harness pass.
+   - If not configured, it is emitted as `skipped:unconfigured` and does not block.
 
 ## Operator Command Surface
 
@@ -145,6 +149,14 @@ python -m app.cli.control_plane_status \
   --token "<LOCAL_AUTH_TOKEN>" \
   --board-id "<board_id>" \
   --profile auto
+```
+
+Verification gate config example:
+
+```bash
+export VERIFICATION_EXTERNAL_HEALTH_URLS="http://localhost:8100/health,http://localhost:8100/readyz"
+curl -X POST -H "Authorization: Bearer <LOCAL_AUTH_TOKEN>" \
+  "http://localhost:8100/api/v1/runtime/verification/execute?profile=auto"
 ```
 
 ## Worker Runtime

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime
+
+import httpx
 
 from app.core.time import utcnow
 from app.services.notebooklm_capability_gate import evaluate_notebooklm_capability
@@ -27,6 +30,30 @@ class VerificationHarnessResult:
     checks: list[VerificationCheckResult]
     all_passed: bool
     required_failed: int
+
+
+def _external_probe_urls() -> tuple[str, ...]:
+    raw = (os.getenv("VERIFICATION_EXTERNAL_HEALTH_URLS") or "").strip()
+    if not raw:
+        return ()
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+async def _probe_external_health(*, urls: tuple[str, ...]) -> tuple[bool, str]:
+    failures: list[str] = []
+    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+        for url in urls:
+            try:
+                response = await client.get(url)
+            except Exception:
+                failures.append(f"{url}=timeout")
+                continue
+            if response.status_code >= 400:
+                failures.append(f"{url}=status_{response.status_code}")
+
+    if failures:
+        return False, f"failed:{';'.join(failures)}"
+    return True, f"ok:{len(urls)}"
 
 
 def _route_check(*, name: str, route_paths: set[str], expected_paths: tuple[str, ...]) -> VerificationCheckResult:
@@ -64,6 +91,27 @@ async def run_verification_harness(
             expected_paths=("/api/v1/runtime/recovery/run",),
         ),
     ]
+
+    probe_urls = _external_probe_urls()
+    if not probe_urls:
+        checks.append(
+            VerificationCheckResult(
+                name="external_health_probe",
+                required=False,
+                passed=True,
+                detail="skipped:unconfigured",
+            )
+        )
+    else:
+        probe_passed, probe_detail = await _probe_external_health(urls=probe_urls)
+        checks.append(
+            VerificationCheckResult(
+                name="external_health_probe",
+                required=True,
+                passed=probe_passed,
+                detail=probe_detail,
+            )
+        )
 
     gate = await evaluate_notebooklm_capability(profile=profile, require_notebook=False)
     checks.append(
