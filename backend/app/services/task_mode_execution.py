@@ -29,6 +29,7 @@ from app.services.notebooklm_adapter import (
     create_notebook,
     query_notebook,
 )
+from app.services.notebooklm_capability_gate import evaluate_notebooklm_capability
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig, get_chat_history
 from app.services.queue import QueuedTask
@@ -346,8 +347,30 @@ async def _ensure_notebook_for_task(task: Task) -> NotebookInfo:
     return info
 
 
+async def _enforce_notebooklm_capability(
+    task: Task,
+    *,
+    require_notebook: bool,
+) -> None:
+    gate = await evaluate_notebooklm_capability(
+        profile=task.notebook_profile,
+        notebook_id=task.notebook_id,
+        require_notebook=require_notebook,
+    )
+    if gate.state == "ready":
+        if task.notebook_profile == "auto" and gate.selected_profile:
+            task.notebook_profile = gate.selected_profile
+        return
+
+    raise NotebookLMError(
+        "[NotebookLM Gate] "
+        f"{gate.operator_message} (state={gate.state}, reason={gate.reason})"
+    )
+
+
 async def _execute_notebook_mode(session: Any, ctx: _ModeExecutionContext) -> None:
     task = ctx.task
+    await _enforce_notebooklm_capability(task, require_notebook=False)
     notebook_info = await _ensure_notebook_for_task(task)
     sources = _parse_sources(task)
     if sources.urls or sources.texts:
@@ -372,6 +395,7 @@ async def _execute_notebook_mode(session: Any, ctx: _ModeExecutionContext) -> No
 
 async def _execute_notebook_creation_mode(ctx: _ModeExecutionContext) -> None:
     task = ctx.task
+    await _enforce_notebooklm_capability(task, require_notebook=False)
     notebook_info = await _ensure_notebook_for_task(task)
     sources = _parse_sources(task)
     if not (sources.urls or sources.texts):
@@ -536,6 +560,7 @@ async def _execute_arena_mode(
     )
 
     if task.task_mode == "arena_notebook":
+        await _enforce_notebooklm_capability(task, require_notebook=False)
         notebook = await _ensure_notebook_for_task(task)
         await add_sources(
             notebook_id=notebook.notebook_id,

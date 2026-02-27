@@ -149,7 +149,7 @@ Before execution:
 1) Check in via heartbeat endpoint.
 2) Continue one `in_progress` task.
 3) If no `in_progress` task exists, pick one assigned `inbox` task.
-4) If no assigned work exists, stay idle and return `HEARTBEAT_OK`.
+4) If no assigned work exists, stay idle; return `HEARTBEAT_OK` only after this cycle's pre-flight check-in succeeds.
 5) Refresh task context and plan only for the active task.
 6) Execute and post only high-signal task comment updates.
 7) Move to `review` when deliverable and evidence are ready.

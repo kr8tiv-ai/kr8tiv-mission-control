@@ -142,3 +142,25 @@ async def query_notebook(*, notebook_id: str, query: str, profile: str) -> str:
             last_error = exc
             continue
     raise NotebookLMError(str(last_error or "NotebookLM query failed"))
+
+
+async def check_notebook_access(*, profile: str) -> tuple[str, int]:
+    """Probe notebook access for a profile, returning chosen profile and notebook count."""
+    last_error: Exception | None = None
+    for candidate in _profile_candidates(profile):
+        try:
+            raw = await _run_command(["notebook", "list", "--json"], profile=candidate)
+            payload = _extract_json_payload(raw)
+            if payload is None:
+                return candidate, 0
+            items = payload.get("items")
+            if isinstance(items, list):
+                return candidate, len(items)
+            notebooks = payload.get("notebooks")
+            if isinstance(notebooks, list):
+                return candidate, len(notebooks)
+            return candidate, 0
+        except Exception as exc:  # pragma: no cover - depends on external CLI availability
+            last_error = exc
+            continue
+    raise NotebookLMError(str(last_error or "NotebookLM capability check failed"))

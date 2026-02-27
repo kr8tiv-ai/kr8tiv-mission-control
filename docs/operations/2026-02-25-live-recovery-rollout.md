@@ -443,3 +443,26 @@ Production rollout evidence will be appended after immutable image publish + VPS
 4. GSD planning outputs produced from query synthesis:
    - `docs/plans/2026-02-27-phase20-22-heartbeat-capability-gate-design.md`
    - `docs/plans/2026-02-27-phase20-22-heartbeat-capability-gate-implementation.md`
+
+## 2026-02-27 GSD Spec Continuation (Phase 20/21 Implementation Batch)
+
+1. Heartbeat contract hardening:
+   - Added template contract test:
+     - `backend/tests/test_heartbeat_template_contract.py`
+   - Updated heartbeat worker loop wording in `BOARD_HEARTBEAT.md.j2` to require successful pre-flight check-in before idle `HEARTBEAT_OK`.
+2. NotebookLM capability gate service:
+   - Added runtime gate:
+     - `backend/app/services/notebooklm_capability_gate.py`
+   - Added adapter probe helper:
+     - `check_notebook_access()` in `backend/app/services/notebooklm_adapter.py`
+   - Added gate test suite:
+     - `backend/tests/test_notebooklm_capability_gate.py`
+3. Notebook mode integration:
+   - Enforced gate before NotebookLM operations in:
+     - `backend/app/services/task_mode_execution.py`
+     - `backend/app/api/tasks.py` (`POST /api/v1/tasks/{task_id}/notebook/query`)
+   - Added task-mode gate tests:
+     - `backend/tests/test_task_mode_notebook_capability_gate.py`
+4. Verification:
+   - `uv run pytest backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py -q` => `16 passed`
+   - `uv run pytest backend/tests/test_tasks_api_rows.py -q` => `5 passed`

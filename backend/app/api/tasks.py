@@ -70,6 +70,7 @@ from app.services.approval_task_links import (
 )
 from app.services.mentions import extract_mentions, matches_agent_mention
 from app.services.notebooklm_adapter import NotebookLMError, query_notebook
+from app.services.notebooklm_capability_gate import evaluate_notebooklm_capability
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError
@@ -1584,6 +1585,25 @@ async def query_task_notebook(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Task has no notebook_id configured.",
+        )
+    gate = await evaluate_notebooklm_capability(
+        profile=task.notebook_profile,
+        notebook_id=notebook_id,
+        require_notebook=True,
+    )
+    if gate.state != "ready":
+        gate_message = (
+            "[NotebookLM Gate] "
+            f"{gate.operator_message} (state={gate.state}, reason={gate.reason})"
+        )
+        if gate.state == "retryable":
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=gate_message,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=gate_message,
         )
     try:
         answer = await query_notebook(
