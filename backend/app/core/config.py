@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     notebooklm_timeout_seconds: int = 120
     channel_rollout_phase: str = "phase1"
     enabled_ingress_channels: str = "telegram"
+    telegram_owner_user_id: str = ""
+    telegram_bot_username: str = ""
+    telegram_bot_user_id: str = ""
+    telegram_strict_dm_policy: bool = True
+    telegram_allow_public_moderation: bool = True
+    telegram_require_owner_tag_or_reply: bool = True
+    telegram_require_owner_for_task_direction: bool = True
 
     # Kr8tiv distribution layer
     distribution_cli_command: str = "node kr8tiv-claw/dist/index.js"

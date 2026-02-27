@@ -288,3 +288,95 @@ async def test_ingest_board_webhook_rejects_disabled_endpoint(
         assert sent_messages == []
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_ingest_board_webhook_blocks_untrusted_telegram_dm_from_queueing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = await _make_engine()
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    app = _build_test_app(session_maker)
+    enqueued: list[dict[str, object]] = []
+    sent_messages: list[str] = []
+
+    async with session_maker() as session:
+        board, webhook = await _seed_webhook(session, enabled=True)
+
+    monkeypatch.setattr(board_webhooks.settings, "telegram_owner_user_id", "111")
+    monkeypatch.setattr(board_webhooks.settings, "telegram_bot_username", "jarvisbot")
+    monkeypatch.setattr(board_webhooks.settings, "telegram_strict_dm_policy", True)
+
+    def _fake_enqueue(payload: QueuedInboundDelivery) -> bool:
+        enqueued.append(
+            {
+                "board_id": str(payload.board_id),
+                "webhook_id": str(payload.webhook_id),
+                "payload_id": str(payload.payload_id),
+            },
+        )
+        return True
+
+    async def _fake_try_send_agent_message(
+        self: board_webhooks.GatewayDispatchService,
+        *,
+        session_key: str,
+        config: object,
+        agent_name: str,
+        message: str,
+        deliver: bool = False,
+    ) -> None:
+        del self, session_key, config, agent_name, deliver
+        sent_messages.append(message)
+        return None
+
+    monkeypatch.setattr(board_webhooks, "enqueue_webhook_delivery", _fake_enqueue)
+    monkeypatch.setattr(
+        board_webhooks.GatewayDispatchService,
+        "try_send_agent_message",
+        _fake_try_send_agent_message,
+    )
+
+    payload = {
+        "update_id": 1,
+        "message": {
+            "message_id": 10,
+            "chat": {"id": 100, "type": "private"},
+            "from": {"id": 222, "username": "intruder"},
+            "text": "create task now",
+        },
+    }
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.post(
+                f"/api/v1/boards/{board.id}/webhooks/{webhook.id}",
+                json=payload,
+            )
+
+        assert response.status_code == 202
+        body = response.json()
+        payload_id = UUID(body["payload_id"])
+
+        async with session_maker() as session:
+            memory_items = (
+                await session.exec(
+                    select(BoardMemory).where(col(BoardMemory.board_id) == board.id),
+                )
+            ).all()
+            assert len(memory_items) == 1
+            assert memory_items[0].tags is not None
+            assert "policy:blocked" in memory_items[0].tags
+            assert "policy:telegram_dm_not_owner" in memory_items[0].tags
+            assert f"payload:{payload_id}" in memory_items[0].tags
+
+        assert enqueued == []
+        assert sent_messages == []
+    finally:
+        await engine.dispose()

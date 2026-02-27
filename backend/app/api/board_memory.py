@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -49,6 +50,12 @@ BOARD_WRITE_DEP = Depends(get_board_for_actor_write)
 SESSION_DEP = Depends(get_session)
 ACTOR_DEP = Depends(require_admin_or_agent)
 _RUNTIME_TYPE_REFERENCES = (UUID,)
+_SENSITIVE_KV_RE = re.compile(
+    r"(?im)\b(auth[_-]?token|api[_-]?key|private[_ -]?key|secret|seed(?:[_ -]?phrase)?|mnemonic)\b\s*[:=]\s*\S+",
+)
+_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9\-._~+/]+=*")
+_HEX_KEY_RE = re.compile(r"\b[0-9a-fA-F]{64}\b")
+_BASE58_SECRET_RE = re.compile(r"\b[1-9A-HJ-NP-Za-km-z]{80,128}\b")
 
 
 def _parse_since(value: str | None) -> datetime | None:
@@ -127,19 +134,24 @@ async def _send_control_command(
 def _chat_targets(
     *,
     agents: list[Agent],
-    mentions: set[str],
+    _mentions: set[str],
     actor: ActorContext,
 ) -> dict[str, Agent]:
     targets: dict[str, Agent] = {}
     for agent in agents:
-        if agent.is_board_lead:
-            targets[str(agent.id)] = agent
-            continue
-        if mentions and matches_agent_mention(agent, mentions):
+        if agent.openclaw_session_id:
             targets[str(agent.id)] = agent
     if actor.actor_type == "agent" and actor.agent:
         targets.pop(str(actor.agent.id), None)
     return targets
+
+
+def _sanitize_chat_snippet(content: str) -> str:
+    sanitized = _SENSITIVE_KV_RE.sub(lambda m: f"{m.group(1)}=[REDACTED]", content)
+    sanitized = _BEARER_RE.sub("Bearer [REDACTED]", sanitized)
+    sanitized = _HEX_KEY_RE.sub("[REDACTED]", sanitized)
+    sanitized = _BASE58_SECRET_RE.sub("[REDACTED]", sanitized)
+    return sanitized
 
 
 def _actor_display_name(actor: ActorContext) -> str:
@@ -182,13 +194,13 @@ async def _notify_chat_targets(
     mentions = extract_mentions(memory.content)
     targets = _chat_targets(
         agents=await Agent.objects.filter_by(board_id=board.id).all(session),
-        mentions=mentions,
+        _mentions=mentions,
         actor=actor,
     )
     if not targets:
         return
     actor_name = _actor_display_name(actor)
-    snippet = memory.content.strip()
+    snippet = _sanitize_chat_snippet(memory.content.strip())
     if len(snippet) > MAX_SNIPPET_LENGTH:
         snippet = f"{snippet[: MAX_SNIPPET_LENGTH - 3]}..."
     base_url = settings.base_url or "http://localhost:8000"
@@ -202,6 +214,7 @@ async def _notify_chat_targets(
             f"Board: {board.name}\n"
             f"From: {actor_name}\n\n"
             f"{snippet}\n\n"
+            "Security: never post tokens, private keys, seed phrases, or credentials.\n\n"
             "Reply via board chat:\n"
             f"POST {base_url}/api/v1/agent/boards/{board.id}/memory\n"
             'Body: {"content":"...","tags":["chat"]}'
