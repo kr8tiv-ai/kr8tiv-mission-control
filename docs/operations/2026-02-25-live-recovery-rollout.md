@@ -810,3 +810,17 @@ Current status snapshot:
    - Result: `6 passed`
 4. Effect:
    - Main branch can no longer silently pass rollout gate with missing runtime probe configuration.
+
+## 2026-02-27 GSD Spec Continuation (Phase 29 Gate Explainability Loop)
+
+1. Gate evidence payload enriched with explicit reason:
+   - Added `status_reason` to `scripts/ci/rollout_health_gate.py` output.
+2. Reason values:
+   - `no_urls_configured`
+   - `all_probes_healthy`
+   - `probe_failures`
+3. Env summary enriched:
+   - `ROLLOUT_GATE_STATUS_REASON=<value>`
+4. Verification:
+   - `UV_PROJECT_ENVIRONMENT=.venv-test uv run pytest tests/test_rollout_health_gate.py tests/test_verification_harness.py tests/test_verification_harness_api.py tests/test_runtime_control_plane_status_api.py -q`
+   - Result: `15 passed`

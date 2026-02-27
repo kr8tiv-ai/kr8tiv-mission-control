@@ -32,6 +32,7 @@ def test_run_health_gate_skips_when_urls_not_configured() -> None:
     result = module.run_health_gate(config)
 
     assert result["status"] == "skipped"
+    assert result["status_reason"] == "no_urls_configured"
     assert result["rollback"]["attempted"] is False
     assert result["attempts"] == []
 
@@ -114,6 +115,7 @@ def test_to_env_lines_exposes_gate_summary() -> None:
     module = _load_module()
     payload = {
         "status": "failed",
+        "status_reason": "probe_failures",
         "failed_urls": ["http://api/health"],
         "rollback": {
             "attempted": True,
@@ -124,6 +126,7 @@ def test_to_env_lines_exposes_gate_summary() -> None:
     }
     env_lines = module.to_env_lines(payload)
     assert "ROLLOUT_GATE_STATUS=failed" in env_lines
+    assert "ROLLOUT_GATE_STATUS_REASON=probe_failures" in env_lines
     assert "ROLLOUT_GATE_FAILED_URL_COUNT=1" in env_lines
     assert "ROLLOUT_GATE_ROLLBACK_ATTEMPTED=true" in env_lines
     assert "ROLLOUT_GATE_ROLLBACK_SUCCEEDED=false" in env_lines

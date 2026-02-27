@@ -64,3 +64,7 @@ Production deploys must be reproducible and restart-safe. Mission Control runtim
    - `passed`: rollout healthy
    - `failed`: rollout unhealthy (and rollback attempted if configured)
    - `skipped`: gate intentionally bypassed due missing URL configuration (not allowed on `main`)
+6. Gate evidence now includes `status_reason`:
+   - `no_urls_configured`
+   - `all_probes_healthy`
+   - `probe_failures`

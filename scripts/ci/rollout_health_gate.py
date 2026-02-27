@@ -128,6 +128,7 @@ def run_health_gate(
     if not config.urls:
         return {
             "status": "skipped",
+            "status_reason": "no_urls_configured",
             "checked_at": checked_at,
             "urls": [],
             "attempts": attempts_payload,
@@ -171,6 +172,7 @@ def run_health_gate(
             sleep_fn(config.sleep_seconds)
 
     status = "passed" if passed else "failed"
+    status_reason = "all_probes_healthy" if passed else "probe_failures"
 
     if status == "failed" and config.rollback_on_fail:
         if config.rollback_command.strip():
@@ -186,6 +188,7 @@ def run_health_gate(
 
     return {
         "status": status,
+        "status_reason": status_reason,
         "checked_at": checked_at,
         "urls": list(config.urls),
         "attempts": attempts_payload,
@@ -206,6 +209,7 @@ def to_env_lines(payload: dict[str, Any]) -> list[str]:
 
     lines = [
         f"ROLLOUT_GATE_STATUS={payload.get('status', 'unknown')}",
+        f"ROLLOUT_GATE_STATUS_REASON={payload.get('status_reason', '')}",
         f"ROLLOUT_GATE_FAILED_URL_COUNT={len(payload.get('failed_urls', []))}",
         f"ROLLOUT_GATE_ROLLBACK_ATTEMPTED={'true' if attempted else 'false'}",
         f"ROLLOUT_GATE_ROLLBACK_SUCCEEDED={succeeded_str}",
