@@ -470,6 +470,17 @@ async def _execute_arena_mode(
                 summary_lines.append(f"- {item}")
             summary_lines.append("")
 
+    if parsed_config.gsd_spec_driven:
+        summary_lines.extend(
+            [
+                "GSD Spec-Driven Evaluation:",
+                "- Map recommendation to stage gates: spec -> plan -> execute -> verify -> done.",
+                "- Reviewer must return exactly one verdict line: VERDICT: APPROVED or VERDICT: REVISE.",
+                "- Include the blocking gate (if any) and the next required action.",
+                "",
+            ]
+        )
+
     summary_lines.append(f"Task: {task.title}")
     if task.description:
         summary_lines.append(f"Description: {task.description}")

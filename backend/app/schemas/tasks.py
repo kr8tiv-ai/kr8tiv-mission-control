@@ -80,6 +80,7 @@ class ArenaConfig(SQLModel):
     rounds: int = Field(default=1, ge=1, le=10)
     final_agent: str | None = None
     supermemory_enabled: bool = True
+    gsd_spec_driven: bool = False
     sources: NotebookSources | None = None
     done_gate_checks: dict[str, bool] = Field(default_factory=dict)
     ui_labeled: bool = False

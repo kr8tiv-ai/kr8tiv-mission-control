@@ -18,7 +18,12 @@ class _DummySession:
         self.items.append(item)
 
 
-def _ctx(*, supermemory_enabled: bool, rounds: int = 1) -> _ModeExecutionContext:
+def _ctx(
+    *,
+    supermemory_enabled: bool,
+    rounds: int = 1,
+    gsd_spec_driven: bool = False,
+) -> _ModeExecutionContext:
     task = SimpleNamespace(
         id=uuid4(),
         title="Investigate issue",
@@ -28,6 +33,7 @@ def _ctx(*, supermemory_enabled: bool, rounds: int = 1) -> _ModeExecutionContext
             "rounds": rounds,
             "final_agent": "arsenal",
             "supermemory_enabled": supermemory_enabled,
+            "gsd_spec_driven": gsd_spec_driven,
         },
         task_mode="arena",
         notebook_profile="auto",
@@ -164,3 +170,35 @@ async def test_arena_mode_preserves_supermemory_context_after_truncation(
     final_prompt = prompts[-1]
     assert "Supermemory context:" in final_prompt
     assert "- Known incident from yesterday." in final_prompt
+
+
+@pytest.mark.asyncio
+async def test_arena_mode_injects_gsd_spec_guidance_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts: list[str] = []
+    session = _DummySession()
+    ctx = _ctx(supermemory_enabled=False, gsd_spec_driven=True)
+
+    async def _fake_find_board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name="arsenal", openclaw_session_id="session-1")
+
+    async def _fake_run_agent_turn(**kwargs):
+        prompt = str(kwargs["prompt"])
+        prompts.append(prompt)
+        if kwargs.get("is_reviewer"):
+            return "arsenal", "Reviewer output\nVERDICT: APPROVED"
+        return "arsenal", "final output"
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _fake_find_board_agent)
+    monkeypatch.setattr(task_mode_execution, "_run_agent_turn", _fake_run_agent_turn)
+
+    await task_mode_execution._execute_arena_mode(session, ctx)
+
+    assert prompts
+    assert all("GSD Spec-Driven Evaluation:" in prompt for prompt in prompts)
+    assert all(
+        "Map recommendation to stage gates: spec -> plan -> execute -> verify -> done."
+        in prompt
+        for prompt in prompts
+    )
