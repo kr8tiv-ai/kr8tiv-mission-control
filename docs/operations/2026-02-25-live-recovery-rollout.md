@@ -837,3 +837,11 @@ Current status snapshot:
    - Workflow run `22474293410` failed fast at step `Rollout gate preflight (main strict)`.
    - Build/push steps were skipped as expected.
    - Confirms policy is active and preventing non-validated main publishes.
+
+## 2026-02-27 GSD Spec Continuation (Phase 31 Gate-Only Dispatch Loop)
+
+1. Added `gate_only` dispatch input to publish workflow:
+   - `.github/workflows/publish-mission-control-images.yml`
+2. Behavior:
+   - `workflow_dispatch` with `gate_only=true` skips build/push and runs rollout gate only.
+   - Enables fast validation of probe/rollback configuration before expensive release runs.
