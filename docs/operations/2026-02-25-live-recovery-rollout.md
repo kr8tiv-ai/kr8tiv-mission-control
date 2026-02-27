@@ -738,3 +738,18 @@ Current status snapshot:
    - `docs/openclaw_15_point_harness.md` updated with Phase 27 overlay checks.
    - NotebookLM rationale captured in:
      - `docs/operations/2026-02-27-notebooklm-phase27-qna.md`
+
+## 2026-02-27 Rollout Update (Phase 27 Gate Wiring Live on Publish Pipeline)
+
+1. Main image publish workflow:
+   - Workflow: `publish-mission-control-images.yml` (`push` on `main`)
+   - Run ID: `22473567379`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22473567379`
+2. Gate step evidence:
+   - Step `Runtime rollout health gate (with optional rollback)` executed successfully.
+   - Artifact `rollout-gate-evidence` uploaded.
+   - Artifact ID: `5685102179`
+3. Current semantics now enforced in pipeline:
+   - publish remains successful only when gate status is `passed` or `skipped`
+   - `failed` status now fails workflow and can trigger rollback command if configured
