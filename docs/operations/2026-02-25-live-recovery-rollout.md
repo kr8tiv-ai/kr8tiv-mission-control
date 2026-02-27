@@ -520,3 +520,17 @@ Production rollout evidence will be appended after immutable image publish + VPS
    - Combined targeted regression:
      - `uv run pytest backend/tests/test_notebook_ops_api.py backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py backend/tests/test_tasks_api_rows.py backend/tests/test_gsd_runs_api.py backend/tests/test_recovery_ops_api.py -q`
      - Result: `30 passed`
+
+## 2026-02-27 GSD Spec Continuation (Phase 23-25 Planning)
+
+Current status snapshot:
+1. Phase 20-22 targeted regression on current `main`:
+   - `uv run pytest tests/test_heartbeat_template_contract.py tests/test_notebooklm_capability_gate.py tests/test_task_mode_notebook_capability_gate.py tests/test_task_mode_supermemory_callout.py tests/test_task_mode_schema.py tests/test_tasks_api_rows.py tests/test_gsd_runs_api.py tests/test_recovery_ops_api.py -q`
+   - Result: `28 passed, 1 warning`
+2. Next-sequence planning artifacts created:
+   - `docs/plans/2026-02-27-phase23-25-control-plane-visibility-design.md`
+   - `docs/plans/2026-02-27-phase23-25-control-plane-visibility-implementation.md`
+3. Planned delivery focus:
+   - Phase 23: notebook gate visibility in task payloads + board UI
+   - Phase 24: GSD continuity metrics aggregation and iteration deltas
+   - Phase 25: executable runtime verification harness tied to GSD run gating
