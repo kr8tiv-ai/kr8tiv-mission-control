@@ -357,6 +357,10 @@ async def _enforce_notebooklm_capability(
         notebook_id=task.notebook_id,
         require_notebook=require_notebook,
     )
+    task.notebook_gate_state = gate.state
+    task.notebook_gate_reason = gate.reason
+    task.notebook_gate_checked_at = gate.checked_at
+
     if gate.state == "ready":
         if task.notebook_profile == "auto" and gate.selected_profile:
             task.notebook_profile = gate.selected_profile

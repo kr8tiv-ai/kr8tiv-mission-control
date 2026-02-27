@@ -1591,6 +1591,14 @@ async def query_task_notebook(
         notebook_id=notebook_id,
         require_notebook=True,
     )
+    task.notebook_gate_state = gate.state
+    task.notebook_gate_reason = gate.reason
+    task.notebook_gate_checked_at = gate.checked_at
+    task.updated_at = utcnow()
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+
     if gate.state != "ready":
         gate_message = (
             "[NotebookLM Gate] "

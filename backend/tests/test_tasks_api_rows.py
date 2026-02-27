@@ -115,3 +115,31 @@ def test_task_event_payload_includes_activity_for_non_comment_event() -> None:
     assert isinstance(task_payload, dict)
     assert task_payload["id"] == str(task.id)
     assert task_payload["is_blocked"] is False
+
+
+def test_task_event_payload_includes_notebook_gate_fields() -> None:
+    task = Task(
+        board_id=uuid4(),
+        title="Notebook-gated task",
+        task_mode="notebook",
+        notebook_gate_state="retryable",
+        notebook_gate_reason="auth_expired",
+    )
+    event = ActivityEvent(
+        event_type="task.updated",
+        message="Task updated: Notebook-gated task.",
+        task_id=task.id,
+    )
+
+    payload = _task_event_payload(
+        event,
+        task,
+        deps_map={},
+        dep_status={},
+        tag_state_by_task_id={},
+    )
+
+    task_payload = payload["task"]
+    assert isinstance(task_payload, dict)
+    assert task_payload["notebook_gate_state"] == "retryable"
+    assert task_payload["notebook_gate_reason"] == "auth_expired"
