@@ -534,3 +534,18 @@ Current status snapshot:
    - Phase 23: notebook gate visibility in task payloads + board UI
    - Phase 24: GSD continuity metrics aggregation and iteration deltas
    - Phase 25: executable runtime verification harness tied to GSD run gating
+
+## 2026-02-27 GSD Spec Continuation (Migration Head Split Hotfix)
+
+1. Root-cause remediation:
+   - Production backend startup was blocked by Alembic `MultipleHeads` (`a8c1d2e3f4b5`, `c1f8e4a6b9d2`).
+   - Added merge migration to unify graph:
+     - `backend/migrations/versions/d9b7c5a3e1f0_merge_notebook_gate_heads.py`
+     - `down_revision = ("a8c1d2e3f4b5", "c1f8e4a6b9d2")`
+2. Migration graph verification:
+   - `uv run alembic heads` => `d9b7c5a3e1f0 (head)`
+3. Regression verification:
+   - `uv run pytest backend/tests/test_heartbeat_template_contract.py backend/tests/test_notebooklm_capability_gate.py backend/tests/test_task_mode_notebook_capability_gate.py backend/tests/test_task_mode_supermemory_callout.py backend/tests/test_task_mode_schema.py backend/tests/test_tasks_api_rows.py backend/tests/test_gsd_runs_api.py backend/tests/test_recovery_ops_api.py backend/tests/test_notebook_ops_api.py -q`
+   - Result: `30 passed, 1 warning`
+4. Rollout note:
+   - This removes the migration-graph blocker; remaining live rollout risk is host disk pressure (`no space left on device`) and is handled in runtime ops.
