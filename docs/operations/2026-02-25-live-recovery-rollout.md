@@ -209,6 +209,44 @@ Verification snapshot:
 
 Production rollout evidence will be appended after immutable image publish + VPS deploy.
 
+## 2026-02-27 Rollout Update (Phase 19 Forced Resync + DB Hardening Live)
+
+Phase 19 forced-recovery controls were merged and deployed with immutable images from commit `db352ac6e6e6001ab0604683ebf03afadc089265`.
+
+Verification snapshot:
+1. Main image publish workflow:
+   - Workflow: `publish-mission-control-images.yml` (`push` on `main`)
+   - Run ID: `22467489063`
+   - Conclusion: `success`
+   - URL: `https://github.com/kr8tiv-ai/kr8tiv-mission-control/actions/runs/22467489063`
+2. VPS rollout action:
+   - Hostinger action ID: `81083656`
+   - Action: `docker_compose_up`
+   - State: `success`
+   - Completed at: `2026-02-27T00:40:23Z`
+3. Active immutable images:
+   - Backend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:db352ac`
+   - Webhook worker: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-backend:db352ac`
+   - Frontend: `ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:db352ac`
+4. Runtime checks:
+   - `http://76.13.106.100:8100/health` => `200`
+   - `http://76.13.106.100:8100/readyz` => `200`
+   - `http://76.13.106.100:3100` => `200`
+   - Postgres exposure check: `76.13.106.100:5432` => `closed`
+5. Forced-recovery behavior check:
+   - `POST /api/v1/runtime/recovery/run?board_id=b1000000-0000-0000-0000-000000000001&force=true` => `200`
+   - Result summary: `total_incidents=4`, `recovered=4`, `failed=0`, `suppressed=0`
+   - Forced action count: `forced_heartbeat_resync=4`
+6. Board agent state check:
+   - `GET /api/v1/agents?board_id=b1000000-0000-0000-0000-000000000001` => all 4 board agents `online`
+7. OpenClaw poller ownership hygiene:
+   - Verified unique Telegram bot token per project (`openclaw-arsenal`, `openclaw-edith`, `openclaw-jocasta`, `openclaw-ydy8`)
+   - Controlled restarts completed:
+     - `81083825` (arsenal) success
+     - `81083832` (edith) success
+     - `81083840` (jocasta) success
+     - `81083849` (ydy8) success
+
 ## 2026-02-27 Phase 19 Development Verification (Forced Heartbeat Resync)
 
 Phase 19 manual recovery hardening was validated in local worktree before rollout.
