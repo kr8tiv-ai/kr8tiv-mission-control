@@ -715,3 +715,26 @@ Current status snapshot:
 4. Current status:
    - Rollout automation path is functioning (publish/update/start successful).
    - Runtime remains unreachable due to unresolved host/container control-plane failure.
+
+## 2026-02-27 GSD Spec Continuation (Phase 27 CI Rollout Gate + Auto-Rollback Hook)
+
+1. Implemented deterministic rollout health gate script:
+   - `scripts/ci/rollout_health_gate.py`
+   - Status semantics: `passed | failed | skipped`
+   - Optional rollback trigger when gate fails and rollback command is configured.
+2. Wired publish workflow gate:
+   - `.github/workflows/publish-mission-control-images.yml`
+   - Added post-publish step:
+     - `Runtime rollout health gate (with optional rollback)`
+   - Added always-on artifact upload:
+     - `rollout-gate-evidence`
+     - `artifacts/rollout/health-gate.json`
+     - `artifacts/rollout/health-gate.env`
+3. Test-first verification:
+   - `UV_PROJECT_ENVIRONMENT=.venv-test uv run pytest tests/test_rollout_health_gate.py tests/test_verification_harness.py tests/test_verification_harness_api.py tests/test_runtime_control_plane_status_api.py -q`
+   - Result: `14 passed`
+4. Operational policy updates:
+   - `docs/production/runtime-image-policy.md` updated with CI gate contracts and rollback semantics.
+   - `docs/openclaw_15_point_harness.md` updated with Phase 27 overlay checks.
+   - NotebookLM rationale captured in:
+     - `docs/operations/2026-02-27-notebooklm-phase27-qna.md`

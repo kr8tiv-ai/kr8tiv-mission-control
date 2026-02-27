@@ -40,10 +40,24 @@ Production deploys must be reproducible and restart-safe. Mission Control runtim
 2. `docker pull <frontend_tag>` succeeds from target host.
 3. `docker compose ps` shows all services on expected tags.
 4. Mission Control API and board/task endpoints return expected status with auth.
+5. CI runtime rollout health gate passes (or is explicitly `skipped` when URLs are unconfigured):
+   - Script: `scripts/ci/rollout_health_gate.py`
+   - Inputs:
+     - `RUNTIME_HEALTH_URLS` (comma-separated)
+     - `RUNTIME_ROLLBACK_COMMAND` (optional)
+   - Evidence artifacts:
+     - `artifacts/rollout/health-gate.json`
+     - `artifacts/rollout/health-gate.env`
 
 ## Rollback
 
 1. Keep previous known-good backend + frontend tags.
 2. Roll back by pinning previous tags in compose.
 3. Re-run `docker compose up -d`.
-
+4. For automated rollback in CI, configure:
+   - `RUNTIME_HEALTH_URLS` to required runtime probes
+   - `RUNTIME_ROLLBACK_COMMAND` to an operator-approved rollback command
+5. Rollout gate semantics:
+   - `passed`: rollout healthy
+   - `failed`: rollout unhealthy (and rollback attempted if configured)
+   - `skipped`: gate intentionally bypassed due missing URL configuration

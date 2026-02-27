@@ -58,3 +58,29 @@ jobs:
           tags: |
             ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:main
             ghcr.io/kr8tiv-ai/kr8tiv-mission-control-frontend:${{ steps.vars.outputs.sha_short }}
+
+      - name: Runtime rollout health gate (with optional rollback)
+        env:
+          RUNTIME_HEALTH_URLS: ${{ secrets.RUNTIME_HEALTH_URLS }}
+          RUNTIME_ROLLBACK_COMMAND: ${{ secrets.RUNTIME_ROLLBACK_COMMAND }}
+        run: |
+          python scripts/ci/rollout_health_gate.py \
+            --urls "${RUNTIME_HEALTH_URLS:-}" \
+            --attempts 8 \
+            --timeout-seconds 8 \
+            --sleep-seconds 15 \
+            --rollback-on-fail \
+            --rollback-command "${RUNTIME_ROLLBACK_COMMAND:-}" \
+            --rollback-timeout-seconds 240 \
+            --evidence-file artifacts/rollout/health-gate.json \
+            --env-file artifacts/rollout/health-gate.env
+
+      - name: Upload rollout gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollout-gate-evidence
+          if-no-files-found: ignore
+          path: |
+            artifacts/rollout/health-gate.json
+            artifacts/rollout/health-gate.env

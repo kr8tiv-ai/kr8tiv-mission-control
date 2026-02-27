@@ -203,6 +203,26 @@ Run these checks after deploying a build that includes optional external verific
    - Ensure all configured probe URLs are healthy.
    - Expected: `external_health_probe.required=true`, `passed=true`, `detail=ok:<count>`.
 
+## Phase 27 Publish-Pipeline Rollout Gate Overlay
+
+Run these checks after enabling CI rollout gating in image publish workflow:
+
+1. Publish workflow runs runtime gate after image push
+   - Workflow: `.github/workflows/publish-mission-control-images.yml`
+   - Expected: step `Runtime rollout health gate (with optional rollback)` executes.
+2. Gate artifact is always uploaded
+   - Expected artifact: `rollout-gate-evidence`
+   - Files:
+     - `artifacts/rollout/health-gate.json`
+     - `artifacts/rollout/health-gate.env`
+3. Failure behavior is deterministic
+   - Expected: gate step fails workflow when status=`failed`.
+4. Rollback hook behavior is deterministic
+   - If `RUNTIME_ROLLBACK_COMMAND` set and gate fails:
+     - Expected: rollback attempt metadata present in evidence payload.
+   - If rollback command missing:
+     - Expected: gate still fails with explicit rollback-missing signal.
+
 ## Evidence Capture Template
 
 Capture and store:
