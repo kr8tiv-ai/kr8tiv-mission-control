@@ -716,6 +716,8 @@ class GatewayControlPlane(ABC):
     async def patch_agent_heartbeats(
         self,
         entries: list[tuple[str, str, dict[str, Any], str | None]],
+        *,
+        include_runtime_defaults: bool = True,
     ) -> None:
         raise NotImplementedError
 
@@ -836,6 +838,8 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
     async def patch_agent_heartbeats(
         self,
         entries: list[tuple[str, str, dict[str, Any], str | None]],
+        *,
+        include_runtime_defaults: bool = True,
     ) -> None:
         base_hash, raw_list, config_data = await _gateway_config_agent_list(self._config)
         entry_by_id = _heartbeat_entry_map(entries)
@@ -848,10 +852,12 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         thinking_patch = _thinking_default_patch(config_data, entries)
         if thinking_patch is not None:
             patch.setdefault("agents", {})["defaults"] = thinking_patch
-        channels_patch = _channel_heartbeat_visibility_patch(config_data)
+        channels_patch = (
+            _channel_heartbeat_visibility_patch(config_data) if include_runtime_defaults else None
+        )
         if channels_patch is not None:
             patch["channels"] = channels_patch
-        control_ui_patch = _control_ui_access_patch(config_data)
+        control_ui_patch = _control_ui_access_patch(config_data) if include_runtime_defaults else None
         if control_ui_patch is not None:
             patch["gateway"] = control_ui_patch
         if not patch:
@@ -1252,13 +1258,17 @@ async def _patch_gateway_agent_heartbeats(
     gateway: Gateway,
     *,
     entries: list[tuple[str, str, dict[str, Any], str | None]],
+    include_runtime_defaults: bool = True,
 ) -> None:
     """Patch multiple agent heartbeat configs in a single gateway config.patch call.
 
     Each entry is (agent_id, workspace_path, heartbeat_dict, model_id).
     """
     control_plane = _control_plane_for_gateway(gateway)
-    await control_plane.patch_agent_heartbeats(entries)
+    await control_plane.patch_agent_heartbeats(
+        entries,
+        include_runtime_defaults=include_runtime_defaults,
+    )
 
 
 def _should_include_bootstrap(
@@ -1286,7 +1296,13 @@ def _wakeup_text(agent: Agent, *, verb: str) -> str:
 class OpenClawGatewayProvisioner:
     """Gateway-only agent lifecycle interface (create -> files -> wake)."""
 
-    async def sync_gateway_agent_heartbeats(self, gateway: Gateway, agents: list[Agent]) -> None:
+    async def sync_gateway_agent_heartbeats(
+        self,
+        gateway: Gateway,
+        agents: list[Agent],
+        *,
+        include_runtime_defaults: bool = True,
+    ) -> None:
         """Sync current Agent.heartbeat_config values to the gateway config."""
         if not gateway.workspace_root:
             msg = "gateway workspace_root is required"
@@ -1300,7 +1316,11 @@ class OpenClawGatewayProvisioner:
             entries.append((agent_id, workspace_path, heartbeat, model_id))
         if not entries:
             return
-        await _patch_gateway_agent_heartbeats(gateway, entries=entries)
+        await _patch_gateway_agent_heartbeats(
+            gateway,
+            entries=entries,
+            include_runtime_defaults=include_runtime_defaults,
+        )
 
     async def apply_agent_lifecycle(
         self,

@@ -1466,7 +1466,11 @@ class AgentLifecycleService(OpenClawDBService):
         if gateway is None or not gateway.url or not gateway.workspace_root:
             return
         try:
-            await OpenClawGatewayProvisioner().sync_gateway_agent_heartbeats(gateway, [agent])
+            await OpenClawGatewayProvisioner().sync_gateway_agent_heartbeats(
+                gateway,
+                [agent],
+                include_runtime_defaults=False,
+            )
         except (OpenClawGatewayError, OSError, RuntimeError, ValueError) as exc:
             self.logger.warning(
                 "agent.heartbeat.model_policy_sync_failed agent_id=%s gateway_id=%s error=%s",

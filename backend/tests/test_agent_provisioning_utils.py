@@ -894,6 +894,62 @@ async def test_patch_agent_heartbeats_skips_patch_when_no_changes(
 
 
 @pytest.mark.asyncio
+async def test_patch_agent_heartbeats_can_skip_runtime_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+    heartbeat = {"every": "20m", "target": "last", "includeReasoning": False}
+    existing_agent = {
+        "id": "board-agent-a",
+        "workspace": "/tmp/workspace-board-agent-a",
+        "heartbeat": heartbeat,
+    }
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {
+                        "list": [existing_agent],
+                        "defaults": {"thinkingDefault": "medium"},
+                    },
+                    "channels": {
+                        "telegram": {
+                            "configWrites": True,
+                            "accounts": {"default": {"configWrites": True}},
+                        },
+                    },
+                    "gateway": {"controlUi": {"allowInsecureAuth": False}},
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                heartbeat,
+                None,
+            )
+        ],
+        include_runtime_defaults=False,
+    )
+
+    assert [method for method, _params in calls].count("config.patch") == 0
+
+
+@pytest.mark.asyncio
 async def test_patch_agent_heartbeats_disables_whatsapp_when_not_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
