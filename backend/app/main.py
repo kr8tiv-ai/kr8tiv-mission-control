@@ -31,6 +31,7 @@ from app.api.gateways import router as gateways_router
 from app.api.gsd_runs import router as gsd_runs_router
 from app.api.installations import router as installations_router
 from app.api.metrics import router as metrics_router
+from app.api.notebook_ops import router as notebook_ops_router
 from app.api.organizations import router as organizations_router
 from app.api.packs import router as packs_router
 from app.api.persona_presets import router as persona_presets_router
@@ -562,6 +563,7 @@ api_v1.include_router(metrics_router)
 api_v1.include_router(organizations_router)
 api_v1.include_router(runtime_router)
 api_v1.include_router(runtime_ops_router)
+api_v1.include_router(notebook_ops_router)
 api_v1.include_router(recovery_ops_router)
 api_v1.include_router(packs_router)
 api_v1.include_router(persona_presets_router)
