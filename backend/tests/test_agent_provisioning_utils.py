@@ -997,6 +997,113 @@ async def test_patch_agent_heartbeats_retries_without_channels_on_invalid_config
     assert "channels" not in patch_payloads[1]
 
 
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_adds_control_ui_break_glass_flags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": [], "defaults": {}},
+                    "gateway": {"controlUi": {"allowInsecureAuth": False}},
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    monkeypatch.setattr(agent_provisioning.settings, "base_url", "http://76.13.106.100:8100")
+    monkeypatch.setattr(agent_provisioning.settings, "cors_origins", "http://76.13.106.100:3100")
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "20m", "target": "last", "includeReasoning": False},
+                None,
+            )
+        ],
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    control_ui = payload["gateway"]["controlUi"]
+    assert control_ui["allowInsecureAuth"] is True
+    assert control_ui["dangerouslyDisableDeviceAuth"] is True
+    assert "http://76.13.106.100:3100" in control_ui["allowedOrigins"]
+    assert "http://localhost:3100" in control_ui["allowedOrigins"]
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_retries_without_gateway_patch_on_invalid_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+    patch_attempt = 0
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        nonlocal patch_attempt
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": [], "defaults": {}},
+                    "gateway": {"controlUi": {"allowInsecureAuth": False}},
+                },
+            }
+        if method == "config.patch":
+            patch_attempt += 1
+            assert params is not None
+            payload = json.loads(str(params["raw"]))
+            if patch_attempt == 1:
+                assert "gateway" in payload
+                raise agent_provisioning.OpenClawGatewayError("invalid config")
+            assert "gateway" not in payload
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "20m", "target": "last", "includeReasoning": False},
+                None,
+            )
+        ],
+    )
+
+    patch_payloads = [
+        json.loads(str(params["raw"]))
+        for method, params in calls
+        if method == "config.patch" and params is not None
+    ]
+    assert len(patch_payloads) == 2
+    assert "gateway" in patch_payloads[0]
+    assert "gateway" not in patch_payloads[1]
+
+
 def test_agents_template_declares_persona_precedence() -> None:
     template = (agent_provisioning._templates_root() / "BOARD_AGENTS.md.j2").read_text(
         encoding="utf-8",

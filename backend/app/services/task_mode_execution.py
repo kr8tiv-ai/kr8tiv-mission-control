@@ -40,6 +40,28 @@ logger = get_logger(__name__)
 _VERDICT_PATTERN = re.compile(r"VERDICT:?\s*(APPROVED|REVISE)\s*$", re.IGNORECASE | re.MULTILINE)
 _ARENA_MODES = {"arena", "arena_notebook"}
 _NOTEBOOK_MODES = {"notebook", "arena_notebook", "notebook_creation"}
+_ARENA_GATEWAY_MAX_ATTEMPTS = 2
+_TRANSIENT_GATEWAY_ERROR_MARKERS = (
+    "timeout",
+    "timed out",
+    "temporarily",
+    "temporarily unavailable",
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "service unavailable",
+    "bad gateway",
+    "gateway timeout",
+    "econnreset",
+    "econnrefused",
+    "enotfound",
+)
+_NON_RETRYABLE_GATEWAY_ERROR_MARKERS = (
+    "device identity required",
+    "missing board agent",
+    "missing session",
+    "missing gateway configuration",
+)
 
 
 @dataclass(frozen=True)
@@ -73,6 +95,15 @@ def _extract_verdict(text: str) -> str | None:
     if match is None:
         return None
     return match.group(1).upper()
+
+
+def _is_transient_gateway_error(exc: Exception) -> bool:
+    detail = str(exc).strip().lower()
+    if not detail:
+        return False
+    if any(marker in detail for marker in _NON_RETRYABLE_GATEWAY_ERROR_MARKERS):
+        return False
+    return any(marker in detail for marker in _TRANSIENT_GATEWAY_ERROR_MARKERS)
 
 
 def _parse_sources(task: Task) -> NotebookSourcesPayload:
@@ -255,68 +286,94 @@ async def _run_agent_turn(
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing session")
     if ctx.gateway_config is None:
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing gateway configuration")
-    try:
-        from app.services.openclaw.gateway_rpc import send_message
+    from app.services.openclaw.gateway_rpc import send_message
 
-        # Capture baseline history signature before sending.
-        history_before = await get_chat_history(
-            board_agent.openclaw_session_id,
-            config=ctx.gateway_config,
-            limit=20,
-        )
-        baseline_signature = _latest_history_signature(history_before)
-
-        await send_message(
-            prompt,
-            session_key=board_agent.openclaw_session_id,
-            config=ctx.gateway_config,
-            deliver=False,
-        )
-
-        # Poll for new response with exponential backoff (2s, 4s, 8s, 16s, 30s)
-        backoff_delays = [2, 4, 8, 16, 30]  # ~60s total timeout
-        for attempt, delay in enumerate(backoff_delays, start=1):
-            await asyncio.sleep(delay)
-            history = await get_chat_history(
+    for gateway_attempt in range(1, _ARENA_GATEWAY_MAX_ATTEMPTS + 1):
+        try:
+            # Capture baseline history signature before sending.
+            history_before = await get_chat_history(
                 board_agent.openclaw_session_id,
                 config=ctx.gateway_config,
                 limit=20,
             )
+            baseline_signature = _latest_history_signature(history_before)
 
-            latest_role = _latest_history_role(history)
-            current_signature = _latest_history_signature(history)
-            response = _extract_latest_message(history)
+            await send_message(
+                prompt,
+                session_key=board_agent.openclaw_session_id,
+                config=ctx.gateway_config,
+                deliver=False,
+            )
 
-            # A valid turn means a new latest history entry from assistant/agent with text.
-            if (
-                response
-                and latest_role in {"assistant", "agent"}
-                and current_signature is not None
-                and current_signature != baseline_signature
-            ):
-                logger.info(
-                    "task_mode.agent_turn.response_received",
+            # Poll for new response with exponential backoff (2s, 4s, 8s, 16s, 30s)
+            backoff_delays = [2, 4, 8, 16, 30]  # ~60s total timeout
+            for attempt, delay in enumerate(backoff_delays, start=1):
+                await asyncio.sleep(delay)
+                history = await get_chat_history(
+                    board_agent.openclaw_session_id,
+                    config=ctx.gateway_config,
+                    limit=20,
+                )
+
+                latest_role = _latest_history_role(history)
+                current_signature = _latest_history_signature(history)
+                response = _extract_latest_message(history)
+
+                # A valid turn means a new latest history entry from assistant/agent with text.
+                if (
+                    response
+                    and latest_role in {"assistant", "agent"}
+                    and current_signature is not None
+                    and current_signature != baseline_signature
+                ):
+                    logger.info(
+                        "task_mode.agent_turn.response_received",
+                        extra={
+                            "task_id": str(ctx.task.id),
+                            "agent_id": agent_id,
+                            "attempt": attempt,
+                            "delay": delay,
+                            "gateway_attempt": gateway_attempt,
+                        },
+                    )
+                    return board_agent.name, response
+
+            # No response in this gateway attempt; optionally retry transport once.
+            if gateway_attempt < _ARENA_GATEWAY_MAX_ATTEMPTS:
+                logger.warning(
+                    "task_mode.agent_turn.gateway_no_response_retry",
                     extra={
                         "task_id": str(ctx.task.id),
                         "agent_id": agent_id,
-                        "attempt": attempt,
-                        "delay": delay,
+                        "gateway_attempt": gateway_attempt,
                     },
                 )
-                return board_agent.name, response
-    except Exception as exc:  # pragma: no cover - network/runtime dependent
-        logger.warning(
-            "task_mode.agent_turn.gateway_failed",
-            extra={
-                "task_id": str(ctx.task.id),
-                "agent_id": agent_id,
-                "error": str(exc),
-            },
-        )
-        detail = str(exc).strip() or exc.__class__.__name__
-        raise RuntimeError(
-            f"Arena agent '{agent_id}' unavailable: gateway response unavailable ({detail})"
-        ) from exc
+                continue
+        except Exception as exc:  # pragma: no cover - network/runtime dependent
+            if gateway_attempt < _ARENA_GATEWAY_MAX_ATTEMPTS and _is_transient_gateway_error(exc):
+                logger.warning(
+                    "task_mode.agent_turn.gateway_retry",
+                    extra={
+                        "task_id": str(ctx.task.id),
+                        "agent_id": agent_id,
+                        "error": str(exc),
+                        "gateway_attempt": gateway_attempt,
+                    },
+                )
+                await asyncio.sleep(gateway_attempt)
+                continue
+            logger.warning(
+                "task_mode.agent_turn.gateway_failed",
+                extra={
+                    "task_id": str(ctx.task.id),
+                    "agent_id": agent_id,
+                    "error": str(exc),
+                },
+            )
+            detail = str(exc).strip() or exc.__class__.__name__
+            raise RuntimeError(
+                f"Arena agent '{agent_id}' unavailable: gateway response unavailable ({detail})"
+            ) from exc
     raise RuntimeError(f"Arena agent '{agent_id}' unavailable: gateway response unavailable")
 
 
@@ -456,6 +513,17 @@ async def _execute_arena_mode(
         )
 
     participants = available_participants
+    if reviewer not in set(participants):
+        fallback_reviewer = final_agent if final_agent in set(participants) else participants[0]
+        logger.warning(
+            "task_mode.arena.reviewer_fallback",
+            extra={
+                "task_id": str(task.id),
+                "requested_reviewer": reviewer,
+                "fallback_reviewer": fallback_reviewer,
+            },
+        )
+        reviewer = fallback_reviewer
 
     summary_lines: list[str] = []
 
@@ -489,14 +557,34 @@ async def _execute_arena_mode(
         round_outputs: list[dict[str, object]] = []
         for agent_id in participants:
             prompt = "\n".join(summary_lines)
-            display_name, output = await _run_agent_turn(
-                ctx=ctx,
-                agent_id=agent_id,
-                prompt=prompt,
-                round_number=round_number,
-                max_rounds=rounds,
-                is_reviewer=(agent_id == reviewer),
-            )
+            try:
+                display_name, output = await _run_agent_turn(
+                    ctx=ctx,
+                    agent_id=agent_id,
+                    prompt=prompt,
+                    round_number=round_number,
+                    max_rounds=rounds,
+                    is_reviewer=(agent_id == reviewer),
+                )
+            except RuntimeError as exc:
+                logger.warning(
+                    "task_mode.arena.agent_turn_failed",
+                    extra={
+                        "task_id": str(task.id),
+                        "agent_id": agent_id,
+                        "round_number": round_number,
+                        "error": str(exc),
+                    },
+                )
+                round_outputs.append(
+                    {
+                        "agent_id": agent_id,
+                        "display_name": agent_id,
+                        "output_text": f"ERROR: {exc}",
+                    }
+                )
+                summary_lines.append(f"[Round {round_number} | {agent_id}] ERROR: {exc}")
+                continue
             round_outputs.append(
                 {
                     "agent_id": agent_id,
@@ -530,6 +618,43 @@ async def _execute_arena_mode(
             "",
         )
         verdict = _extract_verdict(reviewer_output)
+        if verdict is None:
+            strict_prompt = "\n".join(
+                [
+                    "STRICT VERDICT REQUIRED",
+                    "Return exactly one verdict line at the end: VERDICT: APPROVED or VERDICT: REVISE.",
+                    "No extra format. No omission.",
+                    "",
+                    "Current round context:",
+                    *summary_lines[-30:],
+                ]
+            )
+            try:
+                followup_name, followup_output = await _run_agent_turn(
+                    ctx=ctx,
+                    agent_id=reviewer,
+                    prompt=strict_prompt,
+                    round_number=round_number,
+                    max_rounds=rounds,
+                    is_reviewer=True,
+                )
+                round_outputs.append(
+                    {
+                        "agent_id": reviewer,
+                        "display_name": followup_name,
+                        "output_text": followup_output,
+                        "followup": True,
+                    }
+                )
+                summary_lines.append(
+                    f"[Round {round_number} | {reviewer} | followup] {followup_output}"
+                )
+                reviewer_output = followup_output
+                verdict = _extract_verdict(reviewer_output)
+            except RuntimeError as exc:
+                summary_lines.append(
+                    f"[Round {round_number} | {reviewer} | followup] ERROR: {exc}"
+                )
         if verdict is None:
             parse_error = True
             verdict = "ERROR"

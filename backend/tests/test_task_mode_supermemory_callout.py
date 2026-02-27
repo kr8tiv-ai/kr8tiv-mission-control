@@ -23,15 +23,20 @@ def _ctx(
     supermemory_enabled: bool,
     rounds: int = 1,
     gsd_spec_driven: bool = False,
+    agents: list[str] | None = None,
+    final_agent: str = "arsenal",
+    allowed_agents: tuple[str, ...] = ("arsenal",),
+    reviewer_agent: str = "arsenal",
 ) -> _ModeExecutionContext:
+    selected_agents = agents or ["arsenal"]
     task = SimpleNamespace(
         id=uuid4(),
         title="Investigate issue",
         description="Need reliable fix path",
         arena_config={
-            "agents": ["arsenal"],
+            "agents": selected_agents,
             "rounds": rounds,
-            "final_agent": "arsenal",
+            "final_agent": final_agent,
             "supermemory_enabled": supermemory_enabled,
             "gsd_spec_driven": gsd_spec_driven,
         },
@@ -42,8 +47,8 @@ def _ctx(
         board=SimpleNamespace(id=uuid4()),
         task=task,
         gateway_config=object(),
-        allowed_agents=("arsenal",),
-        reviewer_agent="arsenal",
+        allowed_agents=allowed_agents,
+        reviewer_agent=reviewer_agent,
     )
 
 
@@ -202,3 +207,68 @@ async def test_arena_mode_injects_gsd_spec_guidance_when_enabled(
         in prompt
         for prompt in prompts
     )
+
+
+@pytest.mark.asyncio
+async def test_arena_mode_reprompts_reviewer_when_verdict_missing_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts: list[str] = []
+    session = _DummySession()
+    ctx = _ctx(supermemory_enabled=False, rounds=1)
+
+    async def _fake_find_board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name="arsenal", openclaw_session_id="session-1")
+
+    reviewer_turn_count = 0
+
+    async def _fake_run_agent_turn(**kwargs):
+        nonlocal reviewer_turn_count
+        prompt = str(kwargs["prompt"])
+        prompts.append(prompt)
+        if kwargs.get("is_reviewer"):
+            reviewer_turn_count += 1
+            if reviewer_turn_count == 1:
+                return "arsenal", "I recommend revise due to risk."
+            return "arsenal", "Follow-up review\nVERDICT: APPROVED"
+        return "arsenal", "final output"
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _fake_find_board_agent)
+    monkeypatch.setattr(task_mode_execution, "_run_agent_turn", _fake_run_agent_turn)
+
+    await task_mode_execution._execute_arena_mode(session, ctx)
+
+    assert reviewer_turn_count == 2
+    assert any("STRICT VERDICT REQUIRED" in prompt for prompt in prompts)
+
+
+@pytest.mark.asyncio
+async def test_arena_mode_skips_non_reviewer_agent_failure_and_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _DummySession()
+    ctx = _ctx(
+        supermemory_enabled=False,
+        rounds=1,
+        agents=["edith", "arsenal"],
+        final_agent="arsenal",
+        allowed_agents=("edith", "arsenal"),
+        reviewer_agent="arsenal",
+    )
+
+    async def _fake_find_board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name=_agent_id, openclaw_session_id=f"session-{_agent_id}")
+
+    async def _fake_run_agent_turn(**kwargs):
+        agent_id = str(kwargs["agent_id"])
+        if agent_id == "edith":
+            raise RuntimeError("Arena agent 'edith' unavailable: gateway response unavailable")
+        if kwargs.get("is_reviewer"):
+            return "arsenal", "review result\nVERDICT: APPROVED"
+        return "arsenal", "final output"
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _fake_find_board_agent)
+    monkeypatch.setattr(task_mode_execution, "_run_agent_turn", _fake_run_agent_turn)
+
+    await task_mode_execution._execute_arena_mode(session, ctx)
+    assert session.items

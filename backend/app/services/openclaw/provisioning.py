@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
@@ -207,6 +208,67 @@ def _channel_heartbeat_visibility_patch(config_data: dict[str, Any]) -> dict[str
     if not patch:
         return None
     return patch
+
+
+def _desired_control_ui_allowed_origins() -> list[str]:
+    origins: list[str] = []
+
+    def _add(origin: str) -> None:
+        normalized = origin.strip().rstrip("/")
+        if not normalized or normalized in origins:
+            return
+        origins.append(normalized)
+
+    _add("http://localhost:3100")
+    _add("http://127.0.0.1:3100")
+
+    base_url = settings.base_url.strip()
+    if base_url:
+        _add(base_url)
+        parsed = urlparse(base_url)
+        if parsed.hostname:
+            _add(f"http://{parsed.hostname}:3100")
+            _add(f"https://{parsed.hostname}:3100")
+
+    for raw in settings.cors_origins.split(","):
+        if raw.strip():
+            _add(raw)
+
+    return origins
+
+
+def _control_ui_access_patch(config_data: dict[str, Any]) -> dict[str, Any] | None:
+    gateway = config_data.get("gateway")
+    gateway_map = gateway if isinstance(gateway, dict) else {}
+    control_ui = gateway_map.get("controlUi")
+    control_ui_map = control_ui if isinstance(control_ui, dict) else {}
+
+    patch: dict[str, Any] = {}
+    if control_ui_map.get("allowInsecureAuth") is not True:
+        patch["allowInsecureAuth"] = True
+    if control_ui_map.get("dangerouslyDisableDeviceAuth") is not True:
+        patch["dangerouslyDisableDeviceAuth"] = True
+
+    existing_allowed_origins = control_ui_map.get("allowedOrigins")
+    existing_origins: list[str] = []
+    if isinstance(existing_allowed_origins, list):
+        for raw in existing_allowed_origins:
+            if isinstance(raw, str):
+                normalized = raw.strip().rstrip("/")
+                if normalized and normalized not in existing_origins:
+                    existing_origins.append(normalized)
+
+    merged_origins = list(existing_origins)
+    for origin in _desired_control_ui_allowed_origins():
+        if origin not in merged_origins:
+            merged_origins.append(origin)
+
+    if merged_origins != existing_origins and merged_origins:
+        patch["allowedOrigins"] = merged_origins
+
+    if not patch:
+        return None
+    return {"controlUi": patch}
 
 
 def _extract_model_reasoning_modes(config_data: dict[str, Any], model_id: str | None) -> list[str]:
@@ -786,11 +848,14 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         channels_patch = _channel_heartbeat_visibility_patch(config_data)
         if channels_patch is not None:
             patch["channels"] = channels_patch
+        control_ui_patch = _control_ui_access_patch(config_data)
+        if control_ui_patch is not None:
+            patch["gateway"] = control_ui_patch
 
-        # OpenClaw runtimes differ in accepted `channels` shape. Try the full patch first,
+        # OpenClaw runtimes differ in accepted `channels/gateway` shape. Try the full patch first,
         # then degrade to slimmer, backward-compatible payloads if needed.
         candidates: list[dict[str, Any]] = [patch]
-        if channels_patch is not None:
+        if channels_patch is not None or control_ui_patch is not None:
             candidates.append({"agents": dict(patch["agents"])})
             candidates.append({"agents": {"list": new_list}})
 
