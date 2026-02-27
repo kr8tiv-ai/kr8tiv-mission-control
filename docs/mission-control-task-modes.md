@@ -19,6 +19,9 @@ Task-mode support adds the following task fields:
 - `notebook_profile`
 - `notebook_id`
 - `notebook_share_url`
+- `notebook_gate_state` (`ready|retryable|misconfig|hard_fail|unknown`)
+- `notebook_gate_reason`
+- `notebook_gate_checked_at`
 
 Arena rounds are persisted in `task_iterations`.
 
@@ -114,6 +117,17 @@ Task-mode endpoints:
 
 - `GET /api/v1/boards/{board_id}/tasks/{task_id}/iterations`
 - `POST /api/v1/boards/{board_id}/tasks/{task_id}/notebook/query`
+- `GET /api/v1/runtime/notebook/gate`
+- `GET /api/v1/runtime/notebook/gate-summary?board_id=<uuid>`
+- `GET /api/v1/gsd-runs/{run_id}/summary`
+- `POST /api/v1/runtime/verification/execute`
+
+## Phase 23-25 Control-Plane Additions
+
+1. Notebook capability gate outcomes are now persisted on task rows for notebook-enabled modes.
+2. Board operators can fetch notebook gate rollups through `gate-summary` for quick triage.
+3. GSD telemetry now exposes previous-iteration deltas for continuity metrics.
+4. Runtime verification harness can optionally attach evidence and block a GSD run when required checks fail.
 
 ## Worker Runtime
 

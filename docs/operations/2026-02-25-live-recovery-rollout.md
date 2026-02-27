@@ -581,3 +581,83 @@ Current status snapshot:
      - `docker container prune -f`
      - `docker compose -f /docker/openclaw-mission-control/compose.yml up -d`
    - Then rerun live checks on `8100/readyz`, `3100`, and `48650-48653`.
+
+## 2026-02-27 GSD Spec Continuation (Phase 23-25 Local Verification + Evidence Pack)
+
+1. Backend targeted regression (phase23-25 scope):
+   - `UV_PROJECT_ENVIRONMENT=.venv-test uv run pytest tests/test_notebooklm_capability_gate.py tests/test_task_mode_notebook_capability_gate.py tests/test_task_mode_supermemory_callout.py tests/test_task_mode_schema.py tests/test_tasks_api_rows.py tests/test_notebook_ops_api.py tests/test_gsd_runs_api.py tests/test_recovery_ops_api.py tests/test_gsd_metrics_aggregator.py tests/test_verification_harness_api.py -q`
+   - Result: `40 passed, 1 warning`
+2. Frontend verification:
+   - `npm test -- TaskBoard.test.tsx --runInBand` is not supported by Vitest CLI in this repo (`Unknown option --runInBand`).
+   - Equivalent suite verification run: `npm test`
+   - Result: `21 passed` files, `82 passed` tests.
+   - Build verification: `npm run build` => success on Next.js `16.1.6`.
+3. Phase 23 capability sample (`GET /api/v1/runtime/notebook/gate-summary?board_id=<board_id>`):
+   ```json
+   {
+     "board_id": "11111111-1111-1111-1111-111111111111",
+     "total_notebook_tasks": 4,
+     "gate_counts": {
+       "ready": 1,
+       "retryable": 1,
+       "misconfig": 1,
+       "hard_fail": 0,
+       "unknown": 1
+     }
+   }
+   ```
+4. Phase 24 continuity delta sample (`GET /api/v1/gsd-runs/{run_id}/summary`):
+   ```json
+   {
+     "run": {
+       "run_name": "phase24-continuity",
+       "iteration_number": 2,
+       "metrics_snapshot": {
+         "incidents_total": 4,
+         "incidents_failed": 0,
+         "latency_p95_ms": 900
+       }
+     },
+     "previous": {
+       "iteration_number": 1,
+       "metrics_snapshot": {
+         "incidents_total": 5,
+         "incidents_failed": 1,
+         "latency_p95_ms": 1000
+       }
+     },
+     "deltas": {
+       "incidents_total": -1.0,
+       "incidents_failed": -1.0,
+       "latency_p95_ms": -100.0
+     }
+   }
+   ```
+5. Phase 25 verification harness sample (`POST /api/v1/runtime/verification/execute?gsd_run_id=<run_id>`):
+   ```json
+   {
+     "all_passed": false,
+     "required_failed": 1,
+     "checks": [
+       {
+         "name": "health_routes",
+         "required": true,
+         "passed": true,
+         "detail": "ok"
+       },
+       {
+         "name": "notebook_capability",
+         "required": true,
+         "passed": false,
+         "detail": "misconfig:runner_missing"
+       }
+     ],
+     "gsd_run_updated": true,
+     "evidence_link": "verification://<run_id>/<unix_ts>"
+   }
+   ```
+6. Runtime gate writeback behavior validated:
+   - Success path writes `verification_checks_total`, `verification_checks_passed`, and evidence link into target GSD run.
+   - Required-check failure path sets target GSD run `status=blocked`.
+7. Immutable image tags and Hostinger deployment IDs:
+   - Pending for this batch (development verification only; no GHCR publish and no VPS rollout action executed).

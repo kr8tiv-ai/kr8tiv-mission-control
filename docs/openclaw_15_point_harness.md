@@ -163,6 +163,26 @@ Run these checks after deploying a build that includes scheduler migration readi
    - During rollout startup window, webhook worker should not emit repeated recovery-query schema errors.
    - Expected: no transient `UndefinedColumn` loop noise tied to recovery scheduler startup.
 
+## Phase 23-25 Verification Harness Overlay
+
+Run these checks after deploying a build that includes notebook gate summaries, GSD deltas, and runtime verification harness:
+
+1. Notebook gate summary route is live
+   - `GET /api/v1/runtime/notebook/gate-summary?board_id=<board_id>`
+   - Expected: deterministic `gate_counts` payload with `ready|retryable|misconfig|hard_fail|unknown`.
+2. GSD run summary delta route is live
+   - `GET /api/v1/gsd-runs/{run_id}/summary`
+   - Expected: includes `run`, `previous` (when available), and numeric `deltas`.
+3. Runtime verification route executes
+   - `POST /api/v1/runtime/verification/execute`
+   - Expected: check matrix returned with `all_passed` and `required_failed`.
+4. Verification-to-GSD evidence wiring works
+   - `POST /api/v1/runtime/verification/execute?gsd_run_id=<run_id>`
+   - Expected: response includes `gsd_run_updated=true` and non-empty `evidence_link`.
+5. Required check failure blocks GSD run
+   - Trigger at least one required check failure.
+   - Expected: target `gsd_runs.status` transitions to `blocked` and metrics snapshot includes `verification_required_failed`.
+
 ## Evidence Capture Template
 
 Capture and store:
