@@ -24,3 +24,5 @@ backend/~/
 backend/coverage.*
 backend/.coverage
 frontend/coverage
+backend/artifacts/
+backend/artifacts/notebooklm_*
