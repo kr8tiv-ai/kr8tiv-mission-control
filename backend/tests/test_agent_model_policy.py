@@ -41,7 +41,9 @@ def test_locked_model_policy_lookup_for_named_agents() -> None:
     assert arsenal is not None
     assert edith is not None
     assert jocasta is not None
-    assert friday["model"] == "openai-codex/gpt-5.3-codex"
+    assert friday["model"] == "anthropic/claude-opus-4-6"
+    assert friday["provider"] == "anthropic"
+    assert friday["transport"] == "api"
     assert arsenal["transport"] == "cli"
     assert edith["provider"] == "google-gemini-cli"
     assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
@@ -117,8 +119,8 @@ async def test_persist_new_agent_applies_locked_policy_over_requested_policy() -
 
     normalized = normalize_model_policy(agent.model_policy)
     assert normalized is not None
-    assert normalized["model"] == "openai-codex/gpt-5.3-codex"
-    assert normalized["transport"] == "cli"
+    assert normalized["model"] == "anthropic/claude-opus-4-6"
+    assert normalized["transport"] == "api"
     assert normalized["locked"] is True
 
 

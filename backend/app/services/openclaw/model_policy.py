@@ -17,12 +17,12 @@ _MODEL_ALIASES: dict[str, str] = {
 
 _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "friday": {
-        "provider": "openai-codex",
-        "model": "openai-codex/gpt-5.3-codex",
-        "transport": "cli",
+        "provider": "anthropic",
+        "model": "anthropic/claude-opus-4-6",
+        "transport": "api",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to GPT-5.3 Codex CLI runtime.",
+        "notes": "Pinned to Claude Opus 4.6 Anthropic runtime.",
     },
     "arsenal": {
         "provider": "openai-codex",
