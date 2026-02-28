@@ -345,3 +345,59 @@ async def test_arena_mode_degrades_when_final_agent_unavailable(
         "Arena degraded mode: final agent 'arsenal' unavailable" in str(getattr(item, "message", ""))
         for item in comments
     )
+
+
+@pytest.mark.asyncio
+async def test_arena_notebook_injects_notebook_context_and_persists_final_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts: list[str] = []
+    add_sources_calls: list[tuple[str, tuple[str, ...], str]] = []
+    query_called = False
+    session = _DummySession()
+    ctx = _ctx(supermemory_enabled=False, rounds=1)
+    ctx.task.task_mode = "arena_notebook"
+    ctx.task.notebook_profile = "enterprise"
+
+    async def _fake_find_board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name="arsenal", openclaw_session_id="session-1")
+
+    async def _fake_enforce_notebook(*_args, **_kwargs):
+        return None
+
+    async def _fake_ensure_notebook(_task):
+        return SimpleNamespace(
+            notebook_id="nb-123",
+            share_url="https://notebook/share/nb-123",
+            profile="enterprise",
+        )
+
+    async def _fake_query_notebook(**_kwargs):
+        nonlocal query_called
+        query_called = True
+        return "Notebook baseline context"
+
+    async def _fake_add_sources(*, notebook_id, sources, profile):
+        add_sources_calls.append((str(notebook_id), tuple(sources.texts), str(profile)))
+
+    async def _fake_run_agent_turn(**kwargs):
+        assert query_called is True
+        prompt = str(kwargs["prompt"])
+        prompts.append(prompt)
+        if kwargs.get("is_reviewer"):
+            return "arsenal", "review output\nVERDICT: APPROVED"
+        return "arsenal", "final synthesis"
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _fake_find_board_agent)
+    monkeypatch.setattr(task_mode_execution, "_enforce_notebooklm_capability", _fake_enforce_notebook)
+    monkeypatch.setattr(task_mode_execution, "_ensure_notebook_for_task", _fake_ensure_notebook)
+    monkeypatch.setattr(task_mode_execution, "query_notebook", _fake_query_notebook)
+    monkeypatch.setattr(task_mode_execution, "add_sources", _fake_add_sources)
+    monkeypatch.setattr(task_mode_execution, "_run_agent_turn", _fake_run_agent_turn)
+
+    await task_mode_execution._execute_arena_mode(session, ctx)
+
+    assert prompts
+    assert all("NotebookLM context:" in prompt for prompt in prompts)
+    assert all("- Notebook baseline context" in prompt for prompt in prompts)
+    assert add_sources_calls == [("nb-123", ("final synthesis",), "enterprise")]

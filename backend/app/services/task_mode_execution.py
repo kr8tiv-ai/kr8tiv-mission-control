@@ -547,7 +547,26 @@ async def _execute_arena_mode(
         )
         reviewer = fallback_reviewer
 
+    notebook_info: NotebookInfo | None = None
+    notebook_context: str | None = None
+    if task.task_mode == "arena_notebook":
+        await _enforce_notebooklm_capability(task, require_notebook=False)
+        notebook_info = await _ensure_notebook_for_task(task)
+        notebook_query = (task.description or task.title).strip()
+        if notebook_query:
+            notebook_answer = await query_notebook(
+                notebook_id=notebook_info.notebook_id,
+                query=notebook_query,
+                profile=task.notebook_profile,
+            )
+            notebook_context = _coerce_notebook_answer(notebook_answer)
+
     summary_lines: list[str] = []
+
+    if notebook_context:
+        summary_lines.append("NotebookLM context:")
+        summary_lines.append(f"- {notebook_context}")
+        summary_lines.append("")
 
     # Supermemory integration
     if parsed_config.supermemory_enabled:
@@ -624,6 +643,7 @@ async def _execute_arena_mode(
                 for line in summary_lines
                 if line.startswith("Task:")
                 or line.startswith("Description:")
+                or line.startswith("NotebookLM context:")
                 or line.startswith("Supermemory context:")
                 or line.startswith("- ")
             ]
@@ -740,11 +760,9 @@ async def _execute_arena_mode(
         message=f"[Arena Final | {final_agent}] {final_output}",
     )
 
-    if task.task_mode == "arena_notebook":
-        await _enforce_notebooklm_capability(task, require_notebook=False)
-        notebook = await _ensure_notebook_for_task(task)
+    if task.task_mode == "arena_notebook" and notebook_info is not None:
         await add_sources(
-            notebook_id=notebook.notebook_id,
+            notebook_id=notebook_info.notebook_id,
             sources=NotebookSourcesPayload(texts=(final_output,)),
             profile=task.notebook_profile,
         )
