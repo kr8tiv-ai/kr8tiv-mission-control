@@ -204,6 +204,7 @@ async def test_control_plane_status_returns_aggregated_runtime_health(
     assert body["gsd"]["verification_required_failed"] == 2
     assert body["capabilities"]["mission_control"] == "ready"
     assert body["capabilities"]["notebooklm"] == "ready"
+    assert body["capabilities"]["telegram_pollers"] in {"ready", "degraded", "disabled"}
 
     await engine.dispose()
 
@@ -268,4 +269,5 @@ async def test_control_plane_status_alias_runtime_path(
     body = response.json()
     assert body["arena"]["healthy"] is True
     assert body["capabilities"]["verification"] == "ready"
+    assert body["capabilities"]["telegram_pollers"] in {"ready", "degraded", "disabled"}
     await engine.dispose()

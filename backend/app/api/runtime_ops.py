@@ -156,6 +156,23 @@ def _build_arena_status() -> RuntimeArenaStatusRead:
     )
 
 
+def _telegram_pollers_capability() -> str:
+    """Return readiness state for Telegram poller lifecycle."""
+    channels = settings.ingress_channels()
+    if "telegram" not in channels:
+        return "disabled"
+    if not settings.telegram_bot_username.strip() or not settings.telegram_bot_user_id.strip():
+        return "degraded"
+    owner_required = (
+        settings.telegram_strict_dm_policy
+        or settings.telegram_require_owner_for_task_direction
+        or settings.telegram_require_owner_tag_or_reply
+    )
+    if owner_required and not settings.telegram_owner_user_id.strip():
+        return "degraded"
+    return "ready"
+
+
 def _as_notebook_counts(states: Sequence[str | None]) -> tuple[int, dict[str, int]]:
     counts = {key: 0 for key in _NOTEBOOK_STATE_KEYS}
     for state in states:
@@ -309,6 +326,7 @@ async def runtime_control_plane_status(
         capabilities={
             "mission_control": "ready",
             "agent_auth": "ready" if "/api/v1/agent/heartbeat" in _collect_route_paths(request) else "degraded",
+            "telegram_pollers": _telegram_pollers_capability(),
             "arena": "ready" if arena_status.healthy else "degraded",
             "notebooklm": notebook_gate.state,
             "verification": "ready" if verification.all_passed else "degraded",
