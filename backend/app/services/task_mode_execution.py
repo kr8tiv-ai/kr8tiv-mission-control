@@ -573,7 +573,6 @@ async def _execute_arena_mode(
     if task.description:
         summary_lines.append(f"Description: {task.description}")
     converged = False
-    parse_error = False
 
     for round_number in range(1, rounds + 1):
         round_outputs: list[dict[str, object]] = []
@@ -678,8 +677,18 @@ async def _execute_arena_mode(
                     f"[Round {round_number} | {reviewer} | followup] ERROR: {exc}"
                 )
         if verdict is None:
-            parse_error = True
-            verdict = "ERROR"
+            # Graceful degradation path: if reviewer cannot provide strict verdict,
+            # force a conservative REVISE verdict instead of failing the whole job.
+            verdict = "REVISE"
+            if reviewer_output:
+                reviewer_output = f"{reviewer_output.rstrip()}\nVERDICT: REVISE"
+            else:
+                reviewer_output = (
+                    "Reviewer unavailable or missing strict verdict.\nVERDICT: REVISE"
+                )
+            summary_lines.append(
+                "[System] Reviewer verdict missing after strict re-prompt; forcing VERDICT: REVISE."
+            )
         session.add(
             TaskIteration(
                 task_id=task.id,
@@ -696,23 +705,35 @@ async def _execute_arena_mode(
         if verdict == "ERROR":
             break
 
-    if parse_error:
-        raise RuntimeError("Arena reviewer did not return VERDICT: APPROVED or VERDICT: REVISE")
-
     if not converged:
         summary_lines.append(
             "WARNING: Arena convergence cap reached without APPROVED verdict. "
             "Proceeding with latest draft."
         )
 
-    _final_name, final_output = await _run_agent_turn(
-        ctx=ctx,
-        agent_id=final_agent,
-        prompt="\n".join(summary_lines),
-        round_number=rounds,
-        max_rounds=rounds,
-        is_reviewer=False,
-    )
+    try:
+        _final_name, final_output = await _run_agent_turn(
+            ctx=ctx,
+            agent_id=final_agent,
+            prompt="\n".join(summary_lines),
+            round_number=rounds,
+            max_rounds=rounds,
+            is_reviewer=False,
+        )
+    except RuntimeError as exc:
+        logger.warning(
+            "task_mode.arena.final_agent_unavailable",
+            extra={
+                "task_id": str(task.id),
+                "agent_id": final_agent,
+                "error": str(exc),
+            },
+        )
+        final_output = (
+            f"Arena degraded mode: final agent '{final_agent}' unavailable ({exc}). "
+            "Returning latest synthesized context for manual review.\n\n"
+            + "\n".join(summary_lines[-20:])
+        )
     _record_task_comment(
         session,
         task_id=task.id,

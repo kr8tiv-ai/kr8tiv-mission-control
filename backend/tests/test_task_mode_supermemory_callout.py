@@ -272,3 +272,76 @@ async def test_arena_mode_skips_non_reviewer_agent_failure_and_continues(
 
     await task_mode_execution._execute_arena_mode(session, ctx)
     assert session.items
+
+
+@pytest.mark.asyncio
+async def test_arena_mode_forces_revise_when_reviewer_never_returns_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _DummySession()
+    ctx = _ctx(
+        supermemory_enabled=False,
+        rounds=1,
+        agents=["arsenal"],
+        final_agent="arsenal",
+        allowed_agents=("arsenal",),
+        reviewer_agent="arsenal",
+    )
+
+    async def _fake_find_board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name="arsenal", openclaw_session_id="session-1")
+
+    reviewer_attempts = 0
+
+    async def _fake_run_agent_turn(**kwargs):
+        nonlocal reviewer_attempts
+        if kwargs.get("is_reviewer"):
+            reviewer_attempts += 1
+            if reviewer_attempts == 1:
+                return "arsenal", "review without strict verdict"
+            return "arsenal", "still missing strict verdict"
+        return "arsenal", "final output"
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _fake_find_board_agent)
+    monkeypatch.setattr(task_mode_execution, "_run_agent_turn", _fake_run_agent_turn)
+
+    await task_mode_execution._execute_arena_mode(session, ctx)
+
+    task_iterations = [item for item in session.items if hasattr(item, "verdict")]
+    assert task_iterations
+    assert any(getattr(item, "verdict", None) == "REVISE" for item in task_iterations)
+
+
+@pytest.mark.asyncio
+async def test_arena_mode_degrades_when_final_agent_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _DummySession()
+    ctx = _ctx(
+        supermemory_enabled=False,
+        rounds=1,
+        agents=["arsenal"],
+        final_agent="arsenal",
+        allowed_agents=("arsenal",),
+        reviewer_agent="arsenal",
+    )
+
+    async def _fake_find_board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name="arsenal", openclaw_session_id="session-1")
+
+    async def _fake_run_agent_turn(**kwargs):
+        if kwargs.get("is_reviewer"):
+            return "arsenal", "review result\nVERDICT: APPROVED"
+        raise RuntimeError("Arena agent 'arsenal' unavailable: gateway response unavailable")
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _fake_find_board_agent)
+    monkeypatch.setattr(task_mode_execution, "_run_agent_turn", _fake_run_agent_turn)
+
+    await task_mode_execution._execute_arena_mode(session, ctx)
+
+    comments = [item for item in session.items if hasattr(item, "message")]
+    assert comments
+    assert any(
+        "Arena degraded mode: final agent 'arsenal' unavailable" in str(getattr(item, "message", ""))
+        for item in comments
+    )
