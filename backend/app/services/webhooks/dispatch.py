@@ -71,6 +71,8 @@ def _webhook_message(
         strict_dm_policy=settings.telegram_strict_dm_policy,
         require_owner_tag_or_reply=settings.telegram_require_owner_tag_or_reply,
         require_owner_for_task_direction=settings.telegram_require_owner_for_task_direction,
+        dedupe_window_seconds=0,
+        block_self_messages=settings.ingress_block_self_messages,
     )
     return (
         "WEBHOOK EVENT RECEIVED\n"

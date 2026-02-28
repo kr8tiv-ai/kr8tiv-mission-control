@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from app.services.channel_ingress import evaluate_ingress_policy
+from app.services.channel_ingress import evaluate_ingress_policy, reset_ingress_dedupe_cache
+
+
+def setup_function() -> None:
+    reset_ingress_dedupe_cache()
 
 
 def test_telegram_non_owner_dm_is_blocked() -> None:
@@ -105,3 +109,56 @@ def test_telegram_prompt_injection_is_flagged() -> None:
     assert decision.allow_processing is True
     assert decision.allow_task_direction is False
     assert decision.prompt_injection_detected is True
+
+
+def test_telegram_self_message_is_blocked() -> None:
+    payload = {
+        "update_id": 6,
+        "message": {
+            "message_id": 6001,
+            "chat": {"id": -1003, "type": "supergroup"},
+            "from": {"id": 777, "username": "jarvisbot"},
+            "text": "status tick",
+        },
+    }
+    decision = evaluate_ingress_policy(
+        payload=payload,
+        owner_user_id="111",
+        bot_username="jarvisbot",
+        bot_user_id="777",
+    )
+    assert decision.allow_processing is False
+    assert decision.allow_task_direction is False
+    assert decision.is_self_message is True
+    assert decision.blocked_reason == "self_message"
+
+
+def test_telegram_duplicate_message_is_blocked_within_window() -> None:
+    payload = {
+        "update_id": 7,
+        "message": {
+            "message_id": 7001,
+            "chat": {"id": -1004, "type": "supergroup"},
+            "from": {"id": 111, "username": "owner"},
+            "text": "@friday run status",
+        },
+    }
+    first = evaluate_ingress_policy(
+        payload=payload,
+        owner_user_id="111",
+        bot_username="jarvisbot",
+        allowed_agent_mentions=("friday",),
+        dedupe_window_seconds=300,
+    )
+    second = evaluate_ingress_policy(
+        payload=payload,
+        owner_user_id="111",
+        bot_username="jarvisbot",
+        allowed_agent_mentions=("friday",),
+        dedupe_window_seconds=300,
+    )
+    assert first.allow_processing is True
+    assert first.is_duplicate is False
+    assert second.allow_processing is False
+    assert second.is_duplicate is True
+    assert second.blocked_reason == "duplicate_message"

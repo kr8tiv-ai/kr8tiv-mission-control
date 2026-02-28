@@ -552,6 +552,24 @@ def readyz() -> HealthStatusResponse:
     return HealthStatusResponse(ok=True)
 
 
+@app.get(
+    "/api/v1/health",
+    tags=["health"],
+    response_model=HealthStatusResponse,
+    summary="API v1 Health Alias",
+    description="Versioned liveness probe alias for legacy health clients.",
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Service is alive.",
+            "content": {"application/json": {"example": {"ok": True}}},
+        }
+    },
+)
+def api_v1_health() -> HealthStatusResponse:
+    """Versioned liveness probe alias for legacy health clients."""
+    return HealthStatusResponse(ok=True)
+
+
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth_router)
 api_v1.include_router(agent_router)

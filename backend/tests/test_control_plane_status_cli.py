@@ -14,7 +14,7 @@ def test_build_status_url_encodes_optional_params() -> None:
     )
     assert (
         url
-        == "http://localhost:8100/api/v1/runtime/ops/control-plane-status"
+        == "http://localhost:8100/api/v1/runtime/control-plane/status"
         "?board_id=11111111-1111-1111-1111-111111111111&profile=enterprise"
     )
 
@@ -53,10 +53,54 @@ def test_fetch_control_plane_status_sends_bearer_token(monkeypatch) -> None:
         timeout_seconds=9,
     )
 
-    assert seen["url"] == "http://localhost:8100/api/v1/runtime/ops/control-plane-status?profile=auto"
+    assert seen["url"] == "http://localhost:8100/api/v1/runtime/control-plane/status?profile=auto"
     assert seen["authorization"] == "Bearer test-token"
     assert seen["timeout"] == 9
     assert payload["ok"] is True
+
+
+def test_fetch_control_plane_status_falls_back_to_legacy_path(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class _FakeResponse:
+        status = 200
+
+        def read(self) -> bytes:
+            return json.dumps({"ok": True}).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+            return None
+
+    def _fake_urlopen(req, timeout: int):  # noqa: ANN001
+        calls.append(req.full_url)
+        if req.full_url.endswith("/api/v1/runtime/control-plane/status?profile=auto"):
+            raise control_plane_status.error.HTTPError(
+                req.full_url,
+                404,
+                "not found",
+                hdrs=None,
+                fp=None,
+            )
+        _ = timeout
+        return _FakeResponse()
+
+    monkeypatch.setattr(control_plane_status.request, "urlopen", _fake_urlopen)
+    payload = control_plane_status.fetch_control_plane_status(
+        base_url="http://localhost:8100",
+        token="",
+        board_id=None,
+        profile="auto",
+        timeout_seconds=9,
+    )
+
+    assert payload["ok"] is True
+    assert calls == [
+        "http://localhost:8100/api/v1/runtime/control-plane/status?profile=auto",
+        "http://localhost:8100/api/v1/runtime/ops/control-plane-status?profile=auto",
+    ]
 
 
 def test_main_prints_json_payload(monkeypatch, capsys) -> None:

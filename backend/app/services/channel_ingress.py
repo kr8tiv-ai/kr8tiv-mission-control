@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,7 +41,10 @@ class IngressPolicyDecision:
     allow_task_direction: bool
     task_directive_detected: bool
     prompt_injection_detected: bool
-    blocked_reason: str | None
+    is_self_message: bool = False
+    is_duplicate: bool = False
+    ingress_fingerprint: str | None = None
+    blocked_reason: str | None = None
 
 
 def _as_dict(value: object) -> dict[str, object]:
@@ -123,6 +127,56 @@ def _telegram_text(message: dict[str, object]) -> str:
     return ""
 
 
+def _as_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _sender_username(message: dict[str, object]) -> str:
+    sender = _as_dict(message.get("from"))
+    username = sender.get("username")
+    return str(username).strip().lstrip("@").lower() if username is not None else ""
+
+
+_RECENT_INGRESS_FINGERPRINTS: dict[str, float] = {}
+
+
+def _register_ingress_fingerprint(*, fingerprint: str, dedupe_window_seconds: int) -> bool:
+    """Register fingerprint and return True when message is duplicate within window."""
+    if dedupe_window_seconds <= 0:
+        return False
+    now = time.monotonic()
+    last_seen = _RECENT_INGRESS_FINGERPRINTS.get(fingerprint)
+    _RECENT_INGRESS_FINGERPRINTS[fingerprint] = now
+    if last_seen is None:
+        return False
+    return (now - last_seen) < max(0, dedupe_window_seconds)
+
+
+def reset_ingress_dedupe_cache() -> None:
+    """Test helper to reset in-memory ingress dedupe state."""
+    _RECENT_INGRESS_FINGERPRINTS.clear()
+
+
+def _ingress_fingerprint(*, channel: str, message: dict[str, object], text: str) -> str | None:
+    chat_id = _as_int(_as_dict(message.get("chat")).get("id"))
+    message_id = _as_int(message.get("message_id"))
+    if chat_id is not None and message_id is not None:
+        key = f"{channel}:{chat_id}:{message_id}"
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
+    _ = text
+    return None
+
+
 def _entity_mentions(text: str, message: dict[str, object]) -> set[str]:
     handles = {match.group("handle").lower() for match in _MENTION_RE.finditer(text)}
     entities = message.get("entities")
@@ -157,6 +211,8 @@ def evaluate_ingress_policy(
     strict_dm_policy: bool = True,
     require_owner_tag_or_reply: bool = True,
     require_owner_for_task_direction: bool = True,
+    dedupe_window_seconds: int = 120,
+    block_self_messages: bool = True,
 ) -> IngressPolicyDecision:
     resolved_channel = infer_ingress_channel(payload=payload, headers=headers, channel=channel)
     if resolved_channel != "telegram":
@@ -183,6 +239,7 @@ def evaluate_ingress_policy(
     is_private_chat = chat_type == "private"
     is_public_chat = chat_type in {"group", "supergroup", "channel"}
     text = _telegram_text(message)
+    sender_username = _sender_username(message)
     mentions = _entity_mentions(text, message)
 
     normalized_bot_username = bot_username.strip().lstrip("@").lower()
@@ -200,6 +257,17 @@ def evaluate_ingress_policy(
     reply_user_id = _normalized_sender_id(reply_from.get("id"))
     reply_username = str(reply_from.get("username", "")).strip().lstrip("@").lower()
     normalized_bot_user_id = _normalized_sender_id(bot_user_id)
+    is_self_message = bool(
+        (normalized_bot_user_id and sender_id and normalized_bot_user_id == sender_id)
+        or (normalized_bot_username and sender_username and normalized_bot_username == sender_username)
+    )
+    ingress_fingerprint = _ingress_fingerprint(channel=resolved_channel, message=message, text=text)
+    is_duplicate = False
+    if ingress_fingerprint:
+        is_duplicate = _register_ingress_fingerprint(
+            fingerprint=ingress_fingerprint,
+            dedupe_window_seconds=dedupe_window_seconds,
+        )
     addressed_by_reply = bool(
         reply_to
         and (
@@ -220,6 +288,14 @@ def evaluate_ingress_policy(
         allow_processing = False
         allow_task_direction = False
         blocked_reason = "telegram_dm_not_owner"
+    elif block_self_messages and is_self_message:
+        allow_processing = False
+        allow_task_direction = False
+        blocked_reason = "self_message"
+    elif is_duplicate:
+        allow_processing = False
+        allow_task_direction = False
+        blocked_reason = "duplicate_message"
     elif is_public_chat and not is_owner and not allow_public_moderation:
         allow_processing = False
         allow_task_direction = False
@@ -250,6 +326,9 @@ def evaluate_ingress_policy(
         allow_task_direction=allow_task_direction,
         task_directive_detected=task_directive_detected,
         prompt_injection_detected=prompt_injection_detected,
+        is_self_message=is_self_message,
+        is_duplicate=is_duplicate,
+        ingress_fingerprint=ingress_fingerprint,
         blocked_reason=blocked_reason,
     )
 
@@ -270,6 +349,10 @@ def ingress_policy_tags(decision: IngressPolicyDecision) -> list[str]:
         tags.append("policy:no_task_direction")
     if decision.prompt_injection_detected:
         tags.append("policy:prompt_injection")
+    if decision.is_self_message:
+        tags.append("policy:self_message")
+    if decision.is_duplicate:
+        tags.append("policy:duplicate_message")
     if decision.blocked_reason:
         tags.append(f"policy:{decision.blocked_reason}")
     return tags

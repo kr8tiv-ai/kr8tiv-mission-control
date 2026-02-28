@@ -6,9 +6,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from app.api.deps import require_admin_or_agent
+from app.api.deps import require_admin_or_agent, require_org_admin
+from app.api.runtime_ops import RuntimeControlPlaneStatusRead, runtime_control_plane_status
 from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.boards import Board
@@ -16,7 +17,7 @@ from app.models.run_telemetry import RunTelemetry
 from app.schemas.control_plane import PackResolutionResponse, RuntimeRunIngestRequest, RuntimeRunIngestResponse
 from app.services.control_plane import resolve_pack_binding
 from app.services.deterministic_eval_queue import QueuedDeterministicEval, enqueue_deterministic_eval
-from app.services.organizations import ensure_member_for_user, require_board_access
+from app.services.organizations import OrganizationContext, ensure_member_for_user, require_board_access
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -29,6 +30,8 @@ ACTOR_DEP = Depends(require_admin_or_agent)
 TIER_QUERY = Query(default="personal")
 DOMAIN_QUERY = Query(default="")
 PACK_KEY_QUERY = Query(default="engineering-delivery-pack")
+PROFILE_QUERY = Query(default="auto")
+ORG_ADMIN_DEP = Depends(require_org_admin)
 
 
 def _normalize_tier(value: str) -> str:
@@ -177,4 +180,22 @@ async def resolve_runtime_pack(
         version=pack.version,
         policy=pack.policy,
         resolved_chain=resolved.resolved_chain,
+    )
+
+
+@router.get("/control-plane/status", response_model=RuntimeControlPlaneStatusRead)
+async def runtime_control_plane_status_alias(
+    request: Request,
+    board_id: UUID | None = Query(default=None),
+    profile: str = PROFILE_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> RuntimeControlPlaneStatusRead:
+    """Versioned alias for runtime control-plane status used by newer clients."""
+    return await runtime_control_plane_status(
+        request=request,
+        board_id=board_id,
+        profile=profile,
+        session=session,
+        ctx=ctx,
     )

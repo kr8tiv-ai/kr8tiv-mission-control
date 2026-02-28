@@ -70,8 +70,11 @@ class Settings(BaseSettings):
     notebooklm_runner_cmd: str = "uvx --from notebooklm-mcp-cli@latest nlm"
     notebooklm_profiles_root: str = "/var/lib/notebooklm/profiles"
     notebooklm_timeout_seconds: int = 120
+    notebooklm_query_audit_log_path: str = str(BACKEND_ROOT / "artifacts" / "notebooklm_queries.jsonl")
     channel_rollout_phase: str = "phase1"
     enabled_ingress_channels: str = "telegram"
+    ingress_dedupe_window_seconds: int = 120
+    ingress_block_self_messages: bool = True
     telegram_owner_user_id: str = ""
     telegram_bot_username: str = ""
     telegram_bot_user_id: str = ""
@@ -79,6 +82,9 @@ class Settings(BaseSettings):
     telegram_allow_public_moderation: bool = True
     telegram_require_owner_tag_or_reply: bool = True
     telegram_require_owner_for_task_direction: bool = True
+    heartbeat_min_interval_seconds: int = 15
+    heartbeat_jitter_seconds: int = 2
+    heartbeat_singleflight_enabled: bool = True
 
     # Kr8tiv distribution layer
     distribution_cli_command: str = "node kr8tiv-claw/dist/index.js"

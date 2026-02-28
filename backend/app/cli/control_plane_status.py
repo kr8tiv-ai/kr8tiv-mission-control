@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from typing import cast
-from urllib import parse, request
+from urllib import error, parse, request
 
 
 def build_status_url(
@@ -14,10 +14,15 @@ def build_status_url(
     base_url: str,
     board_id: str | None,
     profile: str,
+    legacy: bool = False,
 ) -> str:
     """Build the control-plane status endpoint URL with query parameters."""
     normalized_base = base_url.rstrip("/")
-    endpoint = f"{normalized_base}/api/v1/runtime/ops/control-plane-status"
+    endpoint = (
+        f"{normalized_base}/api/v1/runtime/ops/control-plane-status"
+        if legacy
+        else f"{normalized_base}/api/v1/runtime/control-plane/status"
+    )
     query: dict[str, str] = {}
     if board_id:
         query["board_id"] = board_id
@@ -34,18 +39,30 @@ def fetch_control_plane_status(
     timeout_seconds: int,
 ) -> dict[str, object]:
     """Fetch status from the backend runtime endpoint."""
-    url = build_status_url(base_url=base_url, board_id=board_id, profile=profile)
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    req = request.Request(url, headers=headers, method="GET")
-    with request.urlopen(req, timeout=timeout_seconds) as response:  # noqa: S310
-        payload = response.read().decode("utf-8")
-    decoded = json.loads(payload)
-    if not isinstance(decoded, dict):
-        msg = "control-plane-status payload is not a JSON object"
-        raise ValueError(msg)
-    return cast(dict[str, object], decoded)
+    urls = [
+        build_status_url(base_url=base_url, board_id=board_id, profile=profile, legacy=False),
+        build_status_url(base_url=base_url, board_id=board_id, profile=profile, legacy=True),
+    ]
+    last_error: Exception | None = None
+    for url in urls:
+        req = request.Request(url, headers=headers, method="GET")
+        try:
+            with request.urlopen(req, timeout=timeout_seconds) as response:  # noqa: S310
+                payload = response.read().decode("utf-8")
+        except error.HTTPError as exc:
+            if exc.code == 404:
+                last_error = exc
+                continue
+            raise
+        decoded = json.loads(payload)
+        if not isinstance(decoded, dict):
+            msg = "control-plane-status payload is not a JSON object"
+            raise ValueError(msg)
+        return cast(dict[str, object], decoded)
+    raise RuntimeError(f"control-plane-status endpoint unavailable: {last_error}")
 
 
 def _build_parser() -> argparse.ArgumentParser:

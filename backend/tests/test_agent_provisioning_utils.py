@@ -863,8 +863,8 @@ async def test_patch_agent_heartbeats_skips_patch_when_no_changes(
                     "gateway": {
                         "bind": "lan",
                         "controlUi": {
-                            "allowInsecureAuth": True,
-                            "dangerouslyDisableDeviceAuth": True,
+                            "allowInsecureAuth": False,
+                            "dangerouslyDisableDeviceAuth": False,
                             "allowedOrigins": agent_provisioning._desired_control_ui_allowed_origins(),
                         },
                     },
@@ -1122,7 +1122,7 @@ async def test_patch_agent_heartbeats_retries_without_channels_on_invalid_config
 
 
 @pytest.mark.asyncio
-async def test_patch_agent_heartbeats_adds_control_ui_break_glass_flags(
+async def test_patch_agent_heartbeats_enforces_secure_control_ui_auth_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[str, dict[str, object] | None]] = []
@@ -1135,7 +1135,12 @@ async def test_patch_agent_heartbeats_adds_control_ui_break_glass_flags(
                 "hash": "cfg-hash",
                 "config": {
                     "agents": {"list": [], "defaults": {}},
-                    "gateway": {"controlUi": {"allowInsecureAuth": False}},
+                    "gateway": {
+                        "controlUi": {
+                            "allowInsecureAuth": True,
+                            "dangerouslyDisableDeviceAuth": True,
+                        }
+                    },
                 },
             }
         if method == "config.patch":
@@ -1167,8 +1172,8 @@ async def test_patch_agent_heartbeats_adds_control_ui_break_glass_flags(
     payload = json.loads(raw_payload)
     control_ui = payload["gateway"]["controlUi"]
     assert payload["gateway"]["bind"] == "lan"
-    assert control_ui["allowInsecureAuth"] is True
-    assert control_ui["dangerouslyDisableDeviceAuth"] is True
+    assert control_ui["allowInsecureAuth"] is False
+    assert control_ui["dangerouslyDisableDeviceAuth"] is False
     assert "http://76.13.106.100:3100" in control_ui["allowedOrigins"]
     assert "http://localhost:3100" in control_ui["allowedOrigins"]
 

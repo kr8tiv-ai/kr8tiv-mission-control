@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -24,6 +25,7 @@ from app.schemas.tasks import ArenaConfig, NotebookSources
 from app.services.notebooklm_adapter import (
     NotebookInfo,
     NotebookLMError,
+    NotebookQueryResult,
     NotebookSourcesPayload,
     add_sources,
     create_notebook,
@@ -62,6 +64,8 @@ _NON_RETRYABLE_GATEWAY_ERROR_MARKERS = (
     "missing session",
     "missing gateway configuration",
 )
+_TASK_MODE_ERROR_COMMENT_COOLDOWN_SECONDS = 300
+_RECENT_TASK_MODE_ERRORS: dict[str, float] = {}
 
 
 @dataclass(frozen=True)
@@ -427,6 +431,23 @@ async def _enforce_notebooklm_capability(
     )
 
 
+def _should_emit_task_mode_error_comment(*, task_id: UUID, detail: str) -> bool:
+    """Suppress duplicate transient task-mode error comments in a short cooldown window."""
+    now = time.monotonic()
+    key = f"{task_id}:{detail.strip().lower()[:240]}"
+    last = _RECENT_TASK_MODE_ERRORS.get(key)
+    if last is not None and (now - last) < _TASK_MODE_ERROR_COMMENT_COOLDOWN_SECONDS:
+        return False
+    _RECENT_TASK_MODE_ERRORS[key] = now
+    return True
+
+
+def _coerce_notebook_answer(result: object) -> str:
+    if isinstance(result, NotebookQueryResult):
+        return result.answer
+    return str(result).strip()
+
+
 async def _execute_notebook_mode(session: Any, ctx: _ModeExecutionContext) -> None:
     task = ctx.task
     await _enforce_notebooklm_capability(task, require_notebook=False)
@@ -440,11 +461,12 @@ async def _execute_notebook_mode(session: Any, ctx: _ModeExecutionContext) -> No
         )
     query = (task.description or task.title).strip()
     if query:
-        answer = await query_notebook(
+        answer_result = await query_notebook(
             notebook_id=notebook_info.notebook_id,
             query=query,
             profile=task.notebook_profile,
         )
+        answer = _coerce_notebook_answer(answer_result)
         _record_task_comment(
             session,
             task_id=task.id,
@@ -779,10 +801,12 @@ async def execute_task_mode(task: QueuedTask) -> None:
             # If iterations exist, leave status as in_progress so work isn't lost
             task_row.updated_at = utcnow()
             session.add(task_row)
-            _record_task_comment(
-                session,
-                task_id=task_row.id,
-                message=f"[Task Mode Error] {exc}",
-            )
+            error_detail = str(exc).strip() or exc.__class__.__name__
+            if _should_emit_task_mode_error_comment(task_id=task_row.id, detail=error_detail):
+                _record_task_comment(
+                    session,
+                    task_id=task_row.id,
+                    message=f"[Task Mode Error] {error_detail}",
+                )
             await session.commit()
             raise

@@ -482,6 +482,8 @@ async def ingest_board_webhook(
         strict_dm_policy=settings.telegram_strict_dm_policy,
         require_owner_tag_or_reply=settings.telegram_require_owner_tag_or_reply,
         require_owner_for_task_direction=settings.telegram_require_owner_for_task_direction,
+        dedupe_window_seconds=settings.ingress_dedupe_window_seconds,
+        block_self_messages=settings.ingress_block_self_messages,
     )
     payload = BoardWebhookPayload(
         board_id=board.id,

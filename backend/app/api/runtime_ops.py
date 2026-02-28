@@ -123,6 +123,10 @@ class RuntimeControlPlaneStatusRead(SQLModel):
     notebook: RuntimeNotebookStatusRead
     verification: RuntimeVerificationStatusRead
     gsd: RuntimeGSDGateStatusRead
+    capabilities: dict[str, str] = Field(
+        default_factory=dict,
+        description="Flattened capability readiness map for operator dashboards.",
+    )
 
 
 def _collect_route_paths(request: Request) -> set[str]:
@@ -266,10 +270,16 @@ async def runtime_control_plane_status(
         total_notebook_tasks, gate_counts = _as_notebook_counts(states)
 
     failed_checks = [check.name for check in verification.checks if not check.passed]
+    arena_status = _build_arena_status()
+    gsd_status = await _get_latest_gsd_gate_status(
+        session=session,
+        organization_id=ctx.organization.id,
+        board_id=board_id,
+    )
     return RuntimeControlPlaneStatusRead(
         checked_at=utcnow(),
         board_id=board_id,
-        arena=_build_arena_status(),
+        arena=arena_status,
         notebook=RuntimeNotebookStatusRead(
             state=notebook_gate.state,
             reason=notebook_gate.reason,
@@ -295,9 +305,13 @@ async def runtime_control_plane_status(
             failed_check_names=failed_checks,
             checked_at=verification.generated_at,
         ),
-        gsd=await _get_latest_gsd_gate_status(
-            session=session,
-            organization_id=ctx.organization.id,
-            board_id=board_id,
-        ),
+        gsd=gsd_status,
+        capabilities={
+            "mission_control": "ready",
+            "agent_auth": "ready" if "/api/v1/agent/heartbeat" in _collect_route_paths(request) else "degraded",
+            "arena": "ready" if arena_status.healthy else "degraded",
+            "notebooklm": notebook_gate.state,
+            "verification": "ready" if verification.all_passed else "degraded",
+            "gsd": "blocked" if gsd_status.is_blocked else "ready",
+        },
     )

@@ -50,6 +50,7 @@ from app.schemas.pagination import DefaultLimitOffsetPage
 from app.schemas.tags import TagRef
 from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
+from app.services.agent_heartbeat_guard import get_heartbeat_guard
 from app.services.openclaw.coordination_service import GatewayCoordinationService
 from app.services.openclaw.policies import OpenClawAuthorizationPolicy
 from app.services.openclaw.provisioning_db import AgentLifecycleService
@@ -1420,12 +1421,26 @@ async def agent_heartbeat(
 
     Heartbeats are identity-bound to the token's agent id.
     """
+    guard = get_heartbeat_guard()
+
+    async def _emit() -> AgentRead:
+        return await agents_api.heartbeat_agent(
+            agent_id=str(agent_ctx.agent.id),
+            payload=AgentHeartbeat(),
+            session=session,
+            actor=_actor(agent_ctx),
+        )
+
+    def _skip() -> AgentRead:
+        return AgentLifecycleService.to_agent_read(
+            AgentLifecycleService.with_computed_status(agent_ctx.agent),
+        )
+
     # Heartbeats must apply to the authenticated agent; agent names are not unique.
-    return await agents_api.heartbeat_agent(
+    return await guard.execute(
         agent_id=str(agent_ctx.agent.id),
-        payload=AgentHeartbeat(),
-        session=session,
-        actor=_actor(agent_ctx),
+        emit=_emit,
+        on_skip=_skip,
     )
 
 

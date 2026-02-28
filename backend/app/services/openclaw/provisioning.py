@@ -248,11 +248,12 @@ def _control_ui_access_patch(config_data: dict[str, Any]) -> dict[str, Any] | No
     if not isinstance(bind_value, str) or bind_value.strip().lower() != "lan":
         patch["bind"] = "lan"
 
+    # Enforce secure control UI auth posture for gateway-managed runtimes.
     control_ui_patch: dict[str, Any] = {}
-    if control_ui_map.get("allowInsecureAuth") is not True:
-        control_ui_patch["allowInsecureAuth"] = True
-    if control_ui_map.get("dangerouslyDisableDeviceAuth") is not True:
-        control_ui_patch["dangerouslyDisableDeviceAuth"] = True
+    if control_ui_map.get("allowInsecureAuth") is not False:
+        control_ui_patch["allowInsecureAuth"] = False
+    if control_ui_map.get("dangerouslyDisableDeviceAuth") is not False:
+        control_ui_patch["dangerouslyDisableDeviceAuth"] = False
 
     existing_allowed_origins = control_ui_map.get("allowedOrigins")
     existing_origins: list[str] = []
