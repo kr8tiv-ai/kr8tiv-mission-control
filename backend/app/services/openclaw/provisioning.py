@@ -244,10 +244,15 @@ def _control_ui_access_patch(config_data: dict[str, Any]) -> dict[str, Any] | No
     control_ui_map = control_ui if isinstance(control_ui, dict) else {}
 
     patch: dict[str, Any] = {}
+    bind_value = gateway_map.get("bind")
+    if not isinstance(bind_value, str) or bind_value.strip().lower() != "lan":
+        patch["bind"] = "lan"
+
+    control_ui_patch: dict[str, Any] = {}
     if control_ui_map.get("allowInsecureAuth") is not True:
-        patch["allowInsecureAuth"] = True
+        control_ui_patch["allowInsecureAuth"] = True
     if control_ui_map.get("dangerouslyDisableDeviceAuth") is not True:
-        patch["dangerouslyDisableDeviceAuth"] = True
+        control_ui_patch["dangerouslyDisableDeviceAuth"] = True
 
     existing_allowed_origins = control_ui_map.get("allowedOrigins")
     existing_origins: list[str] = []
@@ -264,11 +269,14 @@ def _control_ui_access_patch(config_data: dict[str, Any]) -> dict[str, Any] | No
             merged_origins.append(origin)
 
     if merged_origins != existing_origins and merged_origins:
-        patch["allowedOrigins"] = merged_origins
+        control_ui_patch["allowedOrigins"] = merged_origins
+
+    if control_ui_patch:
+        patch["controlUi"] = control_ui_patch
 
     if not patch:
         return None
-    return {"controlUi": patch}
+    return patch
 
 
 def _extract_model_reasoning_modes(config_data: dict[str, Any], model_id: str | None) -> list[str]:

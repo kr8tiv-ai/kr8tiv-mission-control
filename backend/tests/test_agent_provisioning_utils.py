@@ -861,6 +861,7 @@ async def test_patch_agent_heartbeats_skips_patch_when_no_changes(
                         },
                     },
                     "gateway": {
+                        "bind": "lan",
                         "controlUi": {
                             "allowInsecureAuth": True,
                             "dangerouslyDisableDeviceAuth": True,
@@ -1165,10 +1166,59 @@ async def test_patch_agent_heartbeats_adds_control_ui_break_glass_flags(
     assert isinstance(raw_payload, str)
     payload = json.loads(raw_payload)
     control_ui = payload["gateway"]["controlUi"]
+    assert payload["gateway"]["bind"] == "lan"
     assert control_ui["allowInsecureAuth"] is True
     assert control_ui["dangerouslyDisableDeviceAuth"] is True
     assert "http://76.13.106.100:3100" in control_ui["allowedOrigins"]
     assert "http://localhost:3100" in control_ui["allowedOrigins"]
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_enforces_gateway_bind_lan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": [], "defaults": {}},
+                    "gateway": {
+                        "bind": "loopback",
+                        "controlUi": {"allowInsecureAuth": True},
+                    },
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "20m", "target": "last", "includeReasoning": False},
+                None,
+            )
+        ],
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert payload["gateway"]["bind"] == "lan"
 
 
 @pytest.mark.asyncio
