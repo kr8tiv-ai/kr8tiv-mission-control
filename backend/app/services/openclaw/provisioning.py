@@ -792,6 +792,7 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
                     registration.model_id,
                 ),
             ],
+            include_runtime_defaults=False,
         )
 
     async def delete_agent(self, agent_id: str, *, delete_files: bool = True) -> None:

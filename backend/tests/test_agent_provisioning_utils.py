@@ -560,6 +560,63 @@ async def test_control_plane_upsert_agent_patches_model_when_present(monkeypatch
     assert payload["agents"]["list"][0]["model"] == "openai-codex/gpt-5.3-codex"
 
 
+@pytest.mark.asyncio
+async def test_control_plane_upsert_agent_does_not_apply_runtime_default_patches(monkeypatch):
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "agents.create":
+            return {"ok": True}
+        if method == "agents.update":
+            return {"ok": True}
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": []},
+                    "gateway": {
+                        "bind": "localhost",
+                        "controlUi": {
+                            "allowInsecureAuth": True,
+                            "dangerouslyDisableDeviceAuth": True,
+                            "allowedOrigins": ["http://localhost:3100"],
+                        },
+                    },
+                    "channels": {
+                        "defaults": {"heartbeat": {"includeReasoning": True}},
+                        "telegram": {"configWrites": True},
+                    },
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    cp = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+    await cp.upsert_agent(
+        agent_provisioning.GatewayAgentRegistration(
+            agent_id="board-agent-a",
+            name="Board Agent A",
+            workspace_path="/tmp/workspace-board-agent-a",
+            heartbeat={"every": "15m", "target": "last", "includeReasoning": False},
+        ),
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert "agents" in payload
+    assert "channels" not in payload
+    assert "gateway" not in payload
+
+
 def test_is_missing_agent_error_matches_gateway_agent_not_found() -> None:
     assert agent_provisioning._is_missing_agent_error(
         agent_provisioning.OpenClawGatewayError('agent "mc-abc" not found'),
