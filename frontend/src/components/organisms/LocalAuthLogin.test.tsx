@@ -113,4 +113,5 @@ describe("LocalAuthLogin", () => {
     expect(setLocalAuthTokenMock).not.toHaveBeenCalled();
     expect(onAuthenticatedMock).not.toHaveBeenCalled();
   });
+
 });

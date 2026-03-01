@@ -40,6 +40,7 @@ services:
       NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli@latest nlm}
       NOTEBOOKLM_PROFILES_ROOT: ${NOTEBOOKLM_PROFILES_ROOT:-/var/lib/notebooklm/profiles}
       NOTEBOOKLM_TIMEOUT_SECONDS: ${NOTEBOOKLM_TIMEOUT_SECONDS:-120}
+      GATEWAY_MIN_VERSION: ${GATEWAY_MIN_VERSION:-2026.2.26}
     depends_on:
       db:
         condition: service_healthy
@@ -96,6 +97,7 @@ services:
       NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli@latest nlm}
       NOTEBOOKLM_PROFILES_ROOT: ${NOTEBOOKLM_PROFILES_ROOT:-/var/lib/notebooklm/profiles}
       NOTEBOOKLM_TIMEOUT_SECONDS: ${NOTEBOOKLM_TIMEOUT_SECONDS:-120}
+      GATEWAY_MIN_VERSION: ${GATEWAY_MIN_VERSION:-2026.2.26}
     restart: unless-stopped
     volumes:
       - notebooklm_profiles:/var/lib/notebooklm/profiles

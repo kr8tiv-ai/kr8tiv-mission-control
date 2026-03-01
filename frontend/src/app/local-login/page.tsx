@@ -3,5 +3,5 @@
 import { LocalAuthLogin } from "@/components/organisms/LocalAuthLogin";
 
 export default function LocalLoginPage() {
-  return <LocalAuthLogin />;
+  return <LocalAuthLogin onAuthenticated={() => window.location.replace("/boards")} />;
 }
