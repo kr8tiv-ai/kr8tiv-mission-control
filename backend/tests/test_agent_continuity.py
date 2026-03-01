@@ -20,6 +20,7 @@ from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.models.organizations import Organization
 from app.services.agent_continuity import AgentContinuityService
+from app.services.openclaw.constants import DEFAULT_HEARTBEAT_CONFIG, stale_after_for_heartbeat_config
 
 
 def _build_test_app() -> FastAPI:
@@ -79,6 +80,11 @@ def _make_agent(
     )
 
 
+def _default_stale_minutes_offset() -> int:
+    stale_after_seconds = int(stale_after_for_heartbeat_config(DEFAULT_HEARTBEAT_CONFIG).total_seconds())
+    return stale_after_seconds // 60 + 1
+
+
 @pytest.mark.asyncio
 async def test_continuity_snapshot_identifies_alive_stale_and_unreachable_agents() -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -98,7 +104,7 @@ async def test_continuity_snapshot_identifies_alive_stale_and_unreachable_agents
         gateway=gateway,
         name="stale-agent",
         session_key="session-stale",
-        minutes_ago=50,
+        minutes_ago=_default_stale_minutes_offset(),
     )
     unreachable = _make_agent(
         board=board,
@@ -158,7 +164,7 @@ async def test_agent_continuity_api_returns_board_scoped_snapshot(
         gateway=gateway,
         name="stale-api-agent",
         session_key="session-stale-api",
-        minutes_ago=50,
+        minutes_ago=_default_stale_minutes_offset(),
     )
 
     async with session_maker() as session:
@@ -255,7 +261,7 @@ async def test_continuity_snapshot_uses_recent_runtime_activity_as_liveness_sign
         gateway=gateway,
         name="runtime-fresh-agent",
         session_key="session-runtime-fresh",
-        minutes_ago=55,
+        minutes_ago=_default_stale_minutes_offset(),
     )
 
     async with session_maker() as session:

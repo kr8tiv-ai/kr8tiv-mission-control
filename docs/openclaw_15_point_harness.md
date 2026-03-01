@@ -33,29 +33,27 @@ Use it after any restart, image update, config change, or credential rotation.
    - Endpoint: `GET /api/v1/gateways/status?board_id=<board_id>`
    - Expected: `connected=true` and gateway runtime compatibility check passes (`GATEWAY_MIN_VERSION >= 2026.2.26`).
 
-4. **Lead lane model is codex**
+4. **Lead lane model is Opus**
    - Session key: `agent:lead-b1000000-0000-0000-0000-000000000001:main`
-   - Expected: `modelProvider=openai-codex`, `model=gpt-5.3-codex`.
+   - Expected: `modelProvider=anthropic`, `model=claude-opus-4-6`.
 
-5. **Arsenal lane model is codex**
+5. **Arsenal lane model is Opus**
    - Session key: `agent:mc-c2000000-0000-0000-0000-000000000002:main`
-   - Expected: `modelProvider=openai-codex`, `model=gpt-5.3-codex`.
+   - Expected: `modelProvider=anthropic`, `model=claude-opus-4-6`.
 
-6. **Jocasta lane model is kimi**
+6. **Jocasta lane model is Opus**
    - Session key: `agent:mc-c4000000-0000-0000-0000-000000000004:main`
-   - Expected: `modelProvider=moonshotai`, `model=kimi-k2.5`.
+   - Expected: `modelProvider=anthropic`, `model=claude-opus-4-6`.
 
-7. **Edith lane model is Gemini**
+7. **Edith lane model is Opus**
    - Session key: `agent:mc-c3000000-0000-0000-0000-000000000003:main`
-   - Expected: Gemini 3.1 family route is active for this lane.
-   - If using `google-gemini-cli/*`: verify OAuth auth profile contains `token` + `projectId`.
-   - If OAuth is unavailable: use `google/*` model route to remain operational.
+   - Expected: `modelProvider=anthropic`, `model=claude-opus-4-6`.
 
 8. **Per-bot config primary models are pinned**
-   - Arsenal: `openai-codex/gpt-5.3-codex`
-   - Friday: `openai-codex/gpt-5.3-codex`
-   - Jocasta: `nvidia/moonshotai/kimi-k2-5`
-   - Edith: chosen Gemini route (`google/*` or `google-gemini-cli/*`) matches your policy.
+   - Arsenal: `anthropic/claude-opus-4-6`
+   - Friday: `anthropic/claude-opus-4-6`
+   - Jocasta: `anthropic/claude-opus-4-6`
+   - Edith: `anthropic/claude-opus-4-6`
    - If Mission Control connects with a non-local Host header, set Friday gateway `controlUi.dangerouslyDisableDeviceAuth=true` (or use full device-identity auth).
 
 9. **Locked policy enforcement**
@@ -238,8 +236,7 @@ Capture and store:
 - Drift-revert proof (before/after values)
 - Tail of recent logs for each OpenClaw container
 
-## Known Pitfall: Gemini CLI vs Gemini API
+## Runtime Model Lock
 
-- `google-gemini-cli/*` uses Cloud Code Assist OAuth and fails with plain API key (`401` / `Invalid Google Cloud Code Assist credentials`).
-- `google/*` uses API-key auth and is appropriate when only `GEMINI_API_KEY` is available.
-- Decide this route explicitly in policy docs and enforce it in your config enforcer to avoid silent drift.
+- Friday, Arsenal, Jocasta, and Edith are all pinned to `anthropic/claude-opus-4-6`.
+- Any mixed-provider runtime route for these four lanes is a policy drift and should fail verification.

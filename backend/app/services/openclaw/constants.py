@@ -12,7 +12,7 @@ _GATEWAY_AGENT_PREFIX = f"agent:{_GATEWAY_OPENCLAW_AGENT_PREFIX}"
 _GATEWAY_AGENT_SUFFIX = ":main"
 
 DEFAULT_HEARTBEAT_CONFIG: dict[str, Any] = {
-    "every": "20m",
+    "every": "30m",
     "target": "last",
     "includeReasoning": False,
 }
@@ -42,7 +42,7 @@ def _parse_heartbeat_every_to_seconds(value: str) -> int:
 
 def heartbeat_interval_seconds(heartbeat_config: object | None) -> int:
     """Return parsed heartbeat cadence seconds with a safe fallback."""
-    fallback = _parse_heartbeat_every_to_seconds(str(DEFAULT_HEARTBEAT_CONFIG.get("every", "20m")))
+    fallback = _parse_heartbeat_every_to_seconds(str(DEFAULT_HEARTBEAT_CONFIG.get("every", "30m")))
     if not isinstance(heartbeat_config, dict):
         return fallback
     raw_every = heartbeat_config.get("every")
@@ -70,7 +70,8 @@ AGENT_SESSION_PREFIX = "agent"
 DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY: dict[str, bool] = {
     # Suppress routine HEARTBEAT_OK delivery by default.
     "showOk": False,
-    "showAlerts": True,
+    # Suppress noisy transient heartbeat alerts (e.g., provider rate-limit) in public channels.
+    "showAlerts": False,
     "useIndicator": True,
 }
 

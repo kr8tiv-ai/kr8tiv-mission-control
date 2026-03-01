@@ -74,8 +74,8 @@ export function LandingHero() {
                   <Link href="/boards" className="btn-large primary">
                     Open Boards <ArrowIcon />
                   </Link>
-                  <Link href="/boards/new" className="btn-large secondary">
-                    Create Board
+                  <Link href="/local-login" className="btn-large secondary">
+                    Log in
                   </Link>
                 </>
               )}
@@ -253,8 +253,8 @@ export function LandingHero() {
                 </>
               ) : (
                 <>
-                  <Link href="/boards/new" className="btn-large white">
-                    Create Board
+                  <Link href="/local-login" className="btn-large white">
+                    Log in
                   </Link>
                   <Link href="/boards" className="btn-large outline">
                     View Boards

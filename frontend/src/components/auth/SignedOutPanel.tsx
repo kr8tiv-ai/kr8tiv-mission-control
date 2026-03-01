@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { SignInButton } from "@/auth/clerk";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,14 @@ export function SignedOutPanel({
             {buttonLabel}
           </Button>
         </SignInButton>
+        <div className="mt-3">
+          <Link
+            href="/local-login"
+            className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+          >
+            Login with access token
+          </Link>
+        </div>
       </div>
     </div>
   );

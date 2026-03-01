@@ -548,7 +548,7 @@ async def test_control_plane_upsert_agent_patches_model_when_present(monkeypatch
             name="Board Agent A",
             workspace_path="/tmp/workspace-board-agent-a",
             heartbeat={"every": "10m", "target": "last", "includeReasoning": False},
-            model_id="openai-codex/gpt-5.3-codex",
+            model_id="anthropic/claude-opus-4-6",
         ),
     )
 
@@ -557,7 +557,7 @@ async def test_control_plane_upsert_agent_patches_model_when_present(monkeypatch
     raw_payload = patch_params.get("raw")
     assert isinstance(raw_payload, str)
     payload = json.loads(raw_payload)
-    assert payload["agents"]["list"][0]["model"] == "openai-codex/gpt-5.3-codex"
+    assert payload["agents"]["list"][0]["model"] == "anthropic/claude-opus-4-6"
 
 
 @pytest.mark.asyncio
@@ -774,13 +774,13 @@ def test_heartbeat_config_defaults_to_lightweight_policy() -> None:
     agent = _AgentStub(name="Alice", heartbeat_config=None)
     heartbeat = agent_provisioning._heartbeat_config(agent)
     assert heartbeat["includeReasoning"] is False
-    assert heartbeat["every"] == "20m"
+    assert heartbeat["every"] == "30m"
 
 
 def test_heartbeat_config_clamps_aggressive_interval() -> None:
     agent = _AgentStub(name="Alice", heartbeat_config={"every": "5m"})
     heartbeat = agent_provisioning._heartbeat_config(agent)
-    assert heartbeat["every"] == "20m"
+    assert heartbeat["every"] == "30m"
 
 
 @pytest.mark.asyncio
@@ -800,7 +800,7 @@ async def test_patch_agent_heartbeats_sets_reasoning_defaults_when_missing(
                         "list": [],
                         "defaults": {
                             "models": {
-                                "openai-codex/gpt-5.3-codex": {
+                                "anthropic/claude-opus-4-6": {
                                     "thinkingModes": ["low", "high"],
                                 }
                             }
@@ -823,7 +823,7 @@ async def test_patch_agent_heartbeats_sets_reasoning_defaults_when_missing(
                 "board-agent-a",
                 "/tmp/workspace-board-agent-a",
                 {"every": "10m", "target": "last", "includeReasoning": True},
-                "openai-codex/gpt-5.3-codex",
+                "anthropic/claude-opus-4-6",
             )
         ],
     )
@@ -889,7 +889,7 @@ async def test_patch_agent_heartbeats_skips_patch_when_no_changes(
 ) -> None:
     calls: list[tuple[str, dict[str, object] | None]] = []
 
-    heartbeat = {"every": "20m", "target": "last", "includeReasoning": False}
+    heartbeat = {"every": "30m", "target": "last", "includeReasoning": False}
     existing_agent = {
         "id": "board-agent-a",
         "workspace": "/tmp/workspace-board-agent-a",
@@ -956,7 +956,7 @@ async def test_patch_agent_heartbeats_can_skip_runtime_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[str, dict[str, object] | None]] = []
-    heartbeat = {"every": "20m", "target": "last", "includeReasoning": False}
+    heartbeat = {"every": "30m", "target": "last", "includeReasoning": False}
     existing_agent = {
         "id": "board-agent-a",
         "workspace": "/tmp/workspace-board-agent-a",
@@ -1216,7 +1216,7 @@ async def test_patch_agent_heartbeats_enforces_secure_control_ui_auth_flags(
             (
                 "board-agent-a",
                 "/tmp/workspace-board-agent-a",
-                {"every": "20m", "target": "last", "includeReasoning": False},
+                {"every": "30m", "target": "last", "includeReasoning": False},
                 None,
             )
         ],
@@ -1269,7 +1269,7 @@ async def test_patch_agent_heartbeats_enforces_gateway_bind_lan(
             (
                 "board-agent-a",
                 "/tmp/workspace-board-agent-a",
-                {"every": "20m", "target": "last", "includeReasoning": False},
+                {"every": "30m", "target": "last", "includeReasoning": False},
                 None,
             )
         ],
@@ -1323,7 +1323,7 @@ async def test_patch_agent_heartbeats_retries_without_gateway_patch_on_invalid_c
             (
                 "board-agent-a",
                 "/tmp/workspace-board-agent-a",
-                {"every": "20m", "target": "last", "includeReasoning": False},
+                {"every": "30m", "target": "last", "includeReasoning": False},
                 None,
             )
         ],

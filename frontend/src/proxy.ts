@@ -11,7 +11,12 @@ const isClerkEnabled = () =>
   );
 
 // Public routes include home and sign-in paths to avoid redirect loops.
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/local-login",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+]);
 
 function isClerkInternalPath(pathname: string): boolean {
   // Clerk may hit these paths for internal auth/session refresh flows.

@@ -64,8 +64,8 @@ export function LandingShell({ children }: { children: ReactNode }) {
                   <Link href="/boards" className="btn-secondary">
                     Boards
                   </Link>
-                  <Link href="/onboarding" className="btn-primary">
-                    Get started
+                  <Link href="/local-login" className="btn-primary">
+                    Log in
                   </Link>
                 </>
               )}
@@ -135,7 +135,10 @@ export function LandingShell({ children }: { children: ReactNode }) {
                     </SignInButton>
                   </>
                 ) : (
-                  <Link href="/boards">Boards</Link>
+                  <>
+                    <Link href="/boards">Boards</Link>
+                    <Link href="/local-login">Token Login</Link>
+                  </>
                 )}
                 <Link href="/onboarding">Onboarding</Link>
               </SignedOut>

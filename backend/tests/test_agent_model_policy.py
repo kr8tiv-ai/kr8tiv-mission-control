@@ -44,33 +44,36 @@ def test_locked_model_policy_lookup_for_named_agents() -> None:
     assert friday["model"] == "anthropic/claude-opus-4-6"
     assert friday["provider"] == "anthropic"
     assert friday["transport"] == "api"
-    assert arsenal["transport"] == "cli"
-    assert edith["provider"] == "google-gemini-cli"
-    assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
-    assert jocasta["model"] == "nvidia/moonshotai/kimi-k2.5"
+    assert arsenal["provider"] == "anthropic"
+    assert arsenal["model"] == "anthropic/claude-opus-4-6"
+    assert arsenal["transport"] == "api"
+    assert edith["provider"] == "anthropic"
+    assert edith["model"] == "anthropic/claude-opus-4-6"
+    assert jocasta["provider"] == "anthropic"
+    assert jocasta["model"] == "anthropic/claude-opus-4-6"
 
 
 def test_normalize_model_policy_maps_legacy_aliases() -> None:
     normalized = normalize_model_policy(
         {
-            "provider": "google-gemini-cli",
-            "model": "google-gemini-cli/gemini-3.1",
-            "transport": "cli",
+            "provider": "openai-codex",
+            "model": "openai-codex/gpt-5.3-codex",
+            "transport": "api",
             "locked": True,
         },
     )
 
     assert normalized is not None
-    assert normalized["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert normalized["model"] == "anthropic/claude-opus-4-6"
     assert (
         model_id_for_policy(
             {
-                "provider": "google-gemini-cli",
-                "model": "google-gemini-cli/gemini-3.1",
-                "transport": "cli",
+                "provider": "nvidia",
+                "model": "nvidia/moonshotai/kimi-k2.5",
+                "transport": "api",
             },
         )
-        == "google-gemini-cli/gemini-3-pro-preview"
+        == "anthropic/claude-opus-4-6"
     )
 
 
@@ -82,9 +85,9 @@ def test_enforce_agent_model_policy_rewrites_legacy_locked_model() -> None:
         gateway_id=uuid4(),
         status="online",
         model_policy={
-            "provider": "google-gemini-cli",
-            "model": "google-gemini-cli/gemini-3.1",
-            "transport": "cli",
+            "provider": "openai-codex",
+            "model": "openai-codex/gpt-5.3-codex",
+            "transport": "api",
             "locked": True,
             "allow_self_change": False,
         },
@@ -95,7 +98,7 @@ def test_enforce_agent_model_policy_rewrites_legacy_locked_model() -> None:
     assert changed is True
     normalized = normalize_model_policy(agent.model_policy)
     assert normalized is not None
-    assert normalized["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert normalized["model"] == "anthropic/claude-opus-4-6"
 
 
 @pytest.mark.asyncio

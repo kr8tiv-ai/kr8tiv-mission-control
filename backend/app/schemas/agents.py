@@ -103,9 +103,9 @@ class AgentBase(SQLModel):
         description="Optional model/provider runtime policy for this agent.",
         examples=[
             {
-                "provider": "openai-codex",
-                "model": "openai-codex/gpt-5.3-codex",
-                "transport": "cli",
+                "provider": "anthropic",
+                "model": "anthropic/claude-opus-4-6",
+                "transport": "api",
                 "locked": True,
                 "allow_self_change": False,
             },
@@ -214,9 +214,9 @@ class AgentUpdate(SQLModel):
         description="Optional model/provider runtime policy update.",
         examples=[
             {
-                "provider": "google-gemini-cli",
-                "model": "google-gemini-cli/gemini-3-pro-preview",
-                "transport": "cli",
+                "provider": "anthropic",
+                "model": "anthropic/claude-opus-4-6",
+                "transport": "api",
                 "locked": True,
             },
         ],

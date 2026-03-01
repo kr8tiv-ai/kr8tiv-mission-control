@@ -23,11 +23,11 @@ The config below is your provided baseline, normalized into valid JSON.
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openai-codex/gpt-5.3-codex",
+        "primary": "anthropic/claude-opus-4-6",
         "fallbacks": []
       },
       "models": {
-        "openai-codex/gpt-5.3-codex": {}
+        "anthropic/claude-opus-4-6": {}
       },
       "workspace": "/home/asaharan/.openclaw/workspace",
       "contextPruning": {
@@ -142,17 +142,17 @@ The config below is your provided baseline, normalized into valid JSON.
     }
   },
   "memory": {
-    "backend": "qmd",
+    "backend": "supermemory",
     "citations": "auto",
-    "qmd": {
-      "includeDefaultMemory": true,
+    "supermemory": {
+      "containerTag": "kr8tiv-friday",
       "update": {
         "interval": "15m",
         "debounceMs": 15000,
         "onBoot": true
       },
       "limits": {
-        "maxResults": 3,
+        "maxResults": 10,
         "maxSnippetChars": 450,
         "maxInjectedChars": 1800,
         "timeoutMs": 8000
@@ -369,11 +369,10 @@ Security implication:
 - `gateway.auth.mode`: `token` or `password`.
 - With `token` mode, set `gateway.auth.token` (or provide via env/CLI override) before non-local usage.
 
-Provider auth nuance (important for mixed CLI/API fleets):
+Runtime model policy note:
 
-- `google-gemini-cli/*` models in recent OpenClaw builds use Google Cloud Code Assist OAuth credentials, not a plain `GEMINI_API_KEY`.
-- A valid profile for `google-gemini-cli` must include OAuth material (`token` + `projectId`) from `openclaw models auth login --provider google-gemini-cli --method oauth`.
-- If you only have `GEMINI_API_KEY`, use `google/*` models instead of `google-gemini-cli/*` to avoid `Invalid Google Cloud Code Assist credentials` failures.
+- Bot runtime lanes are pinned to Anthropic Opus only (`anthropic/claude-opus-4-6`).
+- Mixed-provider model routes are not part of the production runtime policy for Friday/Arsenal/Jocasta/Edith.
 
 #### Reverse Proxy Awareness
 
@@ -403,7 +402,7 @@ Baseline intent:
 
 ### `memory`
 
-`memory` in your baseline appears to be plugin-style configuration (for `qmd`).
+`memory` in this baseline is plugin-style configuration (for `supermemory`).
 
 Compatibility warning:
 
@@ -413,7 +412,7 @@ Compatibility warning:
 
 What to do:
 
-1. If you use a plugin that defines this block, keep it and validate with your plugin set.
+1. If you use the Supermemory plugin, keep this block and validate with your plugin set.
 2. If not, remove this block and use core `agents.defaults.memorySearch` + plugin slots/entries for memory behavior.
 
 ### `skills`
@@ -445,7 +444,7 @@ If invalid, OpenClaw reports exact keys/paths and remediation.
 These fields should be set before using this in production-like workflows:
 
 1. `agents.defaults.model.primary`
-   Set a concrete model id, for example `openai-codex/gpt-5.3-codex`.
+   Set a concrete model id, for example `anthropic/claude-opus-4-6`.
 2. `agents.defaults.models`
    Ensure the map includes your primary model id so per-model config is mapped correctly.
 3. `gateway.auth`
@@ -496,10 +495,10 @@ When adding a gateway in Mission Control:
 
 This repository pins specific agent model policies in backend provisioning logic.
 
-- `friday`: `openai-codex/gpt-5.3-codex` (`transport=cli`, locked)
-- `arsenal`: `openai-codex/gpt-5.3-codex` (`transport=cli`, locked)
-- `edith`: `google-gemini-cli/gemini-3.1` (`transport=cli`, locked)
-- `jocasta`: `nvidia/moonshotai/kimi-k2-5` (`transport=api`, locked)
+- `friday`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
+- `arsenal`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
+- `edith`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
+- `jocasta`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
 
 When these agents are provisioned or template-synced, Mission Control rewrites the OpenClaw
 `agents.list[].model` value to the locked target so drift is corrected.
