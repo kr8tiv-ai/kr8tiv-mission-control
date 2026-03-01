@@ -32,7 +32,7 @@ export function isClerkEnabled(): boolean {
 }
 
 export function SignedIn(props: { children: ReactNode }) {
-  if (isLocalAuthMode()) {
+  if (isLocalAuthMode() || hasLocalAuthToken()) {
     return hasLocalAuthToken() ? <>{props.children}</> : null;
   }
   if (!isClerkEnabled()) return null;
@@ -40,7 +40,7 @@ export function SignedIn(props: { children: ReactNode }) {
 }
 
 export function SignedOut(props: { children: ReactNode }) {
-  if (isLocalAuthMode()) {
+  if (isLocalAuthMode() || hasLocalAuthToken()) {
     return hasLocalAuthToken() ? null : <>{props.children}</>;
   }
   if (!isClerkEnabled()) return <>{props.children}</>;
@@ -61,7 +61,7 @@ export function SignOutButton(
 }
 
 export function useUser() {
-  if (isLocalAuthMode()) {
+  if (isLocalAuthMode() || hasLocalAuthToken()) {
     return {
       isLoaded: true,
       isSignedIn: hasLocalAuthToken(),
@@ -75,8 +75,8 @@ export function useUser() {
 }
 
 export function useAuth() {
-  if (isLocalAuthMode()) {
-    const token = getLocalAuthToken();
+  const token = getLocalAuthToken();
+  if (isLocalAuthMode() || token) {
     return {
       isLoaded: true,
       isSignedIn: Boolean(token),

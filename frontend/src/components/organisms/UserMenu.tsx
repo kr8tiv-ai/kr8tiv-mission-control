@@ -38,8 +38,8 @@ export function UserMenu({
   displayEmail: displayEmailFromDb,
 }: UserMenuProps) {
   const [open, setOpen] = useState(false);
-  const { user } = useUser();
-  const localMode = isLocalAuthMode();
+  const { user, isSignedIn } = useUser();
+  const localMode = isLocalAuthMode() || (isSignedIn && !user);
   if (!user && !localMode) return null;
 
   const avatarUrl = localMode ? null : (user?.imageUrl ?? null);
