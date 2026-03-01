@@ -1179,6 +1179,90 @@ async def test_patch_agent_heartbeats_retries_without_channels_on_invalid_config
 
 
 @pytest.mark.asyncio
+async def test_patch_agent_heartbeats_retries_without_agents_defaults_on_invalid_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+    patch_attempt = 0
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        nonlocal patch_attempt
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "agents": {"list": [], "defaults": {}},
+                },
+            }
+        if method == "config.patch":
+            patch_attempt += 1
+            assert params is not None
+            payload = json.loads(str(params["raw"]))
+            if patch_attempt == 1:
+                assert payload["agents"].get("defaults") == {"thinkingDefault": "normal"}
+                raise agent_provisioning.OpenClawGatewayError("invalid config")
+            assert payload == {
+                "agents": {
+                    "list": [
+                        {
+                            "id": "board-agent-a",
+                            "workspace": "/tmp/workspace-board-agent-a",
+                            "heartbeat": {
+                                "every": "10m",
+                                "target": "last",
+                                "includeReasoning": True,
+                            },
+                        }
+                    ]
+                }
+            }
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "10m", "target": "last", "includeReasoning": True},
+                None,
+            )
+        ],
+        include_runtime_defaults=False,
+    )
+
+    patch_payloads = [
+        json.loads(str(params["raw"]))
+        for method, params in calls
+        if method == "config.patch" and params is not None
+    ]
+    assert len(patch_payloads) == 2
+    assert patch_payloads[0]["agents"].get("defaults") == {"thinkingDefault": "normal"}
+    assert patch_payloads[1] == {
+        "agents": {
+            "list": [
+                {
+                    "id": "board-agent-a",
+                    "workspace": "/tmp/workspace-board-agent-a",
+                    "heartbeat": {
+                        "every": "10m",
+                        "target": "last",
+                        "includeReasoning": True,
+                    },
+                }
+            ]
+        }
+    }
+
+
+@pytest.mark.asyncio
 async def test_patch_agent_heartbeats_enforces_secure_control_ui_auth_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

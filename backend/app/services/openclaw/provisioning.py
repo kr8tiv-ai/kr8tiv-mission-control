@@ -873,13 +873,19 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         if not patch:
             return
 
-        # OpenClaw runtimes differ in accepted `channels/gateway` shape. Try the full patch first,
-        # then degrade to slimmer, backward-compatible payloads if needed.
-        candidates: list[dict[str, Any]] = [patch]
-        if (channels_patch is not None or control_ui_patch is not None) and "agents" in patch:
-            candidates.append({"agents": dict(patch["agents"])})
+        # OpenClaw runtimes differ in accepted patch shape. Try full patch first,
+        # then degrade to slimmer payloads if the runtime rejects newer fields.
+        candidates: list[dict[str, Any]] = []
+
+        def _append_candidate(candidate: dict[str, Any]) -> None:
+            if not any(existing == candidate for existing in candidates):
+                candidates.append(candidate)
+
+        _append_candidate(patch)
+        if "agents" in patch and isinstance(patch["agents"], dict):
+            _append_candidate({"agents": dict(patch["agents"])})
             if "list" in patch["agents"]:
-                candidates.append({"agents": {"list": new_list}})
+                _append_candidate({"agents": {"list": new_list}})
 
         last_invalid_config: OpenClawGatewayError | None = None
         for candidate in candidates:

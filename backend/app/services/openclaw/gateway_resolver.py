@@ -12,6 +12,7 @@ Goals:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from fastapi import HTTPException, status
 
@@ -23,6 +24,19 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 
+def _gateway_origin(url: str) -> str | None:
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    if parsed.scheme == "ws":
+        scheme = "http"
+    elif parsed.scheme == "wss":
+        scheme = "https"
+    else:
+        scheme = parsed.scheme
+    return f"{scheme}://{parsed.netloc}"
+
+
 def gateway_client_config(gateway: Gateway) -> GatewayClientConfig:
     """Build a gateway RPC config from a Gateway model, requiring a URL."""
     url = (gateway.url or "").strip()
@@ -32,7 +46,7 @@ def gateway_client_config(gateway: Gateway) -> GatewayClientConfig:
             detail="Gateway url is required",
         )
     token = (gateway.token or "").strip() or None
-    return GatewayClientConfig(url=url, token=token)
+    return GatewayClientConfig(url=url, token=token, origin=_gateway_origin(url))
 
 
 def optional_gateway_client_config(gateway: Gateway | None) -> GatewayClientConfig | None:
@@ -43,7 +57,7 @@ def optional_gateway_client_config(gateway: Gateway | None) -> GatewayClientConf
     if not url:
         return None
     token = (gateway.token or "").strip() or None
-    return GatewayClientConfig(url=url, token=token)
+    return GatewayClientConfig(url=url, token=token, origin=_gateway_origin(url))
 
 
 def require_gateway_workspace_root(gateway: Gateway) -> str:
