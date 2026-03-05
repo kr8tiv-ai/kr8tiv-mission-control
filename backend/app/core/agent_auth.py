@@ -27,6 +27,7 @@ from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.agents import Agent
+from app.services.openclaw.auth_reconcile_watchdog import record_401_failure
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -124,6 +125,7 @@ async def get_agent_auth_context(
             bool(agent_token),
             bool(authorization),
         )
+        record_401_failure(path=request.url.path)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     agent = await _find_agent_for_token(session, resolved)
     if agent is None:
@@ -132,6 +134,7 @@ async def get_agent_auth_context(
             request.url.path,
             resolved[:6],
         )
+        record_401_failure(path=request.url.path)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     await _touch_agent_presence(request, session, agent)
     return AgentAuthContext(actor_type="agent", agent=agent)
@@ -165,6 +168,7 @@ async def get_agent_auth_context_optional(
             request.url.path,
             resolved[:6],
         )
+        record_401_failure(path=request.url.path)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     await _touch_agent_presence(request, session, agent)
     return AgentAuthContext(actor_type="agent", agent=agent)

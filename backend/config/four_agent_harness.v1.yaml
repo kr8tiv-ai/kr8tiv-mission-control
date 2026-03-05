@@ -5,8 +5,8 @@
     {
       "point_id": 1,
       "name": "IDENTITY_REGISTER",
-      "verification_probe": "identity_profile.role present and canonical",
-      "expected_evidence": "agents.identity_profile.role",
+      "verification_probe": "identity_profile.role plus non-empty identity/soul templates",
+      "expected_evidence": "agents.identity_profile.role + agents.identity_template + agents.soul_template",
       "agent_expectations": {
         "friday": {"role": "CMO & Executive Director"},
         "arsenal": {"role": "COO & Organizer"},

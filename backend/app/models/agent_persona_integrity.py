@@ -27,6 +27,7 @@ class AgentPersonaIntegrity(QueryModel, table=True):
     soul_sha256: str
     user_sha256: str
     identity_sha256: str
+    heartbeat_sha256: str
     agents_sha256: str
     drift_count: int = Field(default=0)
     last_checked_at: datetime = Field(default_factory=utcnow)

@@ -80,6 +80,7 @@ from app.services.openclaw.model_policy import (
     normalize_model_policy,
     resolve_agent_model_policy,
 )
+from app.services.openclaw.four_agent_canon import apply_canon_to_agent
 from app.services.openclaw.policies import OpenClawAuthorizationPolicy
 from app.services.openclaw.provisioning import (
     OpenClawGatewayControlPlane,
@@ -189,6 +190,8 @@ class OpenClawProvisioningService(OpenClawDBService):
                 existing.openclaw_session_id = desired_session_key
                 changed = True
             if enforce_agent_model_policy(existing):
+                changed = True
+            if apply_canon_to_agent(existing):
                 changed = True
             if changed:
                 existing.updated_at = utcnow()
@@ -1049,6 +1052,7 @@ class AgentLifecycleService(OpenClawDBService):
             requested=payload.get("model_policy"),
         )
         agent = Agent.model_validate(payload)
+        apply_canon_to_agent(agent)
         raw_token = mint_agent_token(agent)
         mark_provision_requested(agent, action="provision", status="provisioning")
         agent.openclaw_session_id = self.resolve_session_key(agent)
@@ -1294,6 +1298,7 @@ class AgentLifecycleService(OpenClawDBService):
                 )
             agent.gateway_id = board.gateway_id
         enforce_agent_model_policy(agent)
+        apply_canon_to_agent(agent)
         agent.updated_at = utcnow()
         if agent.heartbeat_config is None:
             agent.heartbeat_config = DEFAULT_HEARTBEAT_CONFIG.copy()
@@ -1461,6 +1466,8 @@ class AgentLifecycleService(OpenClawDBService):
         # Keep persisted locked policies in sync with canonical mapping so stale
         # legacy model ids are corrected automatically during heartbeat check-ins.
         if enforce_agent_model_policy(agent):
+            self.session.add(agent)
+        if apply_canon_to_agent(agent):
             self.session.add(agent)
         gateway = await Gateway.objects.by_id(agent.gateway_id).first(self.session)
         if gateway is None or not gateway.url or not gateway.workspace_root:

@@ -12,6 +12,7 @@
 {% if model_id %}
 ## Runtime Model
 - Model: {{ model_id }}
+{% if model_fallbacks %}- Fallbacks: {{ model_fallbacks }}{% endif %}
 - Provider: {{ model_provider }}
 - Transport: {{ model_transport }}
 - Locked: {{ model_locked }}
@@ -37,4 +38,33 @@ Own board-level coordination and delivery quality by turning objectives into del
 {% if identity_custom_instructions %}
 ## Custom Instructions
 {{ identity_custom_instructions }}
+{% endif %}
+
+{% if identity_coordination_contract %}
+## Coordination Contract
+{{ identity_coordination_contract }}
+{% endif %}
+
+{% if identity_escalation_contract %}
+## Escalation Contract
+{{ identity_escalation_contract }}
+{% endif %}
+
+{% if identity_scope_contract or identity_out_of_scope_contract %}
+## Scope Contract
+{% if identity_scope_contract %}
+### In Scope
+{{ identity_scope_contract }}
+{% endif %}
+{% if identity_out_of_scope_contract %}
+### Out Of Scope
+{{ identity_out_of_scope_contract }}
+{% endif %}
+{% endif %}
+
+{% if identity_memory_backend or identity_memory_policy or identity_memory_container_tag %}
+## Memory Contract
+{% if identity_memory_backend %}- Backend: {{ identity_memory_backend }}{% endif %}
+{% if identity_memory_policy %}- Policy: {{ identity_memory_policy }}{% endif %}
+{% if identity_memory_container_tag %}- Container Tag: {{ identity_memory_container_tag }}{% endif %}
 {% endif %}

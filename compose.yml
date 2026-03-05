@@ -33,6 +33,7 @@ services:
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
       AUTH_MODE: ${AUTH_MODE}
       LOCAL_AUTH_TOKEN: ${LOCAL_AUTH_TOKEN}
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
       RQ_REDIS_URL: redis://redis:6379/0
       ARENA_ALLOWED_AGENTS: ${ARENA_ALLOWED_AGENTS:-friday,arsenal,edith,jocasta}
       ARENA_REVIEWER_AGENT: ${ARENA_REVIEWER_AGENT:-arsenal}
@@ -40,7 +41,7 @@ services:
       NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli@latest nlm}
       NOTEBOOKLM_PROFILES_ROOT: ${NOTEBOOKLM_PROFILES_ROOT:-/var/lib/notebooklm/profiles}
       NOTEBOOKLM_TIMEOUT_SECONDS: ${NOTEBOOKLM_TIMEOUT_SECONDS:-120}
-      GATEWAY_MIN_VERSION: ${GATEWAY_MIN_VERSION:-2026.2.26}
+      GATEWAY_MIN_VERSION: ${GATEWAY_MIN_VERSION:-2026.3.2}
     depends_on:
       db:
         condition: service_healthy
@@ -48,6 +49,8 @@ services:
         condition: service_started
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - notebooklm_profiles:/var/lib/notebooklm/profiles
 
@@ -87,6 +90,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-mission_control}
       AUTH_MODE: ${AUTH_MODE}
       LOCAL_AUTH_TOKEN: ${LOCAL_AUTH_TOKEN}
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
       RQ_REDIS_URL: redis://redis:6379/0
       RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-default}
       RQ_DISPATCH_THROTTLE_SECONDS: ${RQ_DISPATCH_THROTTLE_SECONDS:-2.0}
@@ -97,8 +101,10 @@ services:
       NOTEBOOKLM_RUNNER_CMD: ${NOTEBOOKLM_RUNNER_CMD:-uvx --from notebooklm-mcp-cli@latest nlm}
       NOTEBOOKLM_PROFILES_ROOT: ${NOTEBOOKLM_PROFILES_ROOT:-/var/lib/notebooklm/profiles}
       NOTEBOOKLM_TIMEOUT_SECONDS: ${NOTEBOOKLM_TIMEOUT_SECONDS:-120}
-      GATEWAY_MIN_VERSION: ${GATEWAY_MIN_VERSION:-2026.2.26}
+      GATEWAY_MIN_VERSION: ${GATEWAY_MIN_VERSION:-2026.3.2}
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - notebooklm_profiles:/var/lib/notebooklm/profiles
 

@@ -24,3 +24,6 @@ backend/~/
 backend/coverage.*
 backend/.coverage
 frontend/coverage
+artifacts/
+backend/artifacts/
+temp/

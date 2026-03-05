@@ -50,8 +50,9 @@ from app.api.verification_ops import router as verification_ops_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
 from app.core.logging import configure_logging, get_logger
-from app.db.session import init_db
+from app.db.session import async_session_maker, init_db
 from app.schemas.health import HealthStatusResponse
+from app.services.openclaw.four_agent_canon import sync_four_agent_canon
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -467,6 +468,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         settings.db_auto_migrate,
     )
     await init_db()
+    try:
+        async with async_session_maker() as session:
+            result = await sync_four_agent_canon(session)
+            logger.info("app.four_agent_canon.synced result=%s", result)
+    except Exception as exc:  # pragma: no cover - startup guardrail
+        logger.warning("app.four_agent_canon.sync_failed error=%s", str(exc))
     logger.info("app.lifecycle.started")
     try:
         yield

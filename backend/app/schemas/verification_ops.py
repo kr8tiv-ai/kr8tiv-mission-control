@@ -16,6 +16,16 @@ class VerificationCheckRead(SQLModel):
     detail: str
 
 
+class VerificationAgentPointRead(SQLModel):
+    """Serialized per-agent 15-point harness row.""" 
+
+    agent_id: str
+    point_id: int
+    passed: bool
+    detail: str
+    evidence_ref: str
+
+
 class VerificationExecuteRead(SQLModel):
     """Response payload for verification harness execution."""
 
@@ -23,5 +33,6 @@ class VerificationExecuteRead(SQLModel):
     all_passed: bool
     required_failed: int
     checks: list[VerificationCheckRead] = Field(default_factory=list)
+    agent_matrix: list[VerificationAgentPointRead] = Field(default_factory=list)
     gsd_run_updated: bool = False
     evidence_link: str | None = None

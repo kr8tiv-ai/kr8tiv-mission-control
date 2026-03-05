@@ -102,6 +102,19 @@ Do not fetch OpenAPI on every heartbeat.
 - Do not self-edit model routes or provider auth in heartbeat loops.
 - Use approved fallback model policy only.
 - Idle heartbeats are valid: if no active work changed, return `HEARTBEAT_OK` with no extra chatter.
+- Deduplicate repeated infrastructure alerts (same issue + same metrics) for at least 6 hours unless severity changes or metric delta is >= 5%.
+- For disk alerts, classify host-level vs container overlay signal and avoid repeating unchanged alerts.
+
+{% if identity_heartbeat_contract %}
+## Canonical Heartbeat Contract
+{{ identity_heartbeat_contract }}
+{% endif %}
+
+{% if identity_assignment_authority or identity_group_channel %}
+## Assignment + Coordination Gates
+{% if identity_assignment_authority %}- Assignment authority: {{ identity_assignment_authority }}{% endif %}
+{% if identity_group_channel %}- Planning channel: {{ identity_group_channel }}{% endif %}
+{% endif %}
 
 ## Operator Doctrine
 - "I can't" is not acceptable during execution.

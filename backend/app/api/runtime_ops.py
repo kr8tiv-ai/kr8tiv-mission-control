@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Field, SQLModel, col, select
 
 from app.api.deps import require_admin_or_agent, require_org_admin
@@ -156,6 +157,21 @@ def _build_arena_status() -> RuntimeArenaStatusRead:
     )
 
 
+def _task_mode_capabilities(
+    *,
+    arena_healthy: bool,
+    notebook_state: str,
+) -> dict[str, str]:
+    notebook_ready = notebook_state == "ready"
+    return {
+        "task_mode.standard": "ready",
+        "task_mode.arena": "ready" if arena_healthy else "degraded",
+        "task_mode.notebook": "ready" if notebook_ready else "degraded",
+        "task_mode.notebook_creation": "ready" if notebook_ready else "degraded",
+        "task_mode.arena_notebook": "ready" if arena_healthy and notebook_ready else "degraded",
+    }
+
+
 def _as_notebook_counts(states: Sequence[str | None]) -> tuple[int, dict[str, int]]:
     counts = {key: 0 for key in _NOTEBOOK_STATE_KEYS}
     for state in states:
@@ -190,7 +206,16 @@ async def _get_latest_gsd_gate_status(
     )
     if board_id is not None:
         statement = statement.where(col(GSDRun.board_id) == board_id)
-    row = (await session.exec(statement)).first()
+    try:
+        row = (await session.exec(statement)).first()
+    except SQLAlchemyError as exc:
+        return RuntimeGSDGateStatusRead(
+            is_blocked=False,
+            summary=(
+                "GSD status unavailable due to schema drift or query failure: "
+                f"{exc.__class__.__name__}"
+            ),
+        )
     if row is None:
         return RuntimeGSDGateStatusRead(
             is_blocked=False,
@@ -276,6 +301,20 @@ async def runtime_control_plane_status(
         organization_id=ctx.organization.id,
         board_id=board_id,
     )
+    capabilities = {
+        "mission_control": "ready",
+        "agent_auth": "ready" if "/api/v1/agent/heartbeat" in _collect_route_paths(request) else "degraded",
+        "arena": "ready" if arena_status.healthy else "degraded",
+        "notebooklm": notebook_gate.state,
+        "verification": "ready" if verification.all_passed else "degraded",
+        "gsd": "blocked" if gsd_status.is_blocked else "ready",
+    }
+    capabilities.update(
+        _task_mode_capabilities(
+            arena_healthy=arena_status.healthy,
+            notebook_state=notebook_gate.state,
+        )
+    )
     return RuntimeControlPlaneStatusRead(
         checked_at=utcnow(),
         board_id=board_id,
@@ -306,12 +345,5 @@ async def runtime_control_plane_status(
             checked_at=verification.generated_at,
         ),
         gsd=gsd_status,
-        capabilities={
-            "mission_control": "ready",
-            "agent_auth": "ready" if "/api/v1/agent/heartbeat" in _collect_route_paths(request) else "degraded",
-            "arena": "ready" if arena_status.healthy else "degraded",
-            "notebooklm": notebook_gate.state,
-            "verification": "ready" if verification.all_passed else "degraded",
-            "gsd": "blocked" if gsd_status.is_blocked else "ready",
-        },
+        capabilities=capabilities,
     )

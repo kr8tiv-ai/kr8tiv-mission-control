@@ -51,6 +51,7 @@ from app.services.openclaw.internal.session_keys import (
     board_lead_session_key,
 )
 from app.services.openclaw.model_policy import (
+    fallback_models_for_policy,
     is_model_policy_locked,
     model_id_for_policy,
     normalize_model_policy,
@@ -480,14 +481,19 @@ def _identity_context(agent: Agent) -> dict[str, str]:
 def _model_policy_context(agent: Agent) -> dict[str, str]:
     policy = normalize_model_policy(getattr(agent, "model_policy", None))
     model_id = model_id_for_policy(policy) or ""
+    fallback_models = fallback_models_for_policy(policy)
+    model_fallbacks = ", ".join(fallback_models)
     provider = provider_for_policy(policy)
     transport = transport_for_policy(policy)
     locked = "true" if is_model_policy_locked(policy) else "false"
     summary = ""
     if model_id:
         summary = model_id if not transport else f"{model_id} ({transport})"
+    if model_fallbacks:
+        summary = f"{summary} -> fallback[{model_fallbacks}]".strip()
     return {
         "model_id": model_id,
+        "model_fallbacks": model_fallbacks,
         "model_provider": provider,
         "model_transport": transport,
         "model_locked": locked,

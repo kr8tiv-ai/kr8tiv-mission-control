@@ -7,6 +7,7 @@ import json
 import re
 import time
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -25,17 +26,45 @@ from app.schemas.tasks import ArenaConfig, NotebookSources
 from app.services.notebooklm_adapter import (
     NotebookInfo,
     NotebookLMError,
-    NotebookQueryResult,
     NotebookSourcesPayload,
     add_sources,
     create_notebook,
     query_notebook,
 )
-from app.services.notebooklm_capability_gate import evaluate_notebooklm_capability
+# Back-compat: some deployed builds may not yet include the capability gate module.
+try:
+    from app.services.notebooklm_capability_gate import evaluate_notebooklm_capability
+except ModuleNotFoundError:  # pragma: no cover - deployment skew fallback
+    async def evaluate_notebooklm_capability(
+        *,
+        profile: str,
+        notebook_id: str | None,
+        require_notebook: bool,
+    ) -> SimpleNamespace:
+        _ = notebook_id, require_notebook
+        selected_profile = profile if profile != "auto" else None
+        return SimpleNamespace(
+            state="ready",
+            reason="capability_gate_missing",
+            operator_message="NotebookLM capability gate unavailable; proceeding with legacy behavior.",
+            checked_at=utcnow(),
+            selected_profile=selected_profile,
+        )
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig, get_chat_history
 from app.services.queue import QueuedTask
-from app.services.supermemory_adapter import retrieve_arena_context_lines
+# Back-compat: older deployed builds may not ship the Supermemory adapter module.
+try:
+    from app.services.supermemory_adapter import retrieve_arena_context_lines
+except ModuleNotFoundError:  # pragma: no cover - deployment skew fallback
+    async def retrieve_arena_context_lines(
+        *,
+        query: str,
+        container_scope: str,
+        limit: int = 3,
+    ) -> list[str]:
+        _ = query, container_scope, limit
+        return []
 from app.services.task_mode_queue import decode_task_mode_execution
 
 logger = get_logger(__name__)
@@ -228,6 +257,22 @@ def _latest_history_signature(history_payload: object) -> str | None:
         return str(latest)
 
 
+def _latest_assistant_signature(history_payload: object) -> str | None:
+    entries = _history_entries(history_payload)
+    if not entries:
+        return None
+    for item in reversed(entries):
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        if isinstance(role, str) and role.strip().lower() in {"assistant", "agent"}:
+            try:
+                return json.dumps(item, sort_keys=True, ensure_ascii=False)
+            except Exception:
+                return str(item)
+    return None
+
+
 def _latest_history_role(history_payload: object) -> str | None:
     entries = _history_entries(history_payload)
     if entries and isinstance(entries[-1], dict):
@@ -290,7 +335,7 @@ async def _run_agent_turn(
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing session")
     if ctx.gateway_config is None:
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing gateway configuration")
-    from app.services.openclaw.gateway_rpc import send_message
+    from app.services.openclaw.gateway_rpc import openclaw_call, send_message
 
     for gateway_attempt in range(1, _ARENA_GATEWAY_MAX_ATTEMPTS + 1):
         try:
@@ -300,14 +345,52 @@ async def _run_agent_turn(
                 config=ctx.gateway_config,
                 limit=20,
             )
-            baseline_signature = _latest_history_signature(history_before)
+            baseline_assistant_signature = _latest_assistant_signature(history_before)
 
-            await send_message(
+            send_result = await send_message(
                 prompt,
                 session_key=board_agent.openclaw_session_id,
                 config=ctx.gateway_config,
                 deliver=False,
             )
+            run_id = (
+                send_result.get("runId")
+                if isinstance(send_result, dict)
+                and isinstance(send_result.get("runId"), str)
+                else None
+            )
+            if run_id:
+                try:
+                    wait_result = await openclaw_call(
+                        "agent.wait",
+                        {"runId": run_id},
+                        config=ctx.gateway_config,
+                    )
+                    wait_status = (
+                        str(wait_result.get("status", "")).strip().lower()
+                        if isinstance(wait_result, dict)
+                        else ""
+                    )
+                    if wait_status and wait_status not in {"ok", "started", "timeout"}:
+                        logger.warning(
+                            "task_mode.agent_turn.wait_unexpected_status",
+                            extra={
+                                "task_id": str(ctx.task.id),
+                                "agent_id": agent_id,
+                                "run_id": run_id,
+                                "wait_status": wait_status,
+                            },
+                        )
+                except Exception as wait_exc:  # pragma: no cover - gateway runtime dependent
+                    logger.warning(
+                        "task_mode.agent_turn.wait_failed",
+                        extra={
+                            "task_id": str(ctx.task.id),
+                            "agent_id": agent_id,
+                            "run_id": run_id,
+                            "error": str(wait_exc),
+                        },
+                    )
 
             # Poll for new response with exponential backoff (2s, 4s, 8s, 16s, 30s)
             backoff_delays = [2, 4, 8, 16, 30]  # ~60s total timeout
@@ -319,16 +402,15 @@ async def _run_agent_turn(
                     limit=20,
                 )
 
-                latest_role = _latest_history_role(history)
-                current_signature = _latest_history_signature(history)
+                assistant_signature = _latest_assistant_signature(history)
                 response = _extract_latest_message(history)
 
-                # A valid turn means a new latest history entry from assistant/agent with text.
+                # A valid turn means a new assistant/agent message exists, even if the
+                # latest history item is a tool event.
                 if (
                     response
-                    and latest_role in {"assistant", "agent"}
-                    and current_signature is not None
-                    and current_signature != baseline_signature
+                    and assistant_signature is not None
+                    and assistant_signature != baseline_assistant_signature
                 ):
                     logger.info(
                         "task_mode.agent_turn.response_received",
@@ -443,8 +525,9 @@ def _should_emit_task_mode_error_comment(*, task_id: UUID, detail: str) -> bool:
 
 
 def _coerce_notebook_answer(result: object) -> str:
-    if isinstance(result, NotebookQueryResult):
-        return result.answer
+    answer = getattr(result, "answer", None)
+    if isinstance(answer, str):
+        return answer.strip()
     return str(result).strip()
 
 
@@ -550,7 +633,7 @@ async def _execute_arena_mode(
     summary_lines: list[str] = []
 
     # Supermemory integration
-    if parsed_config.supermemory_enabled:
+    if bool(getattr(parsed_config, "supermemory_enabled", True)):
         context_lines = await _load_supermemory_context(task, board_id=ctx.board.id)
         if context_lines:
             summary_lines.append("Supermemory context:")
@@ -558,7 +641,7 @@ async def _execute_arena_mode(
                 summary_lines.append(f"- {item}")
             summary_lines.append("")
 
-    if parsed_config.gsd_spec_driven:
+    if bool(getattr(parsed_config, "gsd_spec_driven", False)):
         summary_lines.extend(
             [
                 "GSD Spec-Driven Evaluation:",

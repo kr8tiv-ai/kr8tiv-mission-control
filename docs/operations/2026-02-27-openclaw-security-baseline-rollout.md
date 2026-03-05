@@ -10,7 +10,7 @@
 ## Code + GitHub Changes
 
 - Commit `3a8c0fa`
-  - Enforced `GATEWAY_MIN_VERSION=2026.2.26` defaults in code/env.
+  - Enforced `GATEWAY_MIN_VERSION=2026.3.2` defaults in code/env.
   - Added ops evidence doc for NotebookLM Q&A.
   - Updated runtime docs (`mission-control-task-modes`, `openclaw_15_point_harness`).
 - Commit `80eddae`
@@ -34,7 +34,7 @@
 
 ## Runtime Gate Behavior
 
-- With strict gate (`2026.2.26`), current gateway reported `2026.2.22-2` and was marked incompatible.
+- With strict gate (`2026.3.2`), current gateway reported `2026.2.22-2` and was marked incompatible.
 - To avoid board downtime while OpenClaw runtime catches up, environment override was set:
   - `GATEWAY_MIN_VERSION=2026.2.22`
 - Current state after override:
@@ -56,6 +56,6 @@
 
 ## Follow-Up Required
 
-1. Once OpenClaw `stable` resolves to `>=2026.2.26`, remove temporary env override and restore strict baseline in production environment.
+1. Once OpenClaw `stable` resolves to `>=2026.3.2`, remove temporary env override and restore strict baseline in production environment.
 2. Re-run gateway status + board smoke checks after all delayed OpenClaw project actions clear.
 3. Confirm Telegram responder behavior for Friday/Arsenal after runtime refresh.

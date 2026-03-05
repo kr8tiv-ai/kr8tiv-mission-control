@@ -37,10 +37,12 @@ ENV PATH="/app/.venv/bin:${PATH}"
 COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/app ./app
+COPY backend/config ./config
 
 # Copy provisioning templates.
 # In-repo these live at `backend/templates/`; runtime path is `/app/templates`.
 COPY backend/templates ./templates
+COPY backend/artifacts ./artifacts
 
 # Default API port
 EXPOSE 8000

@@ -12,11 +12,12 @@ _RUNTIME_TYPE_REFERENCES = (datetime, UUID)
 
 
 class PersonaIntegrityHashes(SQLModel):
-    """Checksum bundle for the four persona-governing files."""
+    """Checksum bundle for persona-governing files (includes legacy USER.md hash)."""
 
     soul_sha256: str
     user_sha256: str
     identity_sha256: str
+    heartbeat_sha256: str
     agents_sha256: str
 
 

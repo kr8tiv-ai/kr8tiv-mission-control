@@ -12,6 +12,7 @@ from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.gsd_runs import GSDRun
 from app.schemas.verification_ops import VerificationCheckRead, VerificationExecuteRead
+from app.schemas.verification_ops import VerificationAgentPointRead
 from app.services.organizations import OrganizationContext
 from app.services.runtime.verification_harness import VerificationHarnessResult, run_verification_harness
 
@@ -113,6 +114,16 @@ async def execute_verification_harness(
                 detail=check.detail,
             )
             for check in result.checks
+        ],
+        agent_matrix=[
+            VerificationAgentPointRead(
+                agent_id=str(getattr(row, "agent_id", "")),
+                point_id=int(getattr(row, "point_id", 0)),
+                passed=bool(getattr(row, "passed", False)),
+                detail=str(getattr(row, "detail", "")),
+                evidence_ref=str(getattr(row, "evidence_ref", "")),
+            )
+            for row in getattr(result, "agent_matrix", [])
         ],
         gsd_run_updated=gsd_run_updated,
         evidence_link=evidence_link,

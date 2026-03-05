@@ -31,6 +31,7 @@ from app.services.openclaw.gateway_compat import check_gateway_runtime_compatibi
 from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_call
 from app.services.openclaw.model_policy import enforce_agent_model_policy
+from app.services.openclaw.four_agent_canon import apply_canon_to_agent
 from app.services.openclaw.provisioning import OpenClawGatewayProvisioner
 from app.services.openclaw.provisioning_db import (
     GatewayTemplateSyncOptions,
@@ -158,6 +159,8 @@ class GatewayAdminLifecycleService(OpenClawDBService):
             agent.identity_profile = identity_profile
             changed = True
         if enforce_agent_model_policy(agent):
+            changed = True
+        if apply_canon_to_agent(agent):
             changed = True
         if not agent.status:
             agent.status = "provisioning"

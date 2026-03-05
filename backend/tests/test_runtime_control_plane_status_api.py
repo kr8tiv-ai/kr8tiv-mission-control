@@ -204,6 +204,11 @@ async def test_control_plane_status_returns_aggregated_runtime_health(
     assert body["gsd"]["verification_required_failed"] == 2
     assert body["capabilities"]["mission_control"] == "ready"
     assert body["capabilities"]["notebooklm"] == "ready"
+    assert body["capabilities"]["task_mode.standard"] == "ready"
+    assert body["capabilities"]["task_mode.notebook"] == "ready"
+    assert body["capabilities"]["task_mode.notebook_creation"] == "ready"
+    assert body["capabilities"]["task_mode.arena"] == "ready"
+    assert body["capabilities"]["task_mode.arena_notebook"] == "ready"
 
     await engine.dispose()
 
@@ -268,4 +273,70 @@ async def test_control_plane_status_alias_runtime_path(
     body = response.json()
     assert body["arena"]["healthy"] is True
     assert body["capabilities"]["verification"] == "ready"
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_control_plane_status_marks_composite_task_modes_degraded_when_dependencies_fail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    await _create_schema(engine)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    org = Organization(id=uuid4(), name="KR8TIV")
+
+    async with session_maker() as session:
+        session.add(org)
+        await session.commit()
+
+    app = _build_test_app()
+
+    async def _override_get_session() -> AsyncSession:
+        async with session_maker() as session:
+            yield session
+
+    async def _override_require_org_admin() -> OrganizationContext:
+        return _org_context(org)
+
+    from app.api import runtime_ops
+
+    async def _fake_notebook_gate(**_kwargs) -> NotebookCapabilityGateResult:
+        return NotebookCapabilityGateResult(
+            state="retryable",
+            reason="auth_missing",
+            operator_message="Notebook auth missing.",
+            checked_at=utcnow(),
+            selected_profile="personal",
+            notebook_count=0,
+        )
+
+    async def _fake_verification_harness(
+        *,
+        route_paths: set[str],
+        profile: str = "auto",
+    ) -> VerificationHarnessResult:
+        _ = route_paths, profile
+        return VerificationHarnessResult(
+            generated_at=utcnow(),
+            checks=[VerificationCheckResult(name="health_routes", required=True, passed=True, detail="ok")],
+            all_passed=True,
+            required_failed=0,
+        )
+
+    monkeypatch.setattr(runtime_ops, "evaluate_notebooklm_capability", _fake_notebook_gate)
+    monkeypatch.setattr(runtime_ops, "run_verification_harness", _fake_verification_harness)
+
+    app.dependency_overrides[get_session] = _override_get_session
+    app.dependency_overrides[require_org_admin] = _override_require_org_admin
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        response = await client.get("/api/v1/runtime/ops/control-plane-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["capabilities"]["task_mode.standard"] == "ready"
+    assert body["capabilities"]["task_mode.arena"] == "ready"
+    assert body["capabilities"]["task_mode.notebook"] == "degraded"
+    assert body["capabilities"]["task_mode.notebook_creation"] == "degraded"
+    assert body["capabilities"]["task_mode.arena_notebook"] == "degraded"
     await engine.dispose()

@@ -10,7 +10,7 @@ _CLI_PROVIDERS = frozenset(
     {"anthropic", "openai-codex", "claude-cli", "codex-cli", "google-gemini-cli"}
 )
 _API_PROVIDERS = frozenset({"google", "nvidia"})
-_MODEL_ALIASES: dict[str, str] = {
+_PRIMARY_MODEL_ALIASES: dict[str, str] = {
     # Normalize legacy aliases to canonical IDs within the same provider.
     "anthropic/claude-opus-4-6": "claude-cli/claude-opus-4-6",
     "openai-codex/gpt-5-codex": "codex-cli/gpt-5.3-codex",
@@ -19,11 +19,19 @@ _MODEL_ALIASES: dict[str, str] = {
     "google/gemini-3-pro-preview": "google-gemini-cli/gemini-3-pro-preview",
     "nvidia/moonshotai/kimi-k2-5": "nvidia/moonshotai/kimi-k2.5",
 }
+_FALLBACK_MODEL_ALIASES: dict[str, str] = {
+    # Preserve API provider IDs for fallback routes.
+    "openai-codex/gpt-5-codex": "openai-codex/gpt-5.3-codex",
+    "google-gemini-cli/gemini-3.1": "google/gemini-3-pro-preview",
+    "google-gemini-cli/gemini-3-pro-preview": "google/gemini-3-pro-preview",
+    "nvidia/moonshotai/kimi-k2-5": "nvidia/moonshotai/kimi-k2.5",
+}
 
 _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "friday": {
         "provider": "claude-cli",
         "model": "claude-cli/claude-opus-4-6",
+        "fallback_models": ["anthropic/claude-opus-4-6"],
         "transport": "cli",
         "locked": True,
         "allow_self_change": False,
@@ -32,6 +40,7 @@ _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "arsenal": {
         "provider": "codex-cli",
         "model": "codex-cli/gpt-5.3-codex",
+        "fallback_models": ["openai-codex/gpt-5.3-codex"],
         "transport": "cli",
         "locked": True,
         "allow_self_change": False,
@@ -40,6 +49,7 @@ _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "edith": {
         "provider": "google-gemini-cli",
         "model": "google-gemini-cli/gemini-3-pro-preview",
+        "fallback_models": ["google/gemini-3-pro-preview"],
         "transport": "cli",
         "locked": True,
         "allow_self_change": False,
@@ -48,6 +58,7 @@ _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "jocasta": {
         "provider": "nvidia",
         "model": "nvidia/moonshotai/kimi-k2.5",
+        "fallback_models": [],
         "transport": "api",
         "locked": True,
         "allow_self_change": False,
@@ -82,6 +93,43 @@ def _infer_transport(provider: str | None) -> str:
     return "api"
 
 
+def _normalize_primary_model(model: str | None) -> str | None:
+    if model is None:
+        return None
+    return _PRIMARY_MODEL_ALIASES.get(model, model)
+
+
+def _normalize_fallback_model(model: str | None) -> str | None:
+    if model is None:
+        return None
+    return _FALLBACK_MODEL_ALIASES.get(model, model)
+
+
+def _candidate_fallback_values(policy: Mapping[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for key in ("fallback_models", "fallbacks"):
+        value = policy.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.split(",") if part.strip()]
+            candidates.extend(parts)
+            continue
+        if isinstance(value, (list, tuple, set)):
+            candidates.extend(str(item).strip() for item in value if str(item).strip())
+    return candidates
+
+
+def _normalize_fallback_models(*, policy: Mapping[str, Any], primary_model: str) -> list[str]:
+    normalized: list[str] = []
+    for raw in _candidate_fallback_values(policy):
+        candidate = _normalize_fallback_model(_as_nonempty_str(raw))
+        if candidate is None or candidate == primary_model or candidate in normalized:
+            continue
+        normalized.append(candidate)
+    return normalized
+
+
 def locked_model_policy_for_name(name: str | None) -> dict[str, Any] | None:
     policy = _LOCKED_AGENT_MODEL_POLICIES.get(_normalized_agent_name(name))
     if policy is None:
@@ -95,7 +143,7 @@ def normalize_model_policy(policy: object) -> dict[str, Any] | None:
 
     model = _as_nonempty_str(policy.get("model"))
     if model is not None:
-        model = _MODEL_ALIASES.get(model, model)
+        model = _normalize_primary_model(model)
     inferred_provider = _infer_provider_from_model(model)
     provider = inferred_provider or _as_nonempty_str(policy.get("provider"))
     if model is None:
@@ -112,6 +160,7 @@ def normalize_model_policy(policy: object) -> dict[str, Any] | None:
     normalized: dict[str, Any] = {
         "provider": provider or "",
         "model": model,
+        "fallback_models": _normalize_fallback_models(policy=policy, primary_model=model),
         "transport": normalized_transport,
         "locked": locked,
         "allow_self_change": allow_self_change,
@@ -176,3 +225,18 @@ def transport_for_policy(policy: object) -> str:
     if isinstance(transport, str):
         return transport
     return ""
+
+
+def fallback_models_for_policy(policy: object) -> list[str]:
+    normalized = normalize_model_policy(policy)
+    if normalized is None:
+        return []
+    value = normalized.get("fallback_models")
+    if not isinstance(value, list):
+        return []
+    models: list[str] = []
+    for raw in value:
+        text = str(raw).strip()
+        if text and text not in models:
+            models.append(text)
+    return models

@@ -11,6 +11,7 @@
 {% endif %}
 {% if model_id %}
 - `MODEL_ID={{ model_id }}`
+{% if model_fallbacks %}- `MODEL_FALLBACKS={{ model_fallbacks }}`{% endif %}
 - `MODEL_PROVIDER={{ model_provider }}`
 - `MODEL_TRANSPORT={{ model_transport }}`
 - `MODEL_LOCKED={{ model_locked }}`

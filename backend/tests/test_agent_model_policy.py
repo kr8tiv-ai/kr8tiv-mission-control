@@ -42,15 +42,19 @@ def test_locked_model_policy_lookup_for_named_agents() -> None:
     assert edith is not None
     assert jocasta is not None
     assert friday["model"] == "claude-cli/claude-opus-4-6"
+    assert friday["fallback_models"] == ["anthropic/claude-opus-4-6"]
     assert friday["provider"] == "claude-cli"
     assert friday["transport"] == "cli"
     assert arsenal["provider"] == "codex-cli"
     assert arsenal["model"] == "codex-cli/gpt-5.3-codex"
+    assert arsenal["fallback_models"] == ["openai-codex/gpt-5.3-codex"]
     assert arsenal["transport"] == "cli"
     assert edith["provider"] == "google-gemini-cli"
     assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert edith["fallback_models"] == ["google/gemini-3-pro-preview"]
     assert jocasta["provider"] == "nvidia"
     assert jocasta["model"] == "nvidia/moonshotai/kimi-k2.5"
+    assert jocasta["fallback_models"] == []
 
 
 def test_normalize_model_policy_maps_legacy_aliases() -> None:
@@ -65,6 +69,7 @@ def test_normalize_model_policy_maps_legacy_aliases() -> None:
 
     assert normalized is not None
     assert normalized["model"] == "codex-cli/gpt-5.3-codex"
+    assert normalized["fallback_models"] == []
     edith = normalize_model_policy(
         {
             "provider": "google-gemini-cli",
@@ -74,6 +79,7 @@ def test_normalize_model_policy_maps_legacy_aliases() -> None:
     )
     assert edith is not None
     assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert edith["fallback_models"] == []
     assert (
         model_id_for_policy(
             {
@@ -84,6 +90,24 @@ def test_normalize_model_policy_maps_legacy_aliases() -> None:
         )
         == "codex-cli/gpt-5.3-codex"
     )
+
+
+def test_normalize_model_policy_normalizes_fallback_models() -> None:
+    normalized = normalize_model_policy(
+        {
+            "provider": "claude-cli",
+            "model": "claude-cli/claude-opus-4-6",
+            "fallback_models": [
+                "anthropic/claude-opus-4-6",
+                "claude-cli/claude-opus-4-6",
+                "anthropic/claude-opus-4-6",
+            ],
+        },
+    )
+
+    assert normalized is not None
+    assert normalized["model"] == "claude-cli/claude-opus-4-6"
+    assert normalized["fallback_models"] == ["anthropic/claude-opus-4-6"]
 
 
 def test_normalize_model_policy_infers_transport_by_provider_defaults() -> None:

@@ -33,5 +33,5 @@
 
 ## Pending Rollout Actions
 1. Deploy backend image containing `/api/v1/health` alias and runtime status updates.
-2. Upgrade OpenClaw projects to security baseline release (`>=2026.2.26`) and verify no scope regressions.
+2. Upgrade OpenClaw projects to security baseline release (`>=2026.3.2`) and verify no scope regressions.
 3. Execute 30-minute bot/Telegram soak to confirm no recurring `409 Conflict` and no heartbeat storm churn.

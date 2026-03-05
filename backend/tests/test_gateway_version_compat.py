@@ -29,21 +29,21 @@ def test_extract_gateway_version_prefers_primary_path() -> None:
 def test_evaluate_gateway_version_handles_compact_stable_tag() -> None:
     result = gateway_compat.evaluate_gateway_version(
         current_version="stable-20260220",
-        minimum_version="2026.2.26",
+        minimum_version="2026.3.2",
     )
 
     assert result.compatible is False
-    assert "Minimum supported version is 2026.2.26" in (result.message or "")
+    assert "Minimum supported version is 2026.3.2" in (result.message or "")
 
 
 def test_evaluate_gateway_version_accepts_newer_compact_stable_tag() -> None:
     result = gateway_compat.evaluate_gateway_version(
-        current_version="stable-20260227",
-        minimum_version="2026.2.26",
+        current_version="stable-20260327",
+        minimum_version="2026.3.2",
     )
 
     assert result.compatible is True
-    assert result.current_version == "stable-20260227"
+    assert result.current_version == "stable-20260327"
 
 
 def test_evaluate_gateway_version_detects_old_runtime() -> None:
@@ -60,13 +60,13 @@ def test_evaluate_gateway_version_detects_old_runtime() -> None:
 def test_evaluate_gateway_version_uses_configured_default_minimum(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(gateway_compat.settings, "gateway_min_version", "2026.2.26", raising=False)
+    monkeypatch.setattr(gateway_compat.settings, "gateway_min_version", "2026.3.2", raising=False)
 
     result = gateway_compat.evaluate_gateway_version(current_version="2026.2.25")
 
     assert result.compatible is False
-    assert result.minimum_version == "2026.2.26"
-    assert "Minimum supported version is 2026.2.26" in (result.message or "")
+    assert result.minimum_version == "2026.3.2"
+    assert "Minimum supported version is 2026.3.2" in (result.message or "")
 
 
 @pytest.mark.asyncio

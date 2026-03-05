@@ -97,6 +97,23 @@ EXTRA_IDENTITY_PROFILE_FIELDS = {
     "purpose": "identity_purpose",
     "personality": "identity_personality",
     "custom_instructions": "identity_custom_instructions",
+    "coordination_contract": "identity_coordination_contract",
+    "escalation_contract": "identity_escalation_contract",
+    "heartbeat_contract": "identity_heartbeat_contract",
+    "memory_backend": "identity_memory_backend",
+    "memory_policy": "identity_memory_policy",
+    "memory_container_tag": "identity_memory_container_tag",
+    "tools_profile": "identity_tools_profile",
+    "assignment_authority": "identity_assignment_authority",
+    "group_channel": "identity_group_channel",
+    "scope_contract": "identity_scope_contract",
+    "out_of_scope_contract": "identity_out_of_scope_contract",
+    "self_improvement": "identity_self_improvement",
+    "audit_contract": "identity_audit_contract",
+    "halt_contract": "identity_halt_contract",
+    "hot_reload_contract": "identity_hot_reload_contract",
+    "version_sync_contract": "identity_version_sync_contract",
+    "context_budget": "identity_context_budget",
 }
 
 DEFAULT_GATEWAY_FILES = frozenset(

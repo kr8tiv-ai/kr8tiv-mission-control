@@ -165,3 +165,61 @@ async def test_run_agent_turn_retries_transient_gateway_error_once(
 
     assert display_name == "arsenal"
     assert response == "new response"
+
+
+@pytest.mark.asyncio
+async def test_run_agent_turn_accepts_assistant_message_when_latest_entry_is_tool_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _board_agent(_board_id, _agent_id):
+        return SimpleNamespace(name="arsenal", openclaw_session_id="session-1")
+
+    async def _send_message(*_args, **_kwargs):
+        return {"runId": "run-1", "status": "started"}
+
+    async def _wait(*_args, **_kwargs):
+        return {"runId": "run-1", "status": "ok"}
+
+    calls = 0
+
+    async def _history(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return {"messages": [{"role": "user", "content": "baseline"}]}
+        return {
+            "messages": [
+                {"role": "user", "content": "baseline"},
+                {"role": "assistant", "content": "assistant response"},
+                {"role": "toolResult", "content": "tool output"},
+            ]
+        }
+
+    async def _no_sleep(_seconds: float):
+        return None
+
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _board_agent)
+    monkeypatch.setattr("app.services.openclaw.gateway_rpc.send_message", _send_message)
+    monkeypatch.setattr("app.services.openclaw.gateway_rpc.openclaw_call", _wait)
+    monkeypatch.setattr(task_mode_execution, "get_chat_history", _history)
+    monkeypatch.setattr(task_mode_execution.asyncio, "sleep", _no_sleep)
+
+    ctx = _ModeExecutionContext(
+        board=SimpleNamespace(id=uuid4()),
+        task=SimpleNamespace(id=uuid4()),
+        gateway_config=object(),
+        allowed_agents=("arsenal",),
+        reviewer_agent="arsenal",
+    )
+
+    display_name, response = await task_mode_execution._run_agent_turn(
+        ctx=ctx,
+        agent_id="arsenal",
+        prompt="test prompt",
+        round_number=1,
+        max_rounds=3,
+        is_reviewer=False,
+    )
+
+    assert display_name == "arsenal"
+    assert response == "assistant response"

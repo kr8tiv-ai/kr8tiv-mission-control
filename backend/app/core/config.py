@@ -85,6 +85,10 @@ class Settings(BaseSettings):
     heartbeat_min_interval_seconds: int = 15
     heartbeat_jitter_seconds: int = 2
     heartbeat_singleflight_enabled: bool = True
+    auth_reconcile_on_401_enabled: bool = True
+    auth_reconcile_401_threshold: int = 3
+    auth_reconcile_401_window_seconds: int = 120
+    auth_reconcile_cooldown_seconds: int = 300
 
     # Kr8tiv distribution layer
     distribution_cli_command: str = "node kr8tiv-claw/dist/index.js"
@@ -99,7 +103,7 @@ class Settings(BaseSettings):
     supermemory_container_tag_prefix: str = "tenant"
 
     # OpenClaw gateway runtime compatibility (security baseline)
-    gateway_min_version: str = "2026.2.26"
+    gateway_min_version: str = "2026.3.2"
 
     # Prompt evolution gate guardrails
     prompt_eval_enabled: bool = True

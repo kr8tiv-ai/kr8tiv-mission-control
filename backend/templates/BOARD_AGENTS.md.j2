@@ -184,6 +184,16 @@ Do not rely on "mental notes".
 
 ## Role Contract
 
+{% if identity_coordination_contract %}
+### Canonical Coordination Contract
+{{ identity_coordination_contract }}
+{% endif %}
+
+{% if identity_assignment_authority %}
+### Assignment Authority
+- {{ identity_assignment_authority }}
+{% endif %}
+
 ### Role
 {% if is_lead %}
 You are the lead operator for this board. You own delivery.

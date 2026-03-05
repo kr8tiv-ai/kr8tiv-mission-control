@@ -14,10 +14,10 @@ from app.models.organizations import Organization
 from app.services.openclaw.persona_integrity_service import PersonaIntegrityService
 
 
-def _persona_files(*, soul: str, user: str, identity: str, agents: str) -> dict[str, str]:
+def _persona_files(*, soul: str, heartbeat: str, identity: str, agents: str) -> dict[str, str]:
     return {
         "SOUL.md": soul,
-        "USER.md": user,
+        "HEARTBEAT.md": heartbeat,
         "IDENTITY.md": identity,
         "AGENTS.md": agents,
     }
@@ -66,7 +66,7 @@ async def test_persona_integrity_service_creates_baseline_when_missing() -> None
             service = PersonaIntegrityService(session)
             files = _persona_files(
                 soul="core voice",
-                user="owner profile",
+                heartbeat="heartbeat contract",
                 identity="identity contract",
                 agents="runtime contract",
             )
@@ -96,7 +96,7 @@ async def test_persona_integrity_service_detects_drift() -> None:
             service = PersonaIntegrityService(session)
             baseline_files = _persona_files(
                 soul="core voice",
-                user="owner profile",
+                heartbeat="heartbeat contract",
                 identity="identity contract",
                 agents="runtime contract",
             )
@@ -109,7 +109,7 @@ async def test_persona_integrity_service_detects_drift() -> None:
                 agent_id=agent.id,
                 file_contents=_persona_files(
                     soul="core voice changed",
-                    user="owner profile",
+                    heartbeat="heartbeat contract",
                     identity="identity contract",
                     agents="runtime contract",
                 ),
@@ -137,7 +137,7 @@ async def test_persona_integrity_service_reset_baseline_clears_drift() -> None:
             service = PersonaIntegrityService(session)
             baseline_files = _persona_files(
                 soul="v1 soul",
-                user="v1 user",
+                heartbeat="v1 heartbeat",
                 identity="v1 identity",
                 agents="v1 agents",
             )
@@ -147,7 +147,7 @@ async def test_persona_integrity_service_reset_baseline_clears_drift() -> None:
             )
             changed_files = _persona_files(
                 soul="v2 soul",
-                user="v2 user",
+                heartbeat="v2 heartbeat",
                 identity="v2 identity",
                 agents="v2 agents",
             )

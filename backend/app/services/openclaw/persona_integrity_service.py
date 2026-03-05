@@ -17,12 +17,13 @@ from app.services.openclaw.db_service import OpenClawDBService
 SOUL_FILE: Final[str] = "SOUL.md"
 USER_FILE: Final[str] = "USER.md"
 IDENTITY_FILE: Final[str] = "IDENTITY.md"
+HEARTBEAT_FILE: Final[str] = "HEARTBEAT.md"
 AGENTS_FILE: Final[str] = "AGENTS.md"
 
 _DRIFT_FIELD_MAP: Final[tuple[tuple[str, str], ...]] = (
     ("soul_sha256", SOUL_FILE),
-    ("user_sha256", USER_FILE),
     ("identity_sha256", IDENTITY_FILE),
+    ("heartbeat_sha256", HEARTBEAT_FILE),
     ("agents_sha256", AGENTS_FILE),
 )
 
@@ -45,6 +46,7 @@ def _hashes_from_files(file_contents: Mapping[str, object] | None) -> PersonaInt
         soul_sha256=_sha256_text(payload.get(SOUL_FILE, "")),
         user_sha256=_sha256_text(payload.get(USER_FILE, "")),
         identity_sha256=_sha256_text(payload.get(IDENTITY_FILE, "")),
+        heartbeat_sha256=_sha256_text(payload.get(HEARTBEAT_FILE, "")),
         agents_sha256=_sha256_text(payload.get(AGENTS_FILE, "")),
     )
 
@@ -66,6 +68,7 @@ def _hashes_from_row(row: AgentPersonaIntegrity) -> PersonaIntegrityHashes:
         soul_sha256=row.soul_sha256,
         user_sha256=row.user_sha256,
         identity_sha256=row.identity_sha256,
+        heartbeat_sha256=row.heartbeat_sha256,
         agents_sha256=row.agents_sha256,
     )
 
@@ -93,6 +96,7 @@ class PersonaIntegrityService(OpenClawDBService):
                 soul_sha256=hashes.soul_sha256,
                 user_sha256=hashes.user_sha256,
                 identity_sha256=hashes.identity_sha256,
+                heartbeat_sha256=hashes.heartbeat_sha256,
                 agents_sha256=hashes.agents_sha256,
                 drift_count=0,
                 last_checked_at=now,
@@ -105,6 +109,7 @@ class PersonaIntegrityService(OpenClawDBService):
             row.soul_sha256 = hashes.soul_sha256
             row.user_sha256 = hashes.user_sha256
             row.identity_sha256 = hashes.identity_sha256
+            row.heartbeat_sha256 = hashes.heartbeat_sha256
             row.agents_sha256 = hashes.agents_sha256
             row.last_checked_at = now
             row.last_drift_at = None
