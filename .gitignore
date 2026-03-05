@@ -25,5 +25,7 @@ backend/coverage.*
 backend/.coverage
 frontend/coverage
 artifacts/
-backend/artifacts/
+!backend/artifacts/
+backend/artifacts/*
+!backend/artifacts/.gitkeep
 temp/
