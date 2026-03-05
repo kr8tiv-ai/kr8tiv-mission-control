@@ -41,40 +41,81 @@ def test_locked_model_policy_lookup_for_named_agents() -> None:
     assert arsenal is not None
     assert edith is not None
     assert jocasta is not None
-    assert friday["model"] == "anthropic/claude-opus-4-6"
-    assert friday["provider"] == "anthropic"
-    assert friday["transport"] == "api"
-    assert arsenal["provider"] == "anthropic"
-    assert arsenal["model"] == "anthropic/claude-opus-4-6"
-    assert arsenal["transport"] == "api"
-    assert edith["provider"] == "anthropic"
-    assert edith["model"] == "anthropic/claude-opus-4-6"
-    assert jocasta["provider"] == "anthropic"
-    assert jocasta["model"] == "anthropic/claude-opus-4-6"
+    assert friday["model"] == "claude-cli/claude-opus-4-6"
+    assert friday["provider"] == "claude-cli"
+    assert friday["transport"] == "cli"
+    assert arsenal["provider"] == "codex-cli"
+    assert arsenal["model"] == "codex-cli/gpt-5.3-codex"
+    assert arsenal["transport"] == "cli"
+    assert edith["provider"] == "google-gemini-cli"
+    assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert jocasta["provider"] == "nvidia"
+    assert jocasta["model"] == "nvidia/moonshotai/kimi-k2.5"
 
 
 def test_normalize_model_policy_maps_legacy_aliases() -> None:
     normalized = normalize_model_policy(
         {
             "provider": "openai-codex",
-            "model": "openai-codex/gpt-5.3-codex",
+            "model": "openai-codex/gpt-5-codex",
             "transport": "api",
             "locked": True,
         },
     )
 
     assert normalized is not None
-    assert normalized["model"] == "anthropic/claude-opus-4-6"
+    assert normalized["model"] == "codex-cli/gpt-5.3-codex"
+    edith = normalize_model_policy(
+        {
+            "provider": "google-gemini-cli",
+            "model": "google-gemini-cli/gemini-3.1",
+            "transport": "cli",
+        },
+    )
+    assert edith is not None
+    assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
     assert (
         model_id_for_policy(
             {
-                "provider": "nvidia",
-                "model": "nvidia/moonshotai/kimi-k2.5",
-                "transport": "api",
+                "provider": "openai-codex",
+                "model": "openai-codex/gpt-5.3-codex",
+                "transport": "cli",
             },
         )
-        == "anthropic/claude-opus-4-6"
+        == "codex-cli/gpt-5.3-codex"
     )
+
+
+def test_normalize_model_policy_infers_transport_by_provider_defaults() -> None:
+    arsenal = normalize_model_policy(
+        {
+            "provider": "openai-codex",
+            "model": "openai-codex/gpt-5.3-codex",
+        },
+    )
+    edith = normalize_model_policy(
+        {
+            "provider": "google",
+            "model": "google/gemini-3-pro-preview",
+        },
+    )
+    friday = normalize_model_policy(
+        {
+            "provider": "anthropic",
+            "model": "anthropic/claude-opus-4-6",
+        },
+    )
+    jocasta = normalize_model_policy(
+        {
+            "provider": "nvidia",
+            "model": "nvidia/moonshotai/kimi-k2.5",
+        },
+    )
+
+    assert arsenal is not None and arsenal["transport"] == "cli"
+    assert edith is not None and edith["transport"] == "cli"
+    assert friday is not None and friday["transport"] == "cli"
+    assert jocasta is not None and jocasta["transport"] == "api"
 
 
 def test_enforce_agent_model_policy_rewrites_legacy_locked_model() -> None:
@@ -98,7 +139,8 @@ def test_enforce_agent_model_policy_rewrites_legacy_locked_model() -> None:
     assert changed is True
     normalized = normalize_model_policy(agent.model_policy)
     assert normalized is not None
-    assert normalized["model"] == "anthropic/claude-opus-4-6"
+    assert normalized["model"] == "google-gemini-cli/gemini-3-pro-preview"
+    assert normalized["transport"] == "cli"
 
 
 @pytest.mark.asyncio
@@ -122,8 +164,8 @@ async def test_persist_new_agent_applies_locked_policy_over_requested_policy() -
 
     normalized = normalize_model_policy(agent.model_policy)
     assert normalized is not None
-    assert normalized["model"] == "anthropic/claude-opus-4-6"
-    assert normalized["transport"] == "api"
+    assert normalized["model"] == "claude-cli/claude-opus-4-6"
+    assert normalized["transport"] == "cli"
     assert normalized["locked"] is True
 
 

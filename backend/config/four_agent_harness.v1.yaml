@@ -1,0 +1,210 @@
+{
+  "version": "v1",
+  "agents": ["friday", "arsenal", "jocasta", "edith"],
+  "points": [
+    {
+      "point_id": 1,
+      "name": "IDENTITY_REGISTER",
+      "verification_probe": "identity_profile.role present and canonical",
+      "expected_evidence": "agents.identity_profile.role",
+      "agent_expectations": {
+        "friday": {"role": "CMO & Executive Director"},
+        "arsenal": {"role": "COO & Organizer"},
+        "jocasta": {"role": "CTO & Technical Lead"},
+        "edith": {"role": "Research & Intelligence"}
+      }
+    },
+    {
+      "point_id": 2,
+      "name": "HEALTH_HEARTBEAT",
+      "verification_probe": "heartbeat_config has cadence and includeReasoning",
+      "expected_evidence": "agents.heartbeat_config",
+      "agent_expectations": {
+        "friday": {"max_timeout_seconds": 90},
+        "arsenal": {"max_timeout_seconds": 90},
+        "jocasta": {"max_timeout_seconds": 90},
+        "edith": {"max_timeout_seconds": 120}
+      }
+    },
+    {
+      "point_id": 3,
+      "name": "MEMORY_BIND",
+      "verification_probe": "identity_profile memory backend/policy enforced",
+      "expected_evidence": "agents.identity_profile.memory_backend",
+      "agent_expectations": {
+        "friday": {"memory_backend": "supermemory", "memory_policy": "supermemory-only"},
+        "arsenal": {"memory_backend": "supermemory", "memory_policy": "supermemory-only"},
+        "jocasta": {"memory_backend": "supermemory", "memory_policy": "supermemory-only"},
+        "edith": {"memory_backend": "supermemory", "memory_policy": "supermemory-only"}
+      }
+    },
+    {
+      "point_id": 4,
+      "name": "MODEL_ROUTE",
+      "verification_probe": "model_policy locked model ID",
+      "expected_evidence": "agents.model_policy.model",
+      "agent_expectations": {
+        "friday": {"model": "claude-cli/claude-opus-4-6", "transport": "cli", "locked": true},
+        "arsenal": {"model": "codex-cli/gpt-5.3-codex", "transport": "cli", "locked": true},
+        "jocasta": {"model": "nvidia/moonshotai/kimi-k2.5", "transport": "api", "locked": true},
+        "edith": {"model": "google-gemini-cli/gemini-3-pro-preview", "transport": "cli", "locked": true}
+      }
+    },
+    {
+      "point_id": 5,
+      "name": "CONTEXT_BUDGET",
+      "verification_probe": "identity_profile context_budget present",
+      "expected_evidence": "agents.identity_profile.context_budget",
+      "agent_expectations": {
+        "friday": {"context_budget": 0.35},
+        "arsenal": {"context_budget": 0.35},
+        "jocasta": {"context_budget": 0.35},
+        "edith": {"context_budget": 0.35}
+      }
+    },
+    {
+      "point_id": 6,
+      "name": "TASK_INTAKE",
+      "verification_probe": "assignment authority contract present",
+      "expected_evidence": "agents.identity_profile.assignment_authority",
+      "agent_expectations": {
+        "friday": {
+          "assignment_authority": "owner_or_friday",
+          "tools_profile": "coding",
+          "tailscale_access": "required_on_spawn",
+          "host_context_bootstrap": "required_on_spawn",
+          "identity_bootstrap": "required_on_spawn"
+        },
+        "arsenal": {
+          "assignment_authority": "owner_or_friday",
+          "tools_profile": "coding",
+          "tailscale_access": "required_on_spawn",
+          "host_context_bootstrap": "required_on_spawn",
+          "identity_bootstrap": "required_on_spawn"
+        },
+        "jocasta": {
+          "assignment_authority": "owner_or_friday",
+          "tools_profile": "coding",
+          "tailscale_access": "required_on_spawn",
+          "host_context_bootstrap": "required_on_spawn",
+          "identity_bootstrap": "required_on_spawn"
+        },
+        "edith": {
+          "assignment_authority": "owner_or_friday",
+          "tools_profile": "coding",
+          "tailscale_access": "required_on_spawn",
+          "host_context_bootstrap": "required_on_spawn",
+          "identity_bootstrap": "required_on_spawn"
+        }
+      }
+    },
+    {
+      "point_id": 7,
+      "name": "INTER_BOT_COMM",
+      "verification_probe": "coordination contract includes shared planning channel",
+      "expected_evidence": "agents.identity_profile.coordination_contract",
+      "agent_expectations": {
+        "friday": {"channel": "planning_hq"},
+        "arsenal": {"channel": "planning_hq"},
+        "jocasta": {"channel": "planning_hq"},
+        "edith": {"channel": "planning_hq"}
+      }
+    },
+    {
+      "point_id": 8,
+      "name": "ERROR_ESCALATION",
+      "verification_probe": "escalation contract includes Friday chain",
+      "expected_evidence": "agents.identity_profile.escalation_contract",
+      "agent_expectations": {
+        "friday": {"chain": "friday_owner"},
+        "arsenal": {"chain": "arsenal_to_friday"},
+        "jocasta": {"chain": "jocasta_to_arsenal_to_friday"},
+        "edith": {"chain": "edith_to_arsenal_to_friday"}
+      }
+    },
+    {
+      "point_id": 9,
+      "name": "GRACEFUL_SHUTDOWN",
+      "verification_probe": "heartbeat contract includes state flush",
+      "expected_evidence": "agents.identity_profile.heartbeat_contract",
+      "agent_expectations": {
+        "friday": {"requires_state_flush": true},
+        "arsenal": {"requires_state_flush": true},
+        "jocasta": {"requires_state_flush": true},
+        "edith": {"requires_state_flush": true}
+      }
+    },
+    {
+      "point_id": 10,
+      "name": "AUTO_RECOVERY",
+      "verification_probe": "coordination contract includes single-owner recovery",
+      "expected_evidence": "agents.identity_profile.coordination_contract",
+      "agent_expectations": {
+        "friday": {"single_owner_recovery": true},
+        "arsenal": {"single_owner_recovery": true},
+        "jocasta": {"single_owner_recovery": true},
+        "edith": {"single_owner_recovery": true}
+      }
+    },
+    {
+      "point_id": 11,
+      "name": "SELF_IMPROVEMENT",
+      "verification_probe": "identity profile includes mirror-test cadence",
+      "expected_evidence": "agents.identity_profile.self_improvement",
+      "agent_expectations": {
+        "friday": {"mirror_test": "03:00"},
+        "arsenal": {"mirror_test": "03:00"},
+        "jocasta": {"mirror_test": "03:00"},
+        "edith": {"mirror_test": "03:00"}
+      }
+    },
+    {
+      "point_id": 12,
+      "name": "AUDIT_TRAIL",
+      "verification_probe": "identity profile includes audit trail contract",
+      "expected_evidence": "agents.identity_profile.audit_contract",
+      "agent_expectations": {
+        "friday": {"audit_fields_required": true},
+        "arsenal": {"audit_fields_required": true},
+        "jocasta": {"audit_fields_required": true},
+        "edith": {"audit_fields_required": true}
+      }
+    },
+    {
+      "point_id": 13,
+      "name": "EMERGENCY_HALT",
+      "verification_probe": "identity profile includes emergency halt contract",
+      "expected_evidence": "agents.identity_profile.halt_contract",
+      "agent_expectations": {
+        "friday": {"halt_within_seconds": 1},
+        "arsenal": {"halt_within_seconds": 1},
+        "jocasta": {"halt_within_seconds": 1},
+        "edith": {"halt_within_seconds": 1}
+      }
+    },
+    {
+      "point_id": 14,
+      "name": "CONFIG_HOT_RELOAD",
+      "verification_probe": "identity profile includes hot reload contract",
+      "expected_evidence": "agents.identity_profile.hot_reload_contract",
+      "agent_expectations": {
+        "friday": {"hot_reload": true},
+        "arsenal": {"hot_reload": true},
+        "jocasta": {"hot_reload": true},
+        "edith": {"hot_reload": true}
+      }
+    },
+    {
+      "point_id": 15,
+      "name": "VERSION_SYNC",
+      "verification_probe": "identity profile includes version sync contract",
+      "expected_evidence": "agents.identity_profile.version_sync_contract",
+      "agent_expectations": {
+        "friday": {"version_sync": true},
+        "arsenal": {"version_sync": true},
+        "jocasta": {"version_sync": true},
+        "edith": {"version_sync": true}
+      }
+    }
+  ]
+}

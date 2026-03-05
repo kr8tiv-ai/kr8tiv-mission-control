@@ -90,6 +90,8 @@ _REASONING_CAPABILITY_KEYS = (
     "reasoning_modes",
 )
 _REASONING_DEFAULT = "max"
+_THINKING_DEFAULT_ALLOWED = {"off", "minimal", "low", "medium", "high", "xhigh", "adaptive"}
+_THINKING_DEFAULT_ALIASES = {"max": "xhigh", "normal": "medium"}
 
 
 def _is_missing_session_error(exc: OpenClawGatewayError) -> bool:
@@ -336,9 +338,36 @@ def _thinking_default_patch(
             preferred=_REASONING_DEFAULT,
         )
         if resolved:
-            return {"thinkingDefault": resolved}
+            normalized = _THINKING_DEFAULT_ALIASES.get(resolved, resolved)
+            if normalized not in _THINKING_DEFAULT_ALLOWED:
+                normalized = "medium"
+            return {"thinkingDefault": normalized}
 
-    return {"thinkingDefault": resolve_reasoning_mode([], preferred=_REASONING_DEFAULT)}
+    fallback = resolve_reasoning_mode([], preferred=_REASONING_DEFAULT)
+    normalized_fallback = _THINKING_DEFAULT_ALIASES.get(fallback, fallback)
+    if normalized_fallback not in _THINKING_DEFAULT_ALLOWED:
+        normalized_fallback = "medium"
+    return {"thinkingDefault": normalized_fallback}
+
+
+def _tools_profile_patch(config_data: dict[str, Any]) -> dict[str, Any] | None:
+    # OpenClaw v2026.3.2 expects tools profile at top-level "tools.profile".
+    # Keep backward-compat read logic for older configs that stored this in
+    # "agents.defaults.tools.profile".
+    tools = config_data.get("tools")
+    tools_map = tools if isinstance(tools, dict) else {}
+    if not tools_map:
+        agents = config_data.get("agents")
+        if isinstance(agents, dict):
+            defaults = agents.get("defaults")
+            if isinstance(defaults, dict):
+                legacy_tools = defaults.get("tools")
+                if isinstance(legacy_tools, dict):
+                    tools_map = legacy_tools
+    current_profile = str(tools_map.get("profile") or "").strip().lower()
+    if current_profile == "coding":
+        return None
+    return {"profile": "coding"}
 
 
 def _template_env() -> Environment:
@@ -862,6 +891,9 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         thinking_patch = _thinking_default_patch(config_data, entries)
         if thinking_patch is not None:
             patch.setdefault("agents", {})["defaults"] = thinking_patch
+        tools_patch = _tools_profile_patch(config_data) if include_runtime_defaults else None
+        if tools_patch is not None:
+            patch["tools"] = tools_patch
         channels_patch = (
             _channel_heartbeat_visibility_patch(config_data) if include_runtime_defaults else None
         )

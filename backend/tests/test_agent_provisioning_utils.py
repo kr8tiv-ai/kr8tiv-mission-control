@@ -851,7 +851,7 @@ async def test_patch_agent_heartbeats_preserves_existing_thinking_default(
                 "config": {
                     "agents": {
                         "list": [],
-                        "defaults": {"thinkingDefault": "medium"},
+                        "defaults": {"thinkingDefault": "medium", "tools": {"profile": "coding"}},
                     }
                 },
             }
@@ -905,7 +905,7 @@ async def test_patch_agent_heartbeats_skips_patch_when_no_changes(
                 "config": {
                     "agents": {
                         "list": [existing_agent],
-                        "defaults": {"thinkingDefault": "medium"},
+                        "defaults": {"thinkingDefault": "medium", "tools": {"profile": "coding"}},
                     },
                     "channels": {
                         "defaults": {"heartbeat": agent_provisioning.DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY},
@@ -1201,7 +1201,7 @@ async def test_patch_agent_heartbeats_retries_without_agents_defaults_on_invalid
             assert params is not None
             payload = json.loads(str(params["raw"]))
             if patch_attempt == 1:
-                assert payload["agents"].get("defaults") == {"thinkingDefault": "normal"}
+                assert payload["agents"].get("defaults") == {"thinkingDefault": "medium"}
                 raise agent_provisioning.OpenClawGatewayError("invalid config")
             assert payload == {
                 "agents": {
@@ -1244,7 +1244,7 @@ async def test_patch_agent_heartbeats_retries_without_agents_defaults_on_invalid
         if method == "config.patch" and params is not None
     ]
     assert len(patch_payloads) == 2
-    assert patch_payloads[0]["agents"].get("defaults") == {"thinkingDefault": "normal"}
+    assert patch_payloads[0]["agents"].get("defaults") == {"thinkingDefault": "medium"}
     assert patch_payloads[1] == {
         "agents": {
             "list": [
@@ -1365,6 +1365,52 @@ async def test_patch_agent_heartbeats_enforces_gateway_bind_lan(
     assert isinstance(raw_payload, str)
     payload = json.loads(raw_payload)
     assert payload["gateway"]["bind"] == "lan"
+
+
+@pytest.mark.asyncio
+async def test_patch_agent_heartbeats_enforces_tools_profile_coding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object] | None]] = []
+
+    async def _fake_openclaw_call(method, params=None, config=None):
+        _ = config
+        calls.append((method, params))
+        if method == "config.get":
+            return {
+                "hash": "cfg-hash",
+                "config": {
+                    "tools": {"profile": "messaging"},
+                    "agents": {"list": [], "defaults": {}},
+                    "gateway": {"controlUi": {"allowInsecureAuth": False}},
+                },
+            }
+        if method == "config.patch":
+            return {"ok": True}
+        raise AssertionError(f"Unexpected method: {method}")
+
+    monkeypatch.setattr(agent_provisioning, "openclaw_call", _fake_openclaw_call)
+    control_plane = agent_provisioning.OpenClawGatewayControlPlane(
+        agent_provisioning.GatewayClientConfig(url="ws://gateway.example/ws", token=None),
+    )
+
+    await control_plane.patch_agent_heartbeats(
+        [
+            (
+                "board-agent-a",
+                "/tmp/workspace-board-agent-a",
+                {"every": "30m", "target": "last", "includeReasoning": False},
+                None,
+            )
+        ],
+    )
+
+    patch_params = next(params for method, params in calls if method == "config.patch")
+    assert patch_params is not None
+    raw_payload = patch_params.get("raw")
+    assert isinstance(raw_payload, str)
+    payload = json.loads(raw_payload)
+    assert payload["tools"]["profile"] == "coding"
 
 
 @pytest.mark.asyncio

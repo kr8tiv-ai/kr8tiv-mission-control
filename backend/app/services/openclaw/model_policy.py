@@ -6,50 +6,52 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-_CLI_PROVIDERS = frozenset()
-_API_PROVIDERS = frozenset({"anthropic"})
+_CLI_PROVIDERS = frozenset(
+    {"anthropic", "openai-codex", "claude-cli", "codex-cli", "google-gemini-cli"}
+)
+_API_PROVIDERS = frozenset({"google", "nvidia"})
 _MODEL_ALIASES: dict[str, str] = {
-    # Migrate all legacy bot runtime model ids to the canonical Opus route.
-    "openai-codex/gpt-5.3-codex": "anthropic/claude-opus-4-6",
-    "openai-codex/gpt-5-codex": "anthropic/claude-opus-4-6",
-    "google-gemini-cli/gemini-3.1": "anthropic/claude-opus-4-6",
-    "google-gemini-cli/gemini-3-pro-preview": "anthropic/claude-opus-4-6",
-    "nvidia/moonshotai/kimi-k2-5": "anthropic/claude-opus-4-6",
-    "nvidia/moonshotai/kimi-k2.5": "anthropic/claude-opus-4-6",
+    # Normalize legacy aliases to canonical IDs within the same provider.
+    "anthropic/claude-opus-4-6": "claude-cli/claude-opus-4-6",
+    "openai-codex/gpt-5-codex": "codex-cli/gpt-5.3-codex",
+    "openai-codex/gpt-5.3-codex": "codex-cli/gpt-5.3-codex",
+    "google-gemini-cli/gemini-3.1": "google-gemini-cli/gemini-3-pro-preview",
+    "google/gemini-3-pro-preview": "google-gemini-cli/gemini-3-pro-preview",
+    "nvidia/moonshotai/kimi-k2-5": "nvidia/moonshotai/kimi-k2.5",
 }
 
 _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     "friday": {
-        "provider": "anthropic",
-        "model": "anthropic/claude-opus-4-6",
-        "transport": "api",
+        "provider": "claude-cli",
+        "model": "claude-cli/claude-opus-4-6",
+        "transport": "cli",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to Claude Opus 4.6 Anthropic runtime.",
+        "notes": "Pinned to Claude Opus 4.6 via Claude CLI backend.",
     },
     "arsenal": {
-        "provider": "anthropic",
-        "model": "anthropic/claude-opus-4-6",
-        "transport": "api",
+        "provider": "codex-cli",
+        "model": "codex-cli/gpt-5.3-codex",
+        "transport": "cli",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to Claude Opus 4.6 Anthropic runtime.",
+        "notes": "Pinned to Codex 5.3 via Codex CLI backend.",
     },
     "edith": {
-        "provider": "anthropic",
-        "model": "anthropic/claude-opus-4-6",
-        "transport": "api",
+        "provider": "google-gemini-cli",
+        "model": "google-gemini-cli/gemini-3-pro-preview",
+        "transport": "cli",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to Claude Opus 4.6 Anthropic runtime.",
+        "notes": "Pinned to Gemini 3.1 lane via Gemini CLI backend.",
     },
     "jocasta": {
-        "provider": "anthropic",
-        "model": "anthropic/claude-opus-4-6",
+        "provider": "nvidia",
+        "model": "nvidia/moonshotai/kimi-k2.5",
         "transport": "api",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to Claude Opus 4.6 Anthropic runtime.",
+        "notes": "Pinned to Kimi K2.5 via NVIDIA API (free tier route).",
     },
 }
 
