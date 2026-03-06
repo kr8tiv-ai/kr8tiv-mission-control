@@ -13,15 +13,18 @@ _API_PROVIDERS = frozenset({"google", "nvidia"})
 _PRIMARY_MODEL_ALIASES: dict[str, str] = {
     # Normalize legacy aliases to canonical IDs within the same provider.
     "anthropic/claude-opus-4-6": "claude-cli/claude-opus-4-6",
-    "openai-codex/gpt-5-codex": "codex-cli/gpt-5.3-codex",
-    "openai-codex/gpt-5.3-codex": "codex-cli/gpt-5.3-codex",
+    "openai-codex/gpt-5-codex": "codex-cli/gpt-5.4",
+    "openai-codex/gpt-5.3-codex": "codex-cli/gpt-5.4",
+    "openai-codex/gpt-5.4": "codex-cli/gpt-5.4",
+    "codex-cli/gpt-5.3-codex": "codex-cli/gpt-5.4",
     "google-gemini-cli/gemini-3.1": "google-gemini-cli/gemini-3-pro-preview",
     "google/gemini-3-pro-preview": "google-gemini-cli/gemini-3-pro-preview",
     "nvidia/moonshotai/kimi-k2-5": "nvidia/moonshotai/kimi-k2.5",
 }
 _FALLBACK_MODEL_ALIASES: dict[str, str] = {
     # Preserve API provider IDs for fallback routes.
-    "openai-codex/gpt-5-codex": "openai-codex/gpt-5.3-codex",
+    "openai-codex/gpt-5-codex": "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.3-codex": "openai-codex/gpt-5.4",
     "google-gemini-cli/gemini-3.1": "google/gemini-3-pro-preview",
     "google-gemini-cli/gemini-3-pro-preview": "google/gemini-3-pro-preview",
     "nvidia/moonshotai/kimi-k2-5": "nvidia/moonshotai/kimi-k2.5",
@@ -39,12 +42,12 @@ _LOCKED_AGENT_MODEL_POLICIES: dict[str, dict[str, Any]] = {
     },
     "arsenal": {
         "provider": "codex-cli",
-        "model": "codex-cli/gpt-5.3-codex",
-        "fallback_models": ["openai-codex/gpt-5.3-codex"],
+        "model": "codex-cli/gpt-5.4",
+        "fallback_models": ["openai-codex/gpt-5.4"],
         "transport": "cli",
         "locked": True,
         "allow_self_change": False,
-        "notes": "Pinned to Codex 5.3 via Codex CLI backend.",
+        "notes": "Pinned to GPT-5.4 via Codex CLI backend.",
     },
     "edith": {
         "provider": "google-gemini-cli",

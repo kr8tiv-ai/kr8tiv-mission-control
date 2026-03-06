@@ -46,8 +46,8 @@ def test_locked_model_policy_lookup_for_named_agents() -> None:
     assert friday["provider"] == "claude-cli"
     assert friday["transport"] == "cli"
     assert arsenal["provider"] == "codex-cli"
-    assert arsenal["model"] == "codex-cli/gpt-5.3-codex"
-    assert arsenal["fallback_models"] == ["openai-codex/gpt-5.3-codex"]
+    assert arsenal["model"] == "codex-cli/gpt-5.4"
+    assert arsenal["fallback_models"] == ["openai-codex/gpt-5.4"]
     assert arsenal["transport"] == "cli"
     assert edith["provider"] == "google-gemini-cli"
     assert edith["model"] == "google-gemini-cli/gemini-3-pro-preview"
@@ -68,7 +68,7 @@ def test_normalize_model_policy_maps_legacy_aliases() -> None:
     )
 
     assert normalized is not None
-    assert normalized["model"] == "codex-cli/gpt-5.3-codex"
+    assert normalized["model"] == "codex-cli/gpt-5.4"
     assert normalized["fallback_models"] == []
     edith = normalize_model_policy(
         {
@@ -84,11 +84,11 @@ def test_normalize_model_policy_maps_legacy_aliases() -> None:
         model_id_for_policy(
             {
                 "provider": "openai-codex",
-                "model": "openai-codex/gpt-5.3-codex",
+                "model": "openai-codex/gpt-5.4",
                 "transport": "cli",
             },
         )
-        == "codex-cli/gpt-5.3-codex"
+        == "codex-cli/gpt-5.4"
     )
 
 
@@ -114,7 +114,7 @@ def test_normalize_model_policy_infers_transport_by_provider_defaults() -> None:
     arsenal = normalize_model_policy(
         {
             "provider": "openai-codex",
-            "model": "openai-codex/gpt-5.3-codex",
+            "model": "openai-codex/gpt-5.4",
         },
     )
     edith = normalize_model_policy(
@@ -151,7 +151,7 @@ def test_enforce_agent_model_policy_rewrites_legacy_locked_model() -> None:
         status="online",
         model_policy={
             "provider": "openai-codex",
-            "model": "openai-codex/gpt-5.3-codex",
+            "model": "openai-codex/gpt-5.4",
             "transport": "api",
             "locked": True,
             "allow_self_change": False,

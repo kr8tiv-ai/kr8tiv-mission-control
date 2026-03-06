@@ -45,7 +45,7 @@
       "expected_evidence": "agents.model_policy.model",
       "agent_expectations": {
         "friday": {"model": "claude-cli/claude-opus-4-6", "transport": "cli", "locked": true},
-        "arsenal": {"model": "codex-cli/gpt-5.3-codex", "transport": "cli", "locked": true},
+        "arsenal": {"model": "codex-cli/gpt-5.4", "transport": "cli", "locked": true},
         "jocasta": {"model": "nvidia/moonshotai/kimi-k2.5", "transport": "api", "locked": true},
         "edith": {"model": "google-gemini-cli/gemini-3-pro-preview", "transport": "cli", "locked": true}
       }

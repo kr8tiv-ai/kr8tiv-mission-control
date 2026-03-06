@@ -1,4 +1,4 @@
-﻿# ruff: noqa: S101
+# ruff: noqa: S101
 from __future__ import annotations
 
 import json
@@ -118,7 +118,7 @@ def test_point3_fails_when_memory_backend_not_supermemory() -> None:
 
     result = verification_harness._evaluate_agent_point(agent=agent, point=point)
     assert result.passed is False
-    assert result.evidence_ref == "identity_profile.memory_backend+memory_policy"
+    assert result.evidence_ref == "identity_profile.memory_backend+memory_policy+memory_container_tag"
 
 
 def test_point4_fails_when_model_transport_drifts() -> None:
@@ -129,7 +129,7 @@ def test_point4_fails_when_model_transport_drifts() -> None:
         name="arsenal",
         model_policy={
             "provider": "codex-cli",
-            "model": "codex-cli/gpt-5.3-codex",
+            "model": "codex-cli/gpt-5.4",
             "transport": "api",
             "locked": True,
             "allow_self_change": False,
@@ -140,7 +140,7 @@ def test_point4_fails_when_model_transport_drifts() -> None:
         "name": "MODEL_ROUTE",
         "agent_expectations": {
             "arsenal": {
-                "model": "codex-cli/gpt-5.3-codex",
+                "model": "codex-cli/gpt-5.4",
                 "transport": "cli",
                 "locked": True,
             }
@@ -149,7 +149,7 @@ def test_point4_fails_when_model_transport_drifts() -> None:
 
     result = verification_harness._evaluate_agent_point(agent=agent, point=point)
     assert result.passed is False
-    assert result.evidence_ref == "model_policy.model+transport+locked"
+    assert result.evidence_ref == "model_policy.model+transport+locked+agent_continuity.runtime_session_id"
 
 
 def test_point6_fails_when_spawn_requirements_missing() -> None:
@@ -184,5 +184,5 @@ def test_point6_fails_when_spawn_requirements_missing() -> None:
     assert result.passed is False
     assert result.evidence_ref == (
         "identity_profile.assignment_authority+tools_profile+tailscale_access+"
-        "host_context_bootstrap+identity_bootstrap"
+        "host_context_bootstrap+identity_bootstrap+agent_continuity.runtime_session_id"
     )
