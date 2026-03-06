@@ -39,6 +39,7 @@ class _AgentStub:
     identity_profile: dict | None = None
     identity_template: str | None = None
     soul_template: str | None = None
+    model_policy: dict | None = None
 
 
 def test_agent_key_uses_session_key_when_present():
@@ -188,6 +189,81 @@ async def test_provision_main_agent_uses_dedicated_openclaw_agent_id(monkeypatch
     expected_agent_id = GatewayAgentIdentity.openclaw_agent_id_for_id(gateway_id)
     assert captured["patched_agent_id"] == expected_agent_id
     assert captured["files_index_agent_id"] == expected_agent_id
+
+
+@pytest.mark.asyncio
+async def test_provision_passes_structured_model_with_fallbacks_to_gateway(monkeypatch):
+    gateway = _GatewayStub(
+        id=uuid4(),
+        name="Acme",
+        url="ws://gateway.example/ws",
+        token=None,
+        workspace_root="/tmp/openclaw",
+    )
+    agent = _AgentStub(
+        name="Arsenal",
+        model_policy={
+            "provider": "codex-cli",
+            "model": "codex-cli/gpt-5.4",
+            "fallback_models": ["openai-codex/gpt-5.4"],
+            "transport": "cli",
+            "locked": True,
+            "allow_self_change": False,
+        },
+    )
+    captured: dict[str, object] = {}
+
+    async def _fake_ensure_agent_session(self, session_key, *, label=None):
+        return None
+
+    async def _fake_upsert_agent(self, registration):
+        captured["model"] = registration.model_id
+
+    async def _fake_list_agent_files(self, agent_id):
+        return {}
+
+    def _fake_render_agent_files(*args, **kwargs):
+        return {}
+
+    async def _fake_set_agent_files(self, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        agent_provisioning.OpenClawGatewayControlPlane,
+        "ensure_agent_session",
+        _fake_ensure_agent_session,
+    )
+    monkeypatch.setattr(
+        agent_provisioning.OpenClawGatewayControlPlane,
+        "upsert_agent",
+        _fake_upsert_agent,
+    )
+    monkeypatch.setattr(
+        agent_provisioning.OpenClawGatewayControlPlane,
+        "list_agent_files",
+        _fake_list_agent_files,
+    )
+    monkeypatch.setattr(agent_provisioning, "_render_agent_files", _fake_render_agent_files)
+    monkeypatch.setattr(
+        agent_provisioning.BaseAgentLifecycleManager,
+        "_set_agent_files",
+        _fake_set_agent_files,
+    )
+
+    await agent_provisioning.OpenClawGatewayProvisioner().apply_agent_lifecycle(
+        agent=agent,  # type: ignore[arg-type]
+        gateway=gateway,  # type: ignore[arg-type]
+        board=None,
+        auth_token="secret-token",
+        user=None,
+        action="provision",
+        wake=False,
+    )
+
+    assert captured["model"] == {
+        "primary": "codex-cli/gpt-5.4",
+        "fallbacks": ["openai-codex/gpt-5.4"],
+    }
 
 
 @pytest.mark.asyncio

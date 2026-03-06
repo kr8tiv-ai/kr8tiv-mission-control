@@ -93,6 +93,7 @@ _REASONING_CAPABILITY_KEYS = (
 _REASONING_DEFAULT = "max"
 _THINKING_DEFAULT_ALLOWED = {"off", "minimal", "low", "medium", "high", "xhigh", "adaptive"}
 _THINKING_DEFAULT_ALIASES = {"max": "xhigh", "normal": "medium"}
+type GatewayModelEntry = str | dict[str, Any] | None
 
 
 def _is_missing_session_error(exc: OpenClawGatewayError) -> bool:
@@ -283,7 +284,33 @@ def _control_ui_access_patch(config_data: dict[str, Any]) -> dict[str, Any] | No
     return patch
 
 
-def _extract_model_reasoning_modes(config_data: dict[str, Any], model_id: str | None) -> list[str]:
+def _gateway_model_primary(model_entry: GatewayModelEntry) -> str | None:
+    if isinstance(model_entry, str):
+        primary = model_entry.strip()
+        return primary or None
+    if isinstance(model_entry, dict):
+        primary = model_entry.get("primary")
+        if isinstance(primary, str):
+            normalized = primary.strip()
+            return normalized or None
+    return None
+
+
+def _gateway_model_entry(policy: object) -> GatewayModelEntry:
+    primary_model = model_id_for_policy(policy)
+    if not primary_model:
+        return None
+    fallback_models = fallback_models_for_policy(policy)
+    if not fallback_models:
+        return primary_model
+    return {"primary": primary_model, "fallbacks": fallback_models}
+
+
+def _extract_model_reasoning_modes(
+    config_data: dict[str, Any],
+    model_entry: GatewayModelEntry,
+) -> list[str]:
+    model_id = _gateway_model_primary(model_entry)
     if not model_id:
         return []
     agents = config_data.get("agents")
@@ -307,7 +334,7 @@ def _extract_model_reasoning_modes(config_data: dict[str, Any], model_id: str | 
 
 def _thinking_default_patch(
     config_data: dict[str, Any],
-    entries: list[tuple[str, str, dict[str, Any], str | None]],
+    entries: list[tuple[str, str, dict[str, Any], GatewayModelEntry]],
 ) -> dict[str, str] | None:
     agents = config_data.get("agents")
     if not isinstance(agents, dict):
@@ -327,11 +354,10 @@ def _thinking_default_patch(
         if isinstance(primary_value, str) and primary_value.strip():
             preferred_models.append(primary_value.strip())
 
-    for _agent_id, _workspace, _heartbeat, model_id in entries:
-        if isinstance(model_id, str) and model_id.strip():
-            normalized_model = model_id.strip()
-            if normalized_model not in preferred_models:
-                preferred_models.append(normalized_model)
+    for _agent_id, _workspace, _heartbeat, model_entry in entries:
+        normalized_model = _gateway_model_primary(model_entry)
+        if normalized_model and normalized_model not in preferred_models:
+            preferred_models.append(normalized_model)
 
     for model_id in preferred_models:
         resolved = resolve_reasoning_mode(
@@ -710,7 +736,7 @@ class GatewayAgentRegistration:
     name: str
     workspace_path: str
     heartbeat: dict[str, Any]
-    model_id: str | None = None
+    model_id: GatewayModelEntry = None
 
 
 class GatewayControlPlane(ABC):
@@ -759,7 +785,7 @@ class GatewayControlPlane(ABC):
     @abstractmethod
     async def patch_agent_heartbeats(
         self,
-        entries: list[tuple[str, str, dict[str, Any], str | None]],
+        entries: list[tuple[str, str, dict[str, Any], GatewayModelEntry]],
         *,
         include_runtime_defaults: bool = True,
     ) -> None:
@@ -882,7 +908,7 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
 
     async def patch_agent_heartbeats(
         self,
-        entries: list[tuple[str, str, dict[str, Any], str | None]],
+        entries: list[tuple[str, str, dict[str, Any], GatewayModelEntry]],
         *,
         include_runtime_defaults: bool = True,
     ) -> None:
@@ -965,8 +991,8 @@ async def _gateway_config_agent_list(
 
 
 def _heartbeat_entry_map(
-    entries: list[tuple[str, str, dict[str, Any], str | None]],
-) -> dict[str, tuple[str, dict[str, Any], str | None]]:
+    entries: list[tuple[str, str, dict[str, Any], GatewayModelEntry]],
+) -> dict[str, tuple[str, dict[str, Any], GatewayModelEntry]]:
     return {
         agent_id: (workspace_path, heartbeat, model_id)
         for agent_id, workspace_path, heartbeat, model_id in entries
@@ -975,7 +1001,7 @@ def _heartbeat_entry_map(
 
 def _updated_agent_list(
     raw_list: list[object],
-    entry_by_id: dict[str, tuple[str, dict[str, Any], str | None]],
+    entry_by_id: dict[str, tuple[str, dict[str, Any], GatewayModelEntry]],
 ) -> list[object]:
     updated_ids: set[str] = set()
     new_list: list[object] = []
@@ -1154,7 +1180,7 @@ class BaseAgentLifecycleManager(ABC):
         agent_id = self._agent_id(agent)
         workspace_path = _workspace_path(agent, self._gateway.workspace_root)
         heartbeat = _heartbeat_config(agent)
-        model_id = model_id_for_policy(getattr(agent, "model_policy", None))
+        model_id = _gateway_model_entry(getattr(agent, "model_policy", None))
         await self._control_plane.upsert_agent(
             GatewayAgentRegistration(
                 agent_id=agent_id,
@@ -1311,12 +1337,12 @@ def _control_plane_for_gateway(gateway: Gateway) -> OpenClawGatewayControlPlane:
 async def _patch_gateway_agent_heartbeats(
     gateway: Gateway,
     *,
-    entries: list[tuple[str, str, dict[str, Any], str | None]],
+    entries: list[tuple[str, str, dict[str, Any], GatewayModelEntry]],
     include_runtime_defaults: bool = True,
 ) -> None:
     """Patch multiple agent heartbeat configs in a single gateway config.patch call.
 
-    Each entry is (agent_id, workspace_path, heartbeat_dict, model_id).
+    Each entry is (agent_id, workspace_path, heartbeat_dict, model_entry).
     """
     control_plane = _control_plane_for_gateway(gateway)
     await control_plane.patch_agent_heartbeats(
@@ -1361,12 +1387,12 @@ class OpenClawGatewayProvisioner:
         if not gateway.workspace_root:
             msg = "gateway workspace_root is required"
             raise OpenClawGatewayError(msg)
-        entries: list[tuple[str, str, dict[str, Any], str | None]] = []
+        entries: list[tuple[str, str, dict[str, Any], GatewayModelEntry]] = []
         for agent in agents:
             agent_id = _agent_key(agent)
             workspace_path = _workspace_path(agent, gateway.workspace_root)
             heartbeat = _heartbeat_config(agent)
-            model_id = model_id_for_policy(getattr(agent, "model_policy", None))
+            model_id = _gateway_model_entry(getattr(agent, "model_policy", None))
             entries.append((agent_id, workspace_path, heartbeat, model_id))
         if not entries:
             return

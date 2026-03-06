@@ -496,7 +496,7 @@ When adding a gateway in Mission Control:
 This repository pins specific agent model policies in backend provisioning logic.
 
 - `friday`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
-- `arsenal`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
+- `arsenal`: `codex-cli/gpt-5.4` (`transport=cli`, locked)
 - `edith`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
 - `jocasta`: `anthropic/claude-opus-4-6` (`transport=api`, locked)
 
