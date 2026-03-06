@@ -209,6 +209,12 @@ async def test_control_plane_status_returns_aggregated_runtime_health(
     assert body["capabilities"]["task_mode.notebook_creation"] == "ready"
     assert body["capabilities"]["task_mode.arena"] == "ready"
     assert body["capabilities"]["task_mode.arena_notebook"] == "ready"
+    assert body["expected_agent_models"] == {
+        "friday": "claude-cli/claude-opus-4-6",
+        "arsenal": "codex-cli/gpt-5.4",
+        "edith": "google-gemini-cli/gemini-3-pro-preview",
+        "jocasta": "nvidia/moonshotai/kimi-k2.5",
+    }
 
     await engine.dispose()
 

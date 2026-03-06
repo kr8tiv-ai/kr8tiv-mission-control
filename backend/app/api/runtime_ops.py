@@ -19,6 +19,7 @@ from app.models.boards import Board
 from app.models.gsd_runs import GSDRun
 from app.models.tasks import Task
 from app.services.notebooklm_capability_gate import evaluate_notebooklm_capability
+from app.services.openclaw.model_policy import locked_model_policy_for_name
 from app.services.organizations import OrganizationContext
 from app.services.runtime.disk_guard import DiskGuardService
 from app.services.runtime.verification_harness import run_verification_harness
@@ -128,6 +129,10 @@ class RuntimeControlPlaneStatusRead(SQLModel):
         default_factory=dict,
         description="Flattened capability readiness map for operator dashboards.",
     )
+    expected_agent_models: dict[str, str] = Field(
+        default_factory=dict,
+        description="Canonical locked runtime model ids expected for the four-agent roster.",
+    )
 
 
 def _collect_route_paths(request: Request) -> set[str]:
@@ -169,6 +174,14 @@ def _task_mode_capabilities(
         "task_mode.notebook": "ready" if notebook_ready else "degraded",
         "task_mode.notebook_creation": "ready" if notebook_ready else "degraded",
         "task_mode.arena_notebook": "ready" if arena_healthy and notebook_ready else "degraded",
+    }
+
+
+def _expected_agent_models() -> dict[str, str]:
+    return {
+        name: policy["model"]
+        for name in ("friday", "arsenal", "edith", "jocasta")
+        if (policy := locked_model_policy_for_name(name))
     }
 
 
@@ -346,4 +359,5 @@ async def runtime_control_plane_status(
         ),
         gsd=gsd_status,
         capabilities=capabilities,
+        expected_agent_models=_expected_agent_models(),
     )
