@@ -48,7 +48,7 @@ class NotebookQueryResult:
 
 def _profile_candidates(profile: str) -> tuple[str, ...]:
     if profile == "auto":
-        return ("personal", "enterprise")
+        return ("personal", "enterprise", "default")
     return (profile,)
 
 
@@ -110,7 +110,8 @@ async def _run_command(args: list[str], *, profile: str) -> str:
     cmd_with_profile = [*runner, *args, "--profile", profile]
     cmd_without_profile = [*runner, *args]
     env = dict(os.environ)
-    env["NLM_PROFILES_DIR"] = settings.notebooklm_profiles_root
+    profiles_root = Path(settings.notebooklm_profiles_root)
+    env["NOTEBOOKLM_MCP_CLI_PATH"] = str(profiles_root.parent)
 
     def _invoke() -> str:
         def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:

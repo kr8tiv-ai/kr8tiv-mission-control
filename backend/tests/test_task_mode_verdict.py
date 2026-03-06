@@ -4,8 +4,13 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel
 
+from app.models.gateways import Gateway
+from app.models.organizations import Organization
 from app.services import task_mode_execution
+from app.services.openclaw.gateway_rpc import GatewayConfig
 from app.services.task_mode_execution import _ModeExecutionContext, _extract_verdict
 
 
@@ -223,3 +228,92 @@ async def test_run_agent_turn_accepts_assistant_message_when_latest_entry_is_too
 
     assert display_name == "arsenal"
     assert response == "assistant response"
+
+
+@pytest.mark.asyncio
+async def test_run_agent_turn_uses_agent_specific_gateway_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    org_id = uuid4()
+    agent_gateway_id = uuid4()
+    async with session_maker() as session:
+        session.add(Organization(id=org_id, name="KR8TIV"))
+        session.add(
+            Gateway(
+                id=agent_gateway_id,
+                organization_id=org_id,
+                name="arsenal gateway",
+                url="ws://arsenal.example/ws",
+                workspace_root="/tmp/arsenal",
+            )
+        )
+        await session.commit()
+
+    async def _board_agent(_board_id, _agent_id):
+        return SimpleNamespace(
+            name="arsenal",
+            openclaw_session_id="session-1",
+            gateway_id=agent_gateway_id,
+        )
+
+    async def _send_message(*_args, **kwargs):
+        config = kwargs["config"]
+        assert isinstance(config, GatewayConfig)
+        assert config.url == "ws://arsenal.example/ws"
+        return {"runId": "run-1", "status": "started"}
+
+    async def _wait(*_args, **_kwargs):
+        return {"runId": "run-1", "status": "ok"}
+
+    calls = 0
+
+    async def _history(*_args, **kwargs):
+        nonlocal calls
+        config = kwargs["config"]
+        assert isinstance(config, GatewayConfig)
+        assert config.url == "ws://arsenal.example/ws"
+        calls += 1
+        if calls == 1:
+            return {"messages": [{"role": "user", "content": "baseline"}]}
+        return {
+            "messages": [
+                {"role": "user", "content": "baseline"},
+                {"role": "assistant", "content": "assistant response"},
+            ]
+        }
+
+    async def _no_sleep(_seconds: float):
+        return None
+
+    monkeypatch.setattr(task_mode_execution, "async_session_maker", session_maker)
+    monkeypatch.setattr(task_mode_execution, "_find_board_agent", _board_agent)
+    monkeypatch.setattr("app.services.openclaw.gateway_rpc.send_message", _send_message)
+    monkeypatch.setattr("app.services.openclaw.gateway_rpc.openclaw_call", _wait)
+    monkeypatch.setattr(task_mode_execution, "get_chat_history", _history)
+    monkeypatch.setattr(task_mode_execution.asyncio, "sleep", _no_sleep)
+
+    ctx = _ModeExecutionContext(
+        board=SimpleNamespace(id=uuid4()),
+        task=SimpleNamespace(id=uuid4()),
+        gateway_config=GatewayConfig(url="ws://friday.example/ws"),
+        allowed_agents=("arsenal",),
+        reviewer_agent="arsenal",
+    )
+
+    display_name, response = await task_mode_execution._run_agent_turn(
+        ctx=ctx,
+        agent_id="arsenal",
+        prompt="test prompt",
+        round_number=1,
+        max_rounds=3,
+        is_reviewer=False,
+    )
+
+    assert display_name == "arsenal"
+    assert response == "assistant response"
+    await engine.dispose()

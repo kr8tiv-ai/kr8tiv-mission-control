@@ -20,6 +20,7 @@ from app.db.session import async_session_maker
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.boards import Board
+from app.models.gateways import Gateway
 from app.models.task_iterations import TaskIteration
 from app.models.tasks import Task
 from app.schemas.tasks import ArenaConfig, NotebookSources
@@ -50,6 +51,8 @@ except ModuleNotFoundError:  # pragma: no cover - deployment skew fallback
             checked_at=utcnow(),
             selected_profile=selected_profile,
         )
+
+from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig, get_chat_history
 from app.services.queue import QueuedTask
@@ -273,6 +276,25 @@ def _latest_assistant_signature(history_payload: object) -> str | None:
     return None
 
 
+async def _resolve_gateway_config_for_agent(
+    agent: Agent | SimpleNamespace,
+    *,
+    fallback: GatewayConfig | None,
+) -> GatewayConfig | None:
+    gateway_id = getattr(agent, "gateway_id", None)
+    if gateway_id is None:
+        return fallback
+    async with async_session_maker() as session:
+        statement = select(Gateway).where(col(Gateway.id) == gateway_id)
+        if hasattr(session, "exec"):
+            gateway = (await session.exec(statement)).first()
+        else:  # pragma: no cover - compatibility for plain SQLAlchemy async sessions in tests
+            gateway = (await session.execute(statement)).scalars().first()
+    if gateway is None:
+        return fallback
+    return gateway_client_config(gateway)
+
+
 def _latest_history_role(history_payload: object) -> str | None:
     entries = _history_entries(history_payload)
     if entries and isinstance(entries[-1], dict):
@@ -333,7 +355,11 @@ async def _run_agent_turn(
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing board agent")
     if not board_agent.openclaw_session_id:
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing session")
-    if ctx.gateway_config is None:
+    agent_gateway_config = await _resolve_gateway_config_for_agent(
+        board_agent,
+        fallback=ctx.gateway_config,
+    )
+    if agent_gateway_config is None:
         raise RuntimeError(f"Arena agent '{agent_id}' unavailable: missing gateway configuration")
     from app.services.openclaw.gateway_rpc import openclaw_call, send_message
 
@@ -342,7 +368,7 @@ async def _run_agent_turn(
             # Capture baseline history signature before sending.
             history_before = await get_chat_history(
                 board_agent.openclaw_session_id,
-                config=ctx.gateway_config,
+                config=agent_gateway_config,
                 limit=20,
             )
             baseline_assistant_signature = _latest_assistant_signature(history_before)
@@ -350,7 +376,7 @@ async def _run_agent_turn(
             send_result = await send_message(
                 prompt,
                 session_key=board_agent.openclaw_session_id,
-                config=ctx.gateway_config,
+                config=agent_gateway_config,
                 deliver=False,
             )
             run_id = (
@@ -364,7 +390,7 @@ async def _run_agent_turn(
                     wait_result = await openclaw_call(
                         "agent.wait",
                         {"runId": run_id},
-                        config=ctx.gateway_config,
+                        config=agent_gateway_config,
                     )
                     wait_status = (
                         str(wait_result.get("status", "")).strip().lower()
@@ -398,7 +424,7 @@ async def _run_agent_turn(
                 await asyncio.sleep(delay)
                 history = await get_chat_history(
                     board_agent.openclaw_session_id,
-                    config=ctx.gateway_config,
+                    config=agent_gateway_config,
                     limit=20,
                 )
 

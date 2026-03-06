@@ -69,6 +69,37 @@ async def test_run_command_retries_without_profile_when_cli_rejects_option(
 
 
 @pytest.mark.asyncio
+async def test_run_command_sets_cli_storage_root_from_profiles_dir(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen_envs: list[dict[str, str]] = []
+
+    def _fake_run(cmd, **kwargs):
+        _ = cmd
+        seen_envs.append(dict(kwargs["env"]))
+        return subprocess.CompletedProcess(cmd, 0, stdout='{"ok":true}', stderr="")
+
+    monkeypatch.setattr(notebooklm_adapter.settings, "notebooklm_runner_cmd", "nlm")
+    monkeypatch.setattr(
+        notebooklm_adapter.settings,
+        "notebooklm_profiles_root",
+        "/var/lib/notebooklm/profiles",
+    )
+    monkeypatch.setattr(notebooklm_adapter, "subprocess", notebooklm_adapter.subprocess)
+    monkeypatch.setattr(notebooklm_adapter.subprocess, "run", _fake_run)
+
+    output = await notebooklm_adapter._run_command(
+        ["notebook", "query", "nb-3", "hello", "--json"],
+        profile="default",
+    )
+
+    assert output == '{"ok":true}'
+    assert seen_envs
+    assert seen_envs[0]["NOTEBOOKLM_MCP_CLI_PATH"].replace("\\", "/") == "/var/lib/notebooklm"
+    assert "NLM_PROFILES_DIR" not in seen_envs[0]
+
+
+@pytest.mark.asyncio
 async def test_query_notebook_uses_positional_cli_contract_and_parses_nested_answer(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -148,3 +179,27 @@ async def test_query_notebook_raises_when_all_profiles_fail(
             query="hello",
             profile="auto",
         )
+
+
+@pytest.mark.asyncio
+async def test_check_notebook_access_auto_falls_back_to_default_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen_profiles: list[str] = []
+
+    async def _fake_run_command(args: list[str], *, profile: str) -> str:
+        _ = args
+        seen_profiles.append(profile)
+        if profile in {"personal", "enterprise"}:
+            raise NotebookLMError("No such file or directory: /var/lib/notebooklm/profiles")
+        return '{"items":[]}'
+
+    monkeypatch.setattr(notebooklm_adapter, "_run_command", _fake_run_command)
+
+    selected_profile, notebook_count = await notebooklm_adapter.check_notebook_access(
+        profile="auto"
+    )
+
+    assert selected_profile == "default"
+    assert notebook_count == 0
+    assert seen_profiles == ["personal", "enterprise", "default"]
