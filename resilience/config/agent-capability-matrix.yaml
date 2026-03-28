@@ -1,0 +1,35 @@
+agents:
+  - id: arsenal
+    mode: team_mode
+    engine_profile: orchestrator
+  - id: edith
+    mode: team_mode
+    engine_profile: reasoning
+  - id: jocasta
+    mode: team_mode
+    engine_profile: execution
+  - id: ydy8
+    mode: team_mode
+    engine_profile: research
+
+task_types:
+  research:
+    risk_tier: medium
+    capable_agents: [edith, ydy8]
+    fallback_order: [ydy8, jocasta, arsenal]
+  implementation:
+    risk_tier: high
+    capable_agents: [jocasta, edith]
+    fallback_order: [edith, arsenal]
+  operations:
+    risk_tier: critical
+    capable_agents: [arsenal]
+    fallback_order: [edith, jocasta]
+  communications:
+    risk_tier: low
+    capable_agents: [ydy8, arsenal]
+    fallback_order: [arsenal, edith]
+
+individual_mode:
+  default_engine_profile: personal_companion
+  owner_approval_required_risk_tiers: [high, critical]

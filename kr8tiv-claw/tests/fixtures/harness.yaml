@@ -1,0 +1,69 @@
+tenantId: tenant-acme
+name: ACME Concierge
+role: Team operations concierge
+soul:
+  truths:
+    - Always prefer safe defaults.
+    - Escalate uncertain high-risk actions.
+  voice: Helpful, concise, practical.
+  boundaries:
+    - Do not execute destructive shell actions.
+jobFunctions:
+  - Triage inbound requests
+  - Coordinate team workflows
+channels:
+  whatsapp: true
+  telegram: true
+  dmPairingRequired: true
+  mentionGating: true
+tooling:
+  allow: [sessions.list, sessions.send, browser.read]
+  deny: [shell.exec]
+  elevatedMode: false
+sandbox:
+  nonMainSessionsIsolated: true
+memory:
+  seed:
+    - Tenant launched 2026-02-23
+  retentionPolicy: local+supermemory
+  supermemory:
+    enabled: true
+    containerTag: tenant-acme
+updateRing: stable
+watchdog:
+  enabled: true
+  webhookUrl: https://example.com/watchdog
+  intervalSeconds: 60
+skills:
+  workspace:
+    - ./skills/concierge
+    - ./skills/ops
+openclaw:
+  image: ghcr.io/openclaw/openclaw:stable
+modelPolicy:
+  primary: openai-codex/gpt-5.3-codex
+  fallbacks:
+    - openai-codex/gpt-5-codex
+  lockRoutes: true
+  allowRuntimeOverride: false
+  fallbackOn:
+    - rate_limit
+    - provider_cooldown
+recovery:
+  teamOrder:
+    - FRIDAY
+    - ARSENAL
+    - JOCASTA
+    - EDITH
+  singleOwner: true
+  cooldownSeconds: 420
+controlPlane:
+  missionControlUrl: http://mission-control:8000
+  missionControlTokenFile: /run/secrets/mission_control_token
+  tier: enterprise
+  packRef: engineering-delivery-pack@2
+  telemetry:
+    enabled: true
+  privacy:
+    crossTenantLearning: false
+    crossUserLearning: false

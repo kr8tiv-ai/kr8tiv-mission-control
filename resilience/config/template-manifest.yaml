@@ -1,0 +1,5 @@
+templates:
+  - source: ../team-setup-and-organization/docker-templates/agent-template.yml
+    target: templates/runtime/agent-template.yml
+  - source: ../team-setup-and-organization/docker-templates/mission-control.yml
+    target: templates/runtime/mission-control.yml

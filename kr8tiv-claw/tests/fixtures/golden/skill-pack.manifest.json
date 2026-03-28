@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "installRoot": "<workspace>/skills",
+  "installMode": "copy",
+  "skills": [
+    {
+      "source": "./skills/concierge",
+      "destination": "<workspace>/skills/concierge"
+    },
+    {
+      "source": "./skills/ops",
+      "destination": "<workspace>/skills/ops"
+    }
+  ]
+}

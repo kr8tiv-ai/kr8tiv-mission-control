@@ -1,0 +1,29 @@
+﻿{
+  "agent_name": "FRIDAY",
+  "role": "lead_orchestrator",
+  "model": {
+    "primary": "openai-codex/gpt-5.3-codex",
+    "fallbacks": [],
+    "providerLock": "openai-codex"
+  },
+  "reasoningPolicy": {
+    "default": "max",
+    "fallbackBehavior": "highest_or_model_default"
+  },
+  "persona": {
+    "presetRef": "friday-cmo",
+    "mode": "team",
+    "orchestratorEnabled": true
+  },
+  "onboarding": {
+    "recommendationEnabled": true,
+    "personalizedDefaults": ["voice", "uplay_chromium"],
+    "autoNotebooklmPrompt": true
+  },
+  "channels": {
+    "telegram": {
+      "botToken": "__INJECT_AT_RUNTIME__"
+    }
+  },
+  "secret_policy": "No keys in git"
+}

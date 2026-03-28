@@ -1,0 +1,86 @@
+{
+  "tenantId": "tenant-acme",
+  "updateRing": "stable",
+  "security": {
+    "pairing": true,
+    "mentionGating": true,
+    "sandboxNonMainSessions": true,
+    "toolAllowList": [
+      "sessions.list",
+      "sessions.send",
+      "browser.read"
+    ],
+    "toolDenyList": [
+      "shell.exec"
+    ],
+    "elevatedMode": false
+  },
+  "channels": {
+    "whatsapp": true,
+    "telegram": true
+  },
+  "memory": {
+    "retentionPolicy": "local+supermemory",
+    "supermemory": {
+      "enabled": true,
+      "containerTag": "tenant-acme"
+    }
+  },
+  "modelPolicy": {
+    "primary": "openai-codex/gpt-5.3-codex",
+    "fallbacks": [
+      "openai-codex/gpt-5-codex"
+    ],
+    "lockRoutes": true,
+    "allowRuntimeOverride": false,
+    "fallbackOn": [
+      "rate_limit",
+      "provider_cooldown"
+    ]
+  },
+  "reasoningPolicy": {
+    "default": "max",
+    "fallbackBehavior": "highest_or_model_default"
+  },
+  "persona": {
+    "presetRef": "default-team",
+    "mode": "team",
+    "orchestratorEnabled": true
+  },
+  "onboarding": {
+    "recommendationEnabled": true,
+    "personalizedDefaults": [
+      "voice",
+      "uplay_chromium"
+    ],
+    "autoNotebooklmPrompt": true
+  },
+  "recovery": {
+    "teamOrder": [
+      "FRIDAY",
+      "ARSENAL",
+      "JOCASTA",
+      "EDITH"
+    ],
+    "singleOwner": true,
+    "cooldownSeconds": 420
+  },
+  "controlPlane": {
+    "missionControlManaged": true,
+    "allowSelfMutation": false,
+    "missionControlUrl": "http://mission-control:8000",
+    "missionControlTokenFile": "/run/secrets/mission_control_token",
+    "tier": "enterprise",
+    "packRef": "engineering-delivery-pack@2",
+    "telemetry": {
+      "enabled": true
+    },
+    "privacy": {
+      "crossTenantLearning": false,
+      "crossUserLearning": false
+    }
+  },
+  "distribution": {
+    "generatedBy": "kr8tiv-claw-harness-compiler"
+  }
+}

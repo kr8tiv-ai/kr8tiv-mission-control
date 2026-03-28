@@ -1,0 +1,29 @@
+﻿{
+  "agent_name": "JOCASTA",
+  "role": "knowledge_and_context_engineering",
+  "model": {
+    "primary": "nvidia/moonshotai/kimi-k2.5",
+    "fallbacks": [],
+    "providerLock": "nvidia"
+  },
+  "reasoningPolicy": {
+    "default": "max",
+    "fallbackBehavior": "highest_or_model_default"
+  },
+  "persona": {
+    "presetRef": "jocasta-knowledge",
+    "mode": "team",
+    "orchestratorEnabled": true
+  },
+  "onboarding": {
+    "recommendationEnabled": true,
+    "personalizedDefaults": ["voice", "uplay_chromium"],
+    "autoNotebooklmPrompt": true
+  },
+  "channels": {
+    "telegram": {
+      "botToken": "__INJECT_AT_RUNTIME__"
+    }
+  },
+  "secret_policy": "No keys in git"
+}

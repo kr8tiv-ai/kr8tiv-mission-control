@@ -1,0 +1,14 @@
+openclaw:
+  recovery_window_seconds: 120
+  watchdog_interval_seconds: 30
+  unhealthy_threshold: 2
+  escalation_order:
+    - restart_container
+    - restart_project
+    - alert_operator
+
+containers:
+  - openclaw-arsenal
+  - openclaw-edith
+  - openclaw-jocasta
+  - openclaw-ydy8-openclaw-1

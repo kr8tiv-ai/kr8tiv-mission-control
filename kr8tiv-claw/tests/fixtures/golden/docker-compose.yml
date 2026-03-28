@@ -1,0 +1,52 @@
+version: "3.9"
+services:
+  openclaw-gateway:
+    image: ghcr.io/openclaw/openclaw:stable
+    container_name: openclaw-tenant-acme
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENCLAW_WORKSPACE: /workspace
+      MISSION_CONTROL_URL: http://mission-control:8000
+      MISSION_CONTROL_TOKEN_FILE: /run/secrets/mission_control_token
+      MISSION_CONTROL_TIER: enterprise
+      MISSION_CONTROL_PACK_REF: engineering-delivery-pack@2
+      MISSION_CONTROL_TELEMETRY_ENABLED: "true"
+      MISSION_CONTROL_CROSS_TENANT_LEARNING: "false"
+      MISSION_CONTROL_CROSS_USER_LEARNING: "false"
+    volumes:
+      - tenant-tenant-acme-state:/state
+      - tenant-tenant-acme-workspace:/workspace
+      - ${MISSION_CONTROL_TOKEN_HOST_PATH:-./secrets/mission_control_token}:/run/secrets/mission_control_token:ro
+    healthcheck:
+      test: ["CMD-SHELL", "node dist/index.js health --token $OPENCLAW_GATEWAY_TOKEN"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+  agent-watchdog:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      WATCHDOG_WEBHOOK_URL: https://example.com/watchdog
+      WATCHDOG_INTERVAL_SECONDS: "60"
+      TENANT_ID: tenant-acme
+    command: >-
+      sh -c 'while true; do
+        ts=$(date -u +%FT%TZ);
+        payload=$(printf "{\"tenantId\":\"%s\",\"timestamp\":\"%s\",\"status\":\"alive\"}" "$TENANT_ID" "$ts");
+        curl -fsS -X POST "$WATCHDOG_WEBHOOK_URL" -H "content-type: application/json" -d "$payload" || true;
+        sleep "$WATCHDOG_INTERVAL_SECONDS";
+      done'
+    depends_on:
+      openclaw-gateway:
+        condition: service_healthy
+
+
+volumes:
+  tenant-tenant-acme-state:
+  tenant-tenant-acme-workspace:

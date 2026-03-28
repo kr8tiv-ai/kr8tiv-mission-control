@@ -1,0 +1,21 @@
+{
+  "gateway": {
+    "auth": "__INJECT_AT_RUNTIME__"
+  },
+  "channels": {
+    "telegram": {
+      "accounts": {
+        "default": {
+          "botToken": "__INJECT_AT_RUNTIME__"
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openai-codex/gpt-5.3-codex"
+      }
+    }
+  }
+}

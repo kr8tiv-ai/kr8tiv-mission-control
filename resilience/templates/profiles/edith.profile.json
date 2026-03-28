@@ -1,0 +1,31 @@
+﻿{
+  "agent_name": "EDITH",
+  "role": "execution_and_ops_intelligence",
+  "model": {
+    "primary": "google-gemini-cli/gemini-3.1-pro",
+    "fallbacks": [
+      "google-gemini-cli/gemini-3.1-flash"
+    ],
+    "providerLock": "google-gemini-cli"
+  },
+  "reasoningPolicy": {
+    "default": "max",
+    "fallbackBehavior": "highest_or_model_default"
+  },
+  "persona": {
+    "presetRef": "edith-ops",
+    "mode": "team",
+    "orchestratorEnabled": true
+  },
+  "onboarding": {
+    "recommendationEnabled": true,
+    "personalizedDefaults": ["voice", "uplay_chromium"],
+    "autoNotebooklmPrompt": true
+  },
+  "channels": {
+    "telegram": {
+      "botToken": "__INJECT_AT_RUNTIME__"
+    }
+  },
+  "secret_policy": "No keys in git"
+}

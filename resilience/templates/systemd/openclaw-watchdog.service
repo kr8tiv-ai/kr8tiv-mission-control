@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw watchdog remediation loop
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/openclaw
+Environment=OPENCLAW_PROJECT_NAME=kr8tiv-mission-control
+ExecStart=/bin/bash /opt/openclaw/scripts/watchdog_openclaw.sh
+

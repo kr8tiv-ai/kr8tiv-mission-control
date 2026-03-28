@@ -1,0 +1,85 @@
+﻿version: '3.8'
+
+# Template for OpenClaw AI Agent Containers
+# Copy this file and customize for each agent.
+# Keep this file public-safe: no literal secrets.
+
+services:
+  agent:
+    image: ghcr.io/hostinger/hvps-openclaw:latest
+    container_name: openclaw-{AGENT_NAME} # Replace: friday, arsenal, edith, jocasta
+    restart: unless-stopped
+
+    environment:
+      # Agent identity
+      AGENT_ROLE: ${AGENT_ROLE}
+      AGENT_NAME: ${AGENT_NAME}
+
+      # Model policy (lock routes, no runtime drift)
+      MODEL_PRIMARY: ${MODEL_PRIMARY}
+      MODEL_FALLBACKS: ${MODEL_FALLBACKS:-}
+      MODEL_LOCK_ROUTES: ${MODEL_LOCK_ROUTES:-true}
+      MODEL_ALLOW_RUNTIME_OVERRIDE: ${MODEL_ALLOW_RUNTIME_OVERRIDE:-false}
+      PROVIDER_AFFINITY: ${PROVIDER_AFFINITY}
+
+      # Communication
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+
+      # Secrets via files only
+      OPENCLAW_GATEWAY_TOKEN_FILE: /run/secrets/openclaw_gateway_token
+      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      GEMINI_API_KEY_FILE: /run/secrets/gemini_api_key
+      NVIDIA_API_KEY_FILE: /run/secrets/nvidia_api_key
+      SUPERMEMORY_API_KEY_FILE: /run/secrets/supermemory_api_key
+      SUPERMEMORY_CONTAINER: ${SUPERMEMORY_CONTAINER}
+
+    secrets:
+      - openclaw_gateway_token
+      - telegram_bot_token
+      - openai_api_key
+      - gemini_api_key
+      - nvidia_api_key
+      - supermemory_api_key
+
+    volumes:
+      - ./data:/data
+      - ./workspace:/workspace
+
+    ports:
+      - "${PORT}:48650" # Customize port per agent
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:48650/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - agent-network
+
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+networks:
+  agent-network:
+    driver: bridge
+
+secrets:
+  openclaw_gateway_token:
+    file: ./secrets/openclaw_gateway_token.txt
+  telegram_bot_token:
+    file: ./secrets/telegram_bot_token.txt
+  openai_api_key:
+    file: ./secrets/openai_api_key.txt
+  gemini_api_key:
+    file: ./secrets/gemini_api_key.txt
+  nvidia_api_key:
+    file: ./secrets/nvidia_api_key.txt
+  supermemory_api_key:
+    file: ./secrets/supermemory_api_key.txt

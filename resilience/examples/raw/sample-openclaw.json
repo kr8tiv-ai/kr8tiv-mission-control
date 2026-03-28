@@ -1,0 +1,23 @@
+﻿{
+  "gateway": {
+    "auth": {
+      "token": "sample-should-be-redacted"
+    }
+  },
+  "channels": {
+    "telegram": {
+      "accounts": {
+        "default": {
+          "botToken": "123456:fake-token"
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openai-codex/gpt-5.3-codex"
+      }
+    }
+  }
+}

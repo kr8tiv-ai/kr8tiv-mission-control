@@ -1,0 +1,11 @@
+[Unit]
+Description=Run OpenClaw watchdog every 30 seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+Unit=openclaw-watchdog.service
+
+[Install]
+WantedBy=timers.target
+

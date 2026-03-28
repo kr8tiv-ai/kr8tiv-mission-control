@@ -1,0 +1,35 @@
+﻿version: 1
+updated_by: kr8tiv-team-execution-resilience
+
+agents:
+  friday:
+    primary: openai-codex/gpt-5.3-codex
+    fallback: []
+
+  arsenal:
+    primary: openai-codex/gpt-5.3-codex
+    fallback: []
+
+  jocasta:
+    primary: nvidia/moonshotai/kimi-k2.5
+    fallback: []
+
+  edith:
+    primary: google-gemini-cli/gemini-3.1-pro
+    fallback:
+      - google-gemini-cli/gemini-3.1-flash
+
+policy:
+  lock_model_routes: true
+  allow_runtime_override: false
+  require_mission_control_approval_for_route_changes: true
+  strict_provider_affinity:
+    friday: openai-codex
+    arsenal: openai-codex
+    jocasta: nvidia
+    edith: google-gemini-cli
+  fallback_on:
+    - rate_limit
+    - provider_cooldown
+    - billing_disabled
+    - auth_profile_unavailable
